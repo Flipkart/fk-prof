@@ -1,0 +1,10 @@
+{
+  "start": "2017-01-17",
+  "end": "2017-01-18",
+  "traces": [{
+    "name": "trace-name",
+    "props": {
+      "samples": 1000
+    }
+  }]
+}
