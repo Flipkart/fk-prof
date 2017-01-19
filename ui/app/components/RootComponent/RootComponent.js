@@ -3,6 +3,7 @@ import { withRouter } from 'react-router';
 
 import Header from 'components/HeaderComponent';
 import AppIdSelector from 'components/AppIdSelectorComponent';
+import ClusterSelect from 'components/ClusterSelectComponent';
 
 import 'components/RootComponent/RootComponent.css';
 
@@ -19,9 +20,10 @@ const BaseComponent = Komponent => class extends Component {
 const RootComponent = props => {
   const updateQueryParams = ({ pathname = '/', query }) => props.router.push({ pathname, query });
   const updateAppIdQueryParam = o => updateQueryParams({ query: { appId: o.name } });
+  const updateClusterQueryParam = o => updateQueryParams({ query: { cluster: o.name } });
 
   const selectedAppId = props.location.query.appId;
-  const selectedClusterId = props.location.query.clusterId;
+  const selectedCluster = props.location.query.cluster;
 
   return (
     <div>
@@ -36,7 +38,13 @@ const RootComponent = props => {
               />
             </div>
             <div className="mdl-cell mdl-cell--3-col">
-              {selectedAppId && <h3>Cluster Id here</h3>}
+              {selectedAppId && (
+                <ClusterSelect
+                  app={selectedAppId}
+                  onChange={updateClusterQueryParam}
+                  value={selectedCluster}
+                />
+              )}
             </div>
             <div className="mdl-cell mdl-cell--3-col">
               

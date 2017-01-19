@@ -1,6 +1,5 @@
 import React from 'react';
 import { connect } from 'react-redux';
-import { withRouter } from 'react-router';
 import Select from 'react-select';
 
 import fetchAppIdsAction from 'actions/AppIdActions';
@@ -19,6 +18,7 @@ const AppIdSelectorComponent = props => {
     <div>
       <label className={styles.label} htmlFor="appid">App ID</label>
       <Select
+        clearable={false}
         id="appid"
         options={options}
         value={valueOption}
@@ -39,5 +39,5 @@ const mapDispatchToProps = dispatch => ({
   getAppIds: prefix => dispatch(fetchAppIdsAction(prefix)),
 });
 
-export default connect(mapStateToProps, mapDispatchToProps)(withRouter(AppIdSelectorComponent));
+export default connect(mapStateToProps, mapDispatchToProps)(AppIdSelectorComponent);
 
