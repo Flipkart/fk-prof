@@ -19,13 +19,13 @@ export function getProcIdsFailureAction (error) {
 
 export function fetchProcIdsAction ({ appId, clusterId, query }) {
   return (dispatch) => {
-    dispatch(getProcIdsRequestAction());
+    dispatch(getProcIdsRequestAction({ req: clusterId }));
     const queryParams = objectToQueryParams(query);
     const baseUrl = `/apps${appId}/${clusterId}`;
     const url = queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
     return fetch(url)
       .then(response => response.json())
-      .then(json => dispatch(getProcIdsSuccessAction(json)))
+      .then(json => dispatch(getProcIdsSuccessAction({ req: json, res: clusterId })))
       .catch(err => dispatch(getProcIdsFailureAction(err)));
   };
 }
