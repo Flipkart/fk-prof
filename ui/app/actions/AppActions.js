@@ -3,20 +3,20 @@ import fetch from 'isomorphic-fetch';
 import mockAppIds from '../../api-mocks/apps.json';
 import { objectToQueryParams } from 'utils/UrlUtils';
 
-export const GET_APP_IDS_REQUEST = 'GET_APP_IDS_REQUEST';
-export const GET_APP_IDS_SUCCESS = 'GET_APP_IDS_SUCCESS';
-export const GET_APP_IDS_FAILURE = 'GET_APP_IDS_FAILURE';
+export const GET_APPS_REQUEST = 'GET_APPS_REQUEST';
+export const GET_APPS_SUCCESS = 'GET_APPS_SUCCESS';
+export const GET_APPS_FAILURE = 'GET_APPS_FAILURE';
 
 export function getAppIdsRequestAction () {
-  return { type: GET_APP_IDS_REQUEST };
+  return { type: GET_APPS_REQUEST };
 }
 
 export function getAppIdsSuccessAction (appIds) {
-  return { type: GET_APP_IDS_SUCCESS, data: appIds };
+  return { type: GET_APPS_SUCCESS, data: appIds };
 }
 
 export function getAppIdsFailureAction (error) {
-  return { type: GET_APP_IDS_FAILURE, error };
+  return { type: GET_APPS_FAILURE, error };
 }
 
 export default function fetchAppIdsAction (prefix) {

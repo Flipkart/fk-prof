@@ -1,12 +1,12 @@
 import {
-  GET_PROC_IDS_REQUEST,
-  GET_PROC_IDS_SUCCESS,
-  GET_PROC_IDS_FAILURE,
-} from 'actions/ProcIdActions';
+  GET_PROCS_REQUEST,
+  GET_PROCS_SUCCESS,
+  GET_PROCS_FAILURE,
+} from 'actions/ProcActions';
 
 export default function (state = {}, action) {
   switch (action.type) {
-    case GET_PROC_IDS_REQUEST:
+    case GET_PROCS_REQUEST:
       return {
         ...state,
         [action.req.clusterId]: {
@@ -15,7 +15,7 @@ export default function (state = {}, action) {
         },
       };
 
-    case GET_PROC_IDS_SUCCESS:
+    case GET_PROCS_SUCCESS:
       return {
         ...state,
         [action.req.clusterId]: {
@@ -24,7 +24,7 @@ export default function (state = {}, action) {
         },
       };
 
-    case GET_PROC_IDS_FAILURE:
+    case GET_PROCS_FAILURE:
       return {
         ...state,
         [action.req.clusterId]: {

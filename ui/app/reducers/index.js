@@ -1,11 +1,11 @@
 import { combineReducers } from 'redux';
 
-import appIds from 'reducers/AppIdReducer';
-import clusterIds from 'reducers/ClusterIdReducer';
-import procIds from 'reducers/ProcIdReducer';
+import apps from 'reducers/AppReducer';
+import clusters from 'reducers/ClusterReducer';
+import procs from 'reducers/ProcReducer';
 
 export default combineReducers({
-  appIds,
-  clusterIds,
-  procIds,
+  apps,
+  clusters,
+  procs,
 });

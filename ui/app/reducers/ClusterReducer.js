@@ -1,12 +1,12 @@
 import {
-  GET_CLUSTER_IDS_REQUEST,
-  GET_CLUSTER_IDS_SUCCESS,
-  GET_CLUSTER_IDS_FAILURE,
+  GET_CLUSTERS_REQUEST,
+  GET_CLUSTERS_SUCCESS,
+  GET_CLUSTERS_FAILURE,
 } from 'actions/ClusterActions';
 
 export default function (state = {}, action) {
   switch (action.type) {
-    case GET_CLUSTER_IDS_REQUEST:
+    case GET_CLUSTERS_REQUEST:
       return {
         ...state,
         [action.req.app]: {
@@ -15,7 +15,7 @@ export default function (state = {}, action) {
         },
       };
 
-    case GET_CLUSTER_IDS_SUCCESS:
+    case GET_CLUSTERS_SUCCESS:
       return {
         ...state,
         [action.req.app]: {
@@ -24,7 +24,7 @@ export default function (state = {}, action) {
         },
       };
 
-    case GET_CLUSTER_IDS_FAILURE:
+    case GET_CLUSTERS_FAILURE:
       return {
         ...state,
         [action.req.app]: {

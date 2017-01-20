@@ -24,9 +24,10 @@ class ClusterSelectComponent extends Component {
   }
 
   render () {
-    const { onChange, clusters, selectedCluster } = this.props;
+    const { onChange, clusters } = this.props;
     const clusterList = clusters.asyncStatus === 'SUCCESS'
-      ? clusters.list.map(c => ({ name: c })) : [];
+      ? clusters.data.map(c => ({ name: c })) : [];
+    const valueOption = this.props.value && { name: this.props.value };
     return (
       <div>
         <label className={styles.label} htmlFor="cluster">Select Cluster</label>
@@ -38,7 +39,7 @@ class ClusterSelectComponent extends Component {
           labelKey="name"
           valueKey="name"
           isLoading={clusters.asyncStatus === 'PENDING'}
-          value={selectedCluster}
+          value={valueOption}
           noResultsText={clusters.asyncStatus !== 'PENDING' ? 'No results found!' : 'Searching...'}
           placeholder="Type to search..."
         />
