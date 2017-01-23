@@ -9,7 +9,7 @@ export default function (state = {}, action) {
     case GET_PROCS_REQUEST:
       return {
         ...state,
-        [action.req.clusterId]: {
+        [action.req.cluster]: {
           asyncStatus: 'PENDING',
           data: [],
         },
@@ -18,7 +18,7 @@ export default function (state = {}, action) {
     case GET_PROCS_SUCCESS:
       return {
         ...state,
-        [action.req.clusterId]: {
+        [action.req.cluster]: {
           asyncStatus: 'SUCCESS',
           data: action.res,
         },
@@ -27,7 +27,7 @@ export default function (state = {}, action) {
     case GET_PROCS_FAILURE:
       return {
         ...state,
-        [action.req.clusterId]: {
+        [action.req.cluster]: {
           asyncStatus: 'ERROR',
         },
       };

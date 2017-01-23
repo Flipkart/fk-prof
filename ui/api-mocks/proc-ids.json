@@ -1,15 +1,11 @@
-[{
-  "app-id": "app-default",
-  "cluster-id": "cluster-id-default",
-  "proc-ids": [
-    "proc-id-default",
-    "proc-id-lSBlrO6hqRIK5s",
-    "proc-id-jgQ4rshWQ32CWB",
-    "proc-id-hAiGNXrJ78gRE3",
-    "proc-id-pXcR25ZsUSp5MT",
-    "proc-id-F6EGgp9TyfMupQ",
-    "proc-id-wK0ANCQQrRRGHV",
-    "proc-id-QBPC2usjI5yth3",
-    "proc-id-OPMvbEHvCkq3NE"
-  ]
-}]
+[
+  "proc-id-default",
+  "proc-id-lSBlrO6hqRIK5s",
+  "proc-id-jgQ4rshWQ32CWB",
+  "proc-id-hAiGNXrJ78gRE3",
+  "proc-id-pXcR25ZsUSp5MT",
+  "proc-id-F6EGgp9TyfMupQ",
+  "proc-id-wK0ANCQQrRRGHV",
+  "proc-id-QBPC2usjI5yth3",
+  "proc-id-OPMvbEHvCkq3NE"
+]
