@@ -5,6 +5,7 @@ import Header from 'components/HeaderComponent';
 import AppSelect from 'components/AppSelectComponent';
 import ClusterSelect from 'components/ClusterSelectComponent';
 import ProcSelect from 'components/ProcSelectComponent';
+import TraceList from 'components/TraceListComponent';
 
 import 'components/RootComponent/RootComponent.css';
 
@@ -22,6 +23,7 @@ const RootComponent = props => {
   const selectedApp = props.location.query.app;
   const selectedCluster = props.location.query.cluster;
   const selectedProc = props.location.query.proc;
+  const selectedWorkType = props.location.query.workType;
 
   const updateQueryParams = ({ pathname = '/', query }) => props.router.push({ pathname, query });
   const updateAppQueryParam = o => updateQueryParams({ query: { app: o.name } });
@@ -31,6 +33,9 @@ const RootComponent = props => {
   const updateProcQueryParam = (o) => {
     updateQueryParams({ query: { app: selectedApp, cluster: selectedCluster, proc: o.name } });
   };
+  const updateWorkType = workType => updateQueryParams({
+    query: { ...props.location.query, workType },
+  });
 
   return (
     <div>
@@ -66,6 +71,32 @@ const RootComponent = props => {
             <div className="mdl-cell mdl-cell--3-col">
             </div>
           </div>
+          <div className="mdl-grid">
+            <div className="mdl-cell mdl-cell--12-col">
+              { /* More workTypes to come here */ }
+              <button
+                className="mdl-button mdl-js-button mdl-button--raised mdl-button--accent"
+                onClick={updateWorkType.bind(null, 'cpuSampling')}
+              >
+                CPU Sampling
+              </button>
+            </div>
+          </div>
+
+          {selectedWorkType && (
+            <div className="mdl-grid">
+              <div className="mdl-cell mdl-cell--12-col">
+                <TraceList
+                  app={selectedApp}
+                  cluster={selectedCluster}
+                  proc={selectedProc}
+                  workType={selectedWorkType}
+                  startTime={'Mathan will add here'}
+                />
+              </div>
+            </div>
+          )}
+
           { props.children }
         </div>
       </main>
