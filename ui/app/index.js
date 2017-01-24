@@ -8,6 +8,7 @@ import {
 import { Provider } from 'react-redux';
 
 import 'react-select/dist/react-select.css';
+import 'react-datetime/css/react-datetime.css';
 import 'material-design-lite/material.min';
 import 'material-design-lite/material.css';
 

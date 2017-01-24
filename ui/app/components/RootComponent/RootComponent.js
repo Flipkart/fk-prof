@@ -1,12 +1,13 @@
 import React, { Component } from 'react';
 import { withRouter } from 'react-router';
+import DateTime from 'react-datetime';
 
 import Header from 'components/HeaderComponent';
 import AppSelect from 'components/AppSelectComponent';
 import ClusterSelect from 'components/ClusterSelectComponent';
 import ProcSelect from 'components/ProcSelectComponent';
 
-import 'components/RootComponent/RootComponent.css';
+import styles from 'components/RootComponent/RootComponent.css';
 
 const BaseComponent = Komponent => class extends Component {
   componentDidUpdate () {
@@ -64,6 +65,14 @@ const RootComponent = props => {
               )}
             </div>
             <div className="mdl-cell mdl-cell--3-col">
+              {
+                selectedApp && selectedCluster && selectedProc && (
+                  <div>
+                    <label className={styles['label']} htmlFor="startTime">Select Start time</label>
+                    <DateTime className={styles['date-time']} />
+                  </div>
+                )
+              }
             </div>
           </div>
           { props.children }
