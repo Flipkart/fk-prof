@@ -9,7 +9,7 @@ import styles from './TraceListComponent.css';
 
 class TraceListComponent extends Component {
   componentDidMount () {
-    const { cluster, app, proc, startTime = 'yo', workType } = this.props;
+    const { cluster, app, proc, startTime, workType } = this.props;
     if (cluster && app && proc && startTime && workType) {
       this.props.getTraces({ cluster, app, proc, startTime, workType });
     }

@@ -20,10 +20,11 @@ const BaseComponent = Komponent => class extends Component {
   }
 };
 
-const RootComponent = props => {
+const RootComponent = (props) => {
   const selectedApp = props.location.query.app;
   const selectedCluster = props.location.query.cluster;
   const selectedProc = props.location.query.proc;
+  const startTime = props.location.query.startTime;
   const selectedWorkType = props.location.query.workType;
 
   const updateQueryParams = ({ pathname = '/', query }) => props.router.push({ pathname, query });
@@ -33,6 +34,16 @@ const RootComponent = props => {
   };
   const updateProcQueryParam = (o) => {
     updateQueryParams({ query: { app: selectedApp, cluster: selectedCluster, proc: o.name } });
+  };
+  const updateStartTime = (dateTimeObject) => {
+    updateQueryParams({
+      query: {
+        app: selectedApp,
+        cluster: selectedCluster,
+        proc: selectedProc,
+        startTime: dateTimeObject.toISOString(),
+      },
+    });
   };
   const updateWorkType = workType => updateQueryParams({
     query: { ...props.location.query, workType },
@@ -74,23 +85,32 @@ const RootComponent = props => {
                 selectedApp && selectedCluster && selectedProc && (
                   <div>
                     <label className={styles['label']} htmlFor="startTime">Select Start time</label>
-                    <DateTime className={styles['date-time']} />
+                    <DateTime
+                      className={styles['date-time']}
+                      value={startTime ? new Date(startTime) : ''}
+                      onBlur={updateStartTime}
+                      dateFormat="DD-MM-YYYY"
+                    />
                   </div>
                 )
               }
             </div>
           </div>
-          <div className="mdl-grid">
-            <div className="mdl-cell mdl-cell--12-col">
-              { /* More workTypes to come here */ }
-              <button
-                className="mdl-button mdl-js-button mdl-button--raised mdl-button--accent"
-                onClick={updateWorkType.bind(null, 'cpuSampling')}
-              >
-                CPU Sampling
-              </button>
-            </div>
-          </div>
+          {
+            selectedProc && startTime && (
+              <div className="mdl-grid">
+                <div className="mdl-cell mdl-cell--12-col">
+                  { /* More workTypes to come here */ }
+                  <button
+                    className="mdl-button mdl-js-button mdl-button--raised mdl-button--accent"
+                    onClick={updateWorkType.bind(null, 'cpuSampling')}
+                  >
+                    CPU Sampling
+                  </button>
+                </div>
+              </div>
+            )
+          }
 
           {selectedWorkType && (
             <div className="mdl-grid">
@@ -100,7 +120,7 @@ const RootComponent = props => {
                   cluster={selectedCluster}
                   proc={selectedProc}
                   workType={selectedWorkType}
-                  startTime={'Mathan will add here'}
+                  startTime={startTime}
                 />
               </div>
             </div>
@@ -115,6 +135,7 @@ const RootComponent = props => {
 
 RootComponent.propTypes = {
   children: React.PropTypes.node,
+  location: React.PropTypes.object,
 };
 
 export default BaseComponent(withRouter(RootComponent));
