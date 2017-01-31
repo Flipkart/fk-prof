@@ -53,14 +53,12 @@ class TraceListComponent extends Component {
           <thead>
             <tr>
               <th>Trace Name</th>
-              <th>Samples</th>
             </tr>
           </thead>
           <tbody>
             {traces.data.traces.map(t => (
               <tr>
                 <td>{t.name}</td>
-                <td>{t.props && t.props.samples}</td>
               </tr>
             ))}
           </tbody>
