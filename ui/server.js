@@ -44,6 +44,10 @@ if (isDevelopment) {
   }));
 }
 
+app.get('/stacktrace', (req, res) => {
+  res.sendFile(path.join(__dirname, 'api-mocks/stacktrace.json'), { maxAge: 31536000 });
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/index.html'));
 });
