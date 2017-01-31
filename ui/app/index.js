@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import {
   Route,
   Router,
+  IndexRoute,
   browserHistory,
 } from 'react-router';
 import { Provider } from 'react-redux';
@@ -15,9 +16,14 @@ import 'material-design-lite/material.css';
 import store from './store';
 
 import Root from 'components/RootComponent';
+import App from 'components/AppComponent';
+import CPUSampling from 'components/CPUSamplingComponent';
 
 const routes = (
-  <Route path="/" component={Root} />
+  <Route path="/" component={Root}>
+    <IndexRoute component={App} />
+    <Route path="/work-type/cpu-sampling" component={CPUSampling} />
+  </Route>
 );
 
 ReactDOM.render(
