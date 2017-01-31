@@ -50,19 +50,19 @@ class ProfileListComponent extends Component {
                 <td>{t.end}</td>
                 <td>
                   {
-                    t.values.map(workType =>
+                    t.values.map((workType, i) =>
                       (
-                        <div className={styles['worktype']}>
-                          <Link
-                            to={{
-                              pathname: '/',
-                              query: { app, cluster, proc, startTime, endTime, workType },
-                            }}
-                            htmlFor="Select worktype"
-                          >{workType}
-                          </Link>
-                          <span>,</span>
-                        </div>
+                        <Link
+                          to={{
+                            pathname: '/',
+                            query: { app, cluster, proc, startTime, endTime, workType },
+                          }}
+                          htmlFor="Select worktype"
+                          className={styles.workType}
+                        >
+                          {workType}
+                          {i < (t.values.length - 1) && <span>,</span>}
+                        </Link>
                       ),
                     )
                   }

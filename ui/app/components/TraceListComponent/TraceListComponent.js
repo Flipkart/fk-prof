@@ -37,7 +37,7 @@ class TraceListComponent extends Component {
   }
 
   render () {
-    const { traces } = this.props;
+    const { traces, workType } = this.props;
     if (!traces) return null;
     if (traces.asyncStatus === 'PENDING') {
       return (
@@ -58,7 +58,15 @@ class TraceListComponent extends Component {
           <tbody>
             {traces.data.traces.map(t => (
               <tr>
-                <td>{t.name}</td>
+                <td>
+                  <a
+                    rel="noopener noreferrer"
+                    target="_blank"
+                    href={`/work-type/${workType}`}
+                  >
+                    {t.name}
+                  </a>
+                </td>
               </tr>
             ))}
           </tbody>
