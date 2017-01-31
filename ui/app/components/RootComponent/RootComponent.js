@@ -6,6 +6,7 @@ import Header from 'components/HeaderComponent';
 import AppSelect from 'components/AppSelectComponent';
 import ClusterSelect from 'components/ClusterSelectComponent';
 import ProcSelect from 'components/ProcSelectComponent';
+import ProfileList from 'components/ProfileListComponent';
 import TraceList from 'components/TraceListComponent';
 
 import styles from 'components/RootComponent/RootComponent.css';
@@ -25,7 +26,8 @@ const RootComponent = (props) => {
   const selectedCluster = props.location.query.cluster;
   const selectedProc = props.location.query.proc;
   const startTime = props.location.query.startTime;
-  const selectedWorkType = props.location.query.workType;
+  const endTime = props.location.query.endTime;
+  const workType = props.location.query.workType;
 
   const updateQueryParams = ({ pathname = '/', query }) => props.router.push({ pathname, query });
   const updateAppQueryParam = o => updateQueryParams({ query: { app: o.name } });
@@ -45,9 +47,17 @@ const RootComponent = (props) => {
       },
     });
   };
-  const updateWorkType = workType => updateQueryParams({
-    query: { ...props.location.query, workType },
-  });
+  const updateEndTime = (dateTimeObject) => {
+    updateQueryParams({
+      query: {
+        app: selectedApp,
+        cluster: selectedCluster,
+        proc: selectedProc,
+        startTime,
+        endTime: dateTimeObject.toISOString(),
+      },
+    });
+  };
 
   return (
     <div>
@@ -70,7 +80,7 @@ const RootComponent = (props) => {
                 />
               )}
             </div>
-            <div className="mdl-cell mdl-cell--3-col">
+            <div className="mdl-cell mdl-cell--2-col">
               {selectedApp && selectedCluster && (
                 <ProcSelect
                   app={selectedApp}
@@ -80,52 +90,65 @@ const RootComponent = (props) => {
                 />
               )}
             </div>
-            <div className="mdl-cell mdl-cell--3-col">
-              {
-                selectedApp && selectedCluster && selectedProc && (
+            {
+              selectedApp && selectedCluster && selectedProc && (
+                <div className="mdl-cell mdl-cell--2-col">
                   <div>
                     <label className={styles['label']} htmlFor="startTime">Select Start time</label>
                     <DateTime
                       className={styles['date-time']}
-                      value={startTime ? new Date(startTime) : ''}
+                      defaultValue={startTime ? new Date(startTime) : ''}
                       onBlur={updateStartTime}
                       dateFormat="DD-MM-YYYY"
                     />
                   </div>
-                )
-              }
-            </div>
+                </div>
+              )
+            }
+            {
+              selectedApp && selectedCluster && selectedProc && (
+                <div className="mdl-cell mdl-cell--2-col">
+                  <div>
+                    <label className={styles['label']} htmlFor="endTime">Select End time</label>
+                    <DateTime
+                      className={styles['date-time']}
+                      defaultValue={endTime ? new Date(endTime) : ''}
+                      onBlur={updateEndTime}
+                      dateFormat="DD-MM-YYYY"
+                    />
+                  </div>
+                </div>
+              )
+            }
           </div>
           {
-            selectedProc && startTime && (
+            selectedProc && startTime && endTime && (
               <div className="mdl-grid">
-                <div className="mdl-cell mdl-cell--12-col">
-                  { /* More workTypes to come here */ }
-                  <button
-                    className="mdl-button mdl-js-button mdl-button--raised mdl-button--accent"
-                    onClick={updateWorkType.bind(null, 'cpuSampling')}
-                  >
-                    CPU Sampling
-                  </button>
+                <div className={`mdl-cell mdl-cell--${workType ? '8' : '12'}-col`}>
+                  <ProfileList
+                    app={selectedApp}
+                    cluster={selectedCluster}
+                    proc={selectedProc}
+                    startTime={startTime}
+                    endTime={endTime}
+                  />
                 </div>
+                {
+                  workType && (
+                    <div className="mdl-cell mdl-cell--4-col">
+                      <TraceList
+                        app={selectedApp}
+                        cluster={selectedCluster}
+                        proc={selectedProc}
+                        workType={workType}
+                        startTime={startTime}
+                      />
+                    </div>
+                  )
+                }
               </div>
             )
           }
-
-          {selectedWorkType && (
-            <div className="mdl-grid">
-              <div className="mdl-cell mdl-cell--12-col">
-                <TraceList
-                  app={selectedApp}
-                  cluster={selectedCluster}
-                  proc={selectedProc}
-                  workType={selectedWorkType}
-                  startTime={startTime}
-                />
-              </div>
-            </div>
-          )}
-
           { props.children }
         </div>
       </main>
