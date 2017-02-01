@@ -3,6 +3,7 @@ import { connect } from 'react-redux';
 
 import fetchTracesAction from 'actions/TraceActions';
 import { getUniqueId } from 'reducers/TraceReducer';
+import { objectToQueryParams } from 'utils/UrlUtils';
 import safeTraverse from 'utils/safeTraverse';
 
 import styles from './TraceListComponent.css';
@@ -37,7 +38,8 @@ class TraceListComponent extends Component {
   }
 
   render () {
-    const { traces, workType } = this.props;
+    const { traces, workType, cluster, app, proc } = this.props;
+    const queryParams = { workType, cluster, app, proc};
     if (!traces) return null;
     if (traces.asyncStatus === 'PENDING') {
       return (
@@ -62,7 +64,7 @@ class TraceListComponent extends Component {
                   <a
                     rel="noopener noreferrer"
                     target="_blank"
-                    href={`/work-type/${workType}`}
+                    href={`/work-type/${workType}/${t.name}?${objectToQueryParams(queryParams)}`}
                   >
                     {t.name}
                   </a>

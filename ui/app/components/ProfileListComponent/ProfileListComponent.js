@@ -4,13 +4,11 @@ import { Link } from 'react-router';
 import moment from 'moment';
 
 import { fetchProfilesAction } from 'actions/ProfileActions';
-import { fetchCPUSamplingAction } from 'actions/CPUSamplingActions';
 
 import styles from './ProfileListComponent.css';
 
 class ProfileListComponent extends Component {
   componentDidMount () {
-    this.props.fetchCPUSampling();
     const { app, cluster, proc, startTime, endTime } = this.props;
     const startObject = moment(startTime);
     const endObject = moment(endTime);
@@ -24,6 +22,7 @@ class ProfileListComponent extends Component {
       },
     });
   }
+
   render () {
     const { profiles, app, cluster, proc, startTime, endTime } = this.props;
     if (!profiles) return null;
@@ -87,7 +86,6 @@ ProfileListComponent.propTypes = {
   endTime: PropTypes.string.isRequired,
   fetchProfiles: PropTypes.func.isRequired,
   profiles: PropTypes.object.isRequired,
-  fetchCPUSampling: PropTypes.func,
 };
 
 const mapStateToProps = state => ({
@@ -96,7 +94,6 @@ const mapStateToProps = state => ({
 
 const mapDispatchToProps = dispatch => ({
   fetchProfiles: params => dispatch(fetchProfilesAction(params)),
-  fetchCPUSampling: params => dispatch(fetchCPUSamplingAction(params)),
 });
 
 export default connect(mapStateToProps, mapDispatchToProps)(ProfileListComponent);

@@ -1,0 +1,47 @@
+.label {
+  color: #666;
+}
+
+.bold {
+  font-weight: bold;
+}
+
+.filter {
+  padding: 6px;
+  border: 1px solid #eee;
+  margin-left: 20px;
+  font-size: 0.7em;
+}
+
+.alert {
+  padding: 20px;
+  background: #fff;
+  color: #ef5350;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.card {
+  padding: 4px;
+  box-shadow: rgba(0, 0, 0, 0.117647) 0px 1px 6px, rgba(0, 0, 0, 0.117647) 0px 1px 4px;
+  border-radius: 2px;
+}
+
+.listItem {
+  padding: 4px;
+  &:HOVER {
+    background: #eee;
+  }
+}
+
+.pill {
+  border-radius: 20px;
+  text-align: center;
+  display: inline-block;
+  width: 90px;
+  padding: 1px;
+  background: #ff4081;
+  margin-left: 5px;
+  color: #fff;
+  font-size: 10px;
+}

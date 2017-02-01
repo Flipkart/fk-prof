@@ -1,0 +1,64 @@
+global
+  maxconn 4096
+  pidfile ~/tmp/haproxy-queue.pid
+
+defaults
+  log global
+  log 127.0.0.1 local0
+# log 127.0.0.1 local1 notice
+  log 127.0.0.1 local2
+  mode http
+  timeout connect 300000
+  timeout client 300000
+  timeout server 300000
+  maxconn 2000
+  option redispatch
+  retries 3
+  option httpclose
+  option httplog
+  option forwardfor
+  option httpchk HEAD / HTTP/1.0
+  stats enable
+
+frontend http-farm
+  log global
+  bind *:9999
+  default_backend cosmos-server
+
+  acl dependents-url path_beg /view/ingestion/dependentOn
+  use_backend badger-server if dependents-url
+  
+  acl default_url path / /__webpack_hmr
+  use_backend consumption if default_url
+
+  
+
+  acl ingestion_detail_url path_beg /ingestionInfo
+  use_backend dart-server if ingestion_detail_url
+
+  acl consumption_url path_beg /consumption /report /dashboards /analytics/dashboard/browse /analytics/report/browse /getHydraConfig /ingestion /access
+  use_backend consumption if consumption_url
+
+  acl dataforum_url path_beg /dataforum/
+  use_backend dataforum if dataforum_url
+
+
+backend dataforum
+  balance roundrobin
+  server node1 localhost:4000
+
+backend consumption
+  balance roundrobin
+  server node1 localhost:3000
+
+backend dart-server
+  balance roundrobin
+  server webC 10.33.29.170:28223
+
+backend cosmos-server
+  balance roundrobin
+  server node1 127.0.0.1:28221
+
+backend badger-server
+  balance roundrobin
+  server node1 10.47.2.183:28220

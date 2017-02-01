@@ -16,11 +16,11 @@ export function getCPUSamplingFailureAction ({ error, req }) {
   return { type: GET_CPU_SAMPLING_FAILURE, error, req };
 }
 
-export function fetchCPUSamplingAction () {
+export default function fetchCPUSamplingAction (req) {
   return (dispatch) => {
-    dispatch(getCPUSamplingRequestAction());
+    dispatch(getCPUSamplingRequestAction({ req }));
     const baseUrl = '/stacktrace';
     return http.get(baseUrl)
-      .then(response => dispatch(getCPUSamplingSuccessAction({ res: response })));
+      .then(response => dispatch(getCPUSamplingSuccessAction({ res: response, req })));
   };
 }

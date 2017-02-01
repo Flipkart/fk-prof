@@ -22,7 +22,7 @@ import CPUSampling from 'components/CPUSamplingComponent';
 const routes = (
   <Route path="/" component={Root}>
     <IndexRoute component={App} />
-    <Route path="/work-type/cpu-sampling" component={CPUSampling} />
+    <Route path="/work-type/cpu-sampling/:traceName" component={CPUSampling} />
   </Route>
 );
 

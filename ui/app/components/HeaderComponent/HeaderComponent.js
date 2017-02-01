@@ -8,7 +8,6 @@ const Header = () => (
         <div className="mdl-layout-spacer" />
       </div>
     </header>
-    <div className="mdl-layout__drawer" />
   </div>
   );
 

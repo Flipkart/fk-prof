@@ -15,7 +15,7 @@ const BaseComponent = Komponent => class extends Component {
 const RootComponent = props => (
   <div>
     <Header />
-    <main style={{ paddingTop: 64 }}>
+    <main style={{ paddingTop: 64, position: 'relative', zIndex: 1 }}>
       <div className="page-content">
         { props.children }
       </div>
