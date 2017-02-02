@@ -5,11 +5,32 @@ import { withRouter } from 'react-router';
 
 import fetchCPUSamplingAction from 'actions/CPUSamplingActions';
 import safeTraverse from 'utils/safeTraverse';
+import memoize from 'utils/memoize';
 
 import styles from './CPUSamplingComponent.css';
 import 'react-treeview/react-treeview.css';
 
 const noop = () => {};
+
+const dedupeNodes = (nodes) => {
+  const dedupedNodes = nodes.reduce((prev, curr) => {
+    const newPrev = Object.assign({}, prev);
+    const newCurr = Object.assign({}, curr);
+    if (!newPrev[newCurr.name]) {
+      newPrev[newCurr.name] = newCurr;
+    } else {
+      newPrev[newCurr.name].onStack += newCurr.onStack;
+      newPrev[newCurr.name].onCPU += newCurr.onCPU;
+      newPrev[newCurr.name].parent = [...newPrev[newCurr.name].parent, ...newCurr.parent];
+    }
+    return newPrev;
+  }, {});
+  return Object.keys(dedupedNodes)
+    .map(k => ({ ...dedupedNodes[k], deduped: true }))
+    .sort((a, b) => b.onCPU - a.onCPU);
+};
+
+const memoizedDedupeNodes = memoize(dedupeNodes, a => a.name, true);
 
 export class CPUSamplingComponent extends Component {
   constructor () {
@@ -26,11 +47,14 @@ export class CPUSamplingComponent extends Component {
     this.props.fetchCPUSampling({ app, cluster, proc, workType: 'cpu-sampling', traceName });
   }
 
-  getTree (nodes = []) {
-    return nodes.map((n) => {
+  getTree (nodes = [], pName = '') {
+    const dedupedNodes = memoizedDedupeNodes(...nodes);
+    return dedupedNodes.map((n, i) => {
+      const uniqueId = i + pName.toString() + n.name.toString();
       const newNodes = n.members || n.parent;
       return (
         <TreeView
+          key={uniqueId}
           defaultCollapsed
           nodeLabel={
             <span className={styles.listItem}>
@@ -38,10 +62,10 @@ export class CPUSamplingComponent extends Component {
               <span className={styles.pill}>On CPU: {n.onCPU}</span>
             </span>
           }
-          onClick={newNodes ? this.toggle.bind(this, newNodes, n.name) : noop}
+          onClick={newNodes ? this.toggle.bind(this, newNodes, uniqueId) : noop}
         >
           {
-            this.state[n.name] && newNodes && this.getTree(newNodes)
+            this.state[uniqueId] && newNodes && this.getTree(newNodes, uniqueId)
           }
         </TreeView>
       );
@@ -51,7 +75,7 @@ export class CPUSamplingComponent extends Component {
   toggle (newNodes = [], open) {
     this.setState({
       ...this.state,
-      [open]: true,
+      [open]: !this.state[open],
     });
   }
 
@@ -66,7 +90,6 @@ export class CPUSamplingComponent extends Component {
     const terminalNodes = safeTraverse(this.props, ['tree', 'data', 'terminalNodes']) || [];
     const filteredTerminalNodes = filterText
       ? terminalNodes.filter(n => n.name.indexOf(filterText) > -1) : terminalNodes;
-
     if (this.props.tree.asyncStatus === 'PENDING') {
       return (
         <div className="mdl-progress mdl-js-progress mdl-progress__indeterminate" />

@@ -4,8 +4,6 @@ import {
   GET_CPU_SAMPLING_FAILURE,
 } from 'actions/CPUSamplingActions';
 
-import findIndex from 'utils/findIndex';
-
 function createTree (input, methodLookup, terminalNodes = []) {
   function formTree (index) {
     let current = input[index];
@@ -15,6 +13,7 @@ function createTree (input, methodLookup, terminalNodes = []) {
       name: methodLookup[current[0]],
       onStack: current[3][0],
       onCPU: current[3][1],
+      parent: [],
     };
     if (current.childCount !== 0) {
       for (let i = 0; i < current.childCount; i++) {
@@ -26,27 +25,12 @@ function createTree (input, methodLookup, terminalNodes = []) {
         current.children = [...current.children, returnValue.node];
       }
     }
-    if (current.childCount === 0) {
-      const existingNodeIndex = findIndex(terminalNodes, 'name', current.name);
-      if (existingNodeIndex > -1) {
-        // node really exists
-        const node = terminalNodes[existingNodeIndex];
-        const newNode = {
-          onStack: node.onStack + current.onStack,
-          onCPU: node.onCPU + current.onCPU,
-          name: node.name,
-          members: node.members ? [...node.members, current] : [node, current],
-        };
-        terminalNodes.splice(existingNodeIndex, 1, newNode);
-      } else {
-        terminalNodes.push(current);
-      }
-    }
+    if (current.childCount === 0) terminalNodes.push(current);
     return { index: nextChild, node: current };
   }
   return {
     treeRoot: formTree(0).node,
-    terminalNodes: terminalNodes.sort((a, b) => b.onCPU - a.onCPU).slice(0, 4),
+    terminalNodes: terminalNodes.sort((a, b) => b.onCPU - a.onCPU),
   };
 }
 

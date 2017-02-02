@@ -36,12 +36,13 @@
 
 .pill {
   border-radius: 20px;
+  border: 1px solid #ff4081;
   text-align: center;
   display: inline-block;
   width: 90px;
   padding: 1px;
-  background: #ff4081;
+  font-weight: bold;
   margin-left: 5px;
-  color: #fff;
+  color: #ff4081;
   font-size: 10px;
 }
