@@ -51,7 +51,7 @@ export class CPUSamplingComponent extends Component {
     const dedupedNodes = memoizedDedupeNodes(...nodes);
     return dedupedNodes.map((n, i) => {
       const uniqueId = i + pName.toString() + n.name.toString();
-      const newNodes = n.members || n.parent;
+      const newNodes = n.parent;
       return (
         <TreeView
           key={uniqueId}
@@ -89,10 +89,10 @@ export class CPUSamplingComponent extends Component {
     const { traceName } = this.props.params;
     const terminalNodes = safeTraverse(this.props, ['tree', 'data', 'terminalNodes']) || [];
     const filteredTerminalNodes = filterText
-      ? terminalNodes.filter(n => n.name.indexOf(filterText) > -1) : terminalNodes;
+      ? terminalNodes.filter(n => n.name.match(filterText)) : terminalNodes;
     if (this.props.tree.asyncStatus === 'PENDING') {
       return (
-        <div className="mdl-progress mdl-js-progress mdl-progress__indeterminate" />
+        <h2>Please wait, coming right up!</h2>
       );
     }
 
