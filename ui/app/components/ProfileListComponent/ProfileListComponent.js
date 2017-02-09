@@ -4,33 +4,32 @@ import { Link } from 'react-router';
 import moment from 'moment';
 
 import { fetchProfilesAction } from 'actions/ProfileActions';
+import Loader from 'components/LoaderComponent';
 
 import styles from './ProfileListComponent.css';
 
 class ProfileListComponent extends Component {
   componentDidMount () {
-    const { app, cluster, proc, startTime, endTime } = this.props;
-    const startObject = moment(startTime);
-    const endObject = moment(endTime);
+    const { app, cluster, proc, start, end } = this.props;
+    const startObject = moment(start);
+    const endObject = moment(end);
     this.props.fetchProfiles({
       app,
       cluster,
       proc,
       query: {
-        startTime,
+        start,
         duration: endObject.diff(startObject, 'seconds'),
       },
     });
   }
 
   render () {
-    const { profiles, app, cluster, proc, startTime, endTime } = this.props;
+    const { profiles, app, cluster, proc, start, end } = this.props;
     if (!profiles) return null;
     if (profiles.asyncStatus === 'PENDING') {
       return (
-        <div
-          className="mdl-progress mdl-js-progress mdl-progress__indeterminate"
-        />
+        <Loader />
       );
     }
 
@@ -46,7 +45,7 @@ class ProfileListComponent extends Component {
           </thead>
           <tbody>
             {profiles.data.map(t => (
-              <tr>
+              <tr key={`${t.start}${t.end}`}>
                 <td>{t.start}</td>
                 <td>{t.end}</td>
                 <td>
@@ -54,9 +53,18 @@ class ProfileListComponent extends Component {
                     t.values.map((workType, i) =>
                       (
                         <Link
+                          key={workType}
                           to={{
                             pathname: '/',
-                            query: { app, cluster, proc, startTime, endTime, workType },
+                            query: {
+                              app,
+                              cluster,
+                              proc,
+                              start,
+                              end,
+                              profileStart: t.start,
+                              workType,
+                            },
                           }}
                           htmlFor="Select worktype"
                           className={styles.workType}
@@ -82,8 +90,8 @@ ProfileListComponent.propTypes = {
   app: PropTypes.string.isRequired,
   cluster: PropTypes.string.isRequired,
   proc: PropTypes.string.isRequired,
-  startTime: PropTypes.string.isRequired,
-  endTime: PropTypes.string.isRequired,
+  start: PropTypes.string.isRequired,
+  end: PropTypes.string.isRequired,
   fetchProfiles: PropTypes.func.isRequired,
   profiles: PropTypes.object.isRequired,
 };

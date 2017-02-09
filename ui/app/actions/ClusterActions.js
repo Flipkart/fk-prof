@@ -1,7 +1,5 @@
-import { objectToQueryParams } from 'utils/UrlUtils';
 import http from 'utils/http';
-
-import mockCluster from '../../api-mocks/cluster-ids.json';
+import { objectToQueryParams } from 'utils/UrlUtils';
 
 export const GET_CLUSTERS_REQUEST = 'GET_CLUSTERS_REQUEST';
 export const GET_CLUSTERS_SUCCESS = 'GET_CLUSTERS_SUCCESS';
@@ -23,13 +21,10 @@ export default function fetchClustersAction ({ app, query }) {
   return (dispatch) => {
     dispatch(getClustersRequestAction({ req: { app } }));
     const queryParams = objectToQueryParams(query);
-    const baseUrl = `/apps/${app}`;
+    const baseUrl = `/api/cluster/${app}`;
     const url = queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
-    // return http.get(url)
-    //   .then(response => response.json())
-    return Promise.resolve()
-      .then(() => dispatch(getClustersSuccessAction({ res: mockCluster, req: { app } })))
-      // .then(json => dispatch(getClustersSuccessAction({ res: json, req: app })))
+    return http.get(url)
+      .then(res => dispatch(getClustersSuccessAction({ res, req: { app } })))
       .catch(err => dispatch(getClustersFailureAction({ err, req: { app } })));
   };
 }

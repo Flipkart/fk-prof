@@ -6,6 +6,7 @@ import { withRouter } from 'react-router';
 import fetchCPUSamplingAction from 'actions/CPUSamplingActions';
 import safeTraverse from 'utils/safeTraverse';
 import memoize from 'utils/memoize';
+import Loader from 'components/LoaderComponent';
 
 import styles from './CPUSamplingComponent.css';
 import 'react-treeview/react-treeview.css';
@@ -42,9 +43,16 @@ export class CPUSamplingComponent extends Component {
   }
 
   componentDidMount () {
-    const { app, cluster, proc } = this.props.location.query;
+    const { app, cluster, proc, workType, profileStart } = this.props.location.query;
     const { traceName } = this.props.params;
-    this.props.fetchCPUSampling({ app, cluster, proc, workType: 'cpu-sampling', traceName });
+    this.props.fetchCPUSampling({
+      app,
+      cluster,
+      proc,
+      workType,
+      traceName,
+      query: { start: profileStart },
+    });
   }
 
   getTree (nodes = [], pName = '') {
@@ -92,7 +100,10 @@ export class CPUSamplingComponent extends Component {
       ? terminalNodes.filter(n => n.name.match(filterText)) : terminalNodes;
     if (this.props.tree.asyncStatus === 'PENDING') {
       return (
-        <h2>Please wait, coming right up!</h2>
+        <div>
+          <h4 style={{ textAlign: 'center' }}>Please wait, coming right up!</h4>
+          <Loader />
+        </div>
       );
     }
 

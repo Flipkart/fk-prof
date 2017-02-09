@@ -42,7 +42,7 @@ export default function (state = {}, action) {
       };
 
     case GET_CPU_SAMPLING_SUCCESS: {
-      const { profile: { frame_nodes }, method_lookup } = action.res;
+      const { aggregated_samples: { frame_nodes }, method_lookup } = action.res;
       return {
         asyncStatus: 'SUCCESS',
         data: createTree(frame_nodes, method_lookup),

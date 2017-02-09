@@ -1,7 +1,5 @@
-import fetch from 'isomorphic-fetch';
+import http from 'utils/http';
 import { objectToQueryParams } from 'utils/UrlUtils';
-
-import mockProcs from '../../api-mocks/proc-ids.json';
 
 export const GET_PROCS_REQUEST = 'GET_PROCS_REQUEST';
 export const GET_PROCS_SUCCESS = 'GET_PROCS_SUCCESS';
@@ -23,15 +21,10 @@ export default function fetchProcsAction ({ app, cluster, query }) {
   return (dispatch) => {
     dispatch(getProcsRequestAction({ req: { cluster } }));
     const queryParams = objectToQueryParams(query);
-    const baseUrl = `/apps${app}/${cluster}`;
+    const baseUrl = `/api/proc/${app}/${cluster}`;
     const url = queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
-    // return fetch(url)
-    //   .then(response => response.json())
-    //   .then(json => dispatch(getProcsSuccessAction({ req: json, res: cluster })))
-    //   .catch(err => dispatch(getProcsFailureAction(err)));
-    return Promise.resolve()
-      .then(() => dispatch(getProcsSuccessAction({ res: mockProcs, req: { app, cluster } })))
-      // .then(json => dispatch(getClustersSuccessAction({ res: json, req: app })))
+    return http.get(url)
+      .then(json => dispatch(getProcsSuccessAction({ res: json, req: { app, cluster } })))
       .catch(err => dispatch(getProcsFailureAction({ err, req: { app, cluster } })));
   };
 }

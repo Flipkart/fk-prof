@@ -1,7 +1,5 @@
-import fetch from 'isomorphic-fetch';
+import http from 'utils/http';
 import { objectToQueryParams } from 'utils/UrlUtils';
-
-import mockProfiles from '../../api-mocks/profiles.json';
 
 export const GET_PROFILES_REQUEST = 'GET_PROFILES_REQUEST';
 export const GET_PROFILES_SUCCESS = 'GET_PROFILES_SUCCESS';
@@ -23,11 +21,9 @@ export function fetchProfilesAction ({ app, cluster, proc, query }) {
   return (dispatch) => {
     dispatch(getProfilesRequestAction());
     const queryParams = objectToQueryParams(query);
-    const baseUrl = `/profiles${app}/${cluster}/${proc}`;
+    const baseUrl = `/api/profiles/${app}/${cluster}/${proc}`;
     const url = queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
-    return Promise.resolve(dispatch(getProfilesSuccessAction(mockProfiles)));
-    return fetch(url)
-      .then(response => response.json())
+    return http.get(url)
       .then(json => dispatch(getProfilesSuccessAction(json)))
       .catch(err => dispatch(getProfilesFailureAction(err)));
   };

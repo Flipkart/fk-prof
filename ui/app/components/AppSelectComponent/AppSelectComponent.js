@@ -3,6 +3,7 @@ import { connect } from 'react-redux';
 import Select from 'react-select';
 
 import fetchAppsAction from 'actions/AppActions';
+import debounce from 'utils/debounce';
 import styles from './AppSelectComponent.css';
 
 const noop = () => {};
@@ -25,7 +26,7 @@ const AppSelectComponent = props => {
         onChange={props.onChange || noop}
         labelKey="name"
         valueKey="name"
-        onInputChange={props.getApps}
+        onInputChange={debounce(props.getApps, 500)}
         isLoading={props.apps.asyncStatus === 'PENDING'}
         noResultsText={noResultsText}
         placeholder="Type to search..."

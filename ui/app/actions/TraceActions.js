@@ -1,7 +1,5 @@
-import fetch from 'isomorphic-fetch';
+import http from 'utils/http';
 import { objectToQueryParams } from 'utils/UrlUtils';
-
-import mockTraces from '../../api-mocks/traces.json';
 
 export const GET_TRACES_REQUEST = 'GET_TRACES_REQUEST';
 export const GET_TRACES_SUCCESS = 'GET_TRACES_SUCCESS';
@@ -27,15 +25,11 @@ export default function fetchTracesAction ({ app, cluster, proc, workType, query
       },
     }));
     const queryParams = objectToQueryParams(query);
-    const baseUrl = `/apps${app}/${cluster}/${proc}/${workType}`;
+    const baseUrl = `/api/traces/${app}/${cluster}/${proc}/${workType}`;
     const url = queryParams ? `${baseUrl}?${queryParams}` : baseUrl;
-    // return fetch(url)
-    //   .then(response => response.json())
-    //   .then(json => dispatch(getTracesSuccessAction(json)))
-    //   .catch(err => dispatch(getTracesFailureAction(err)));
-    return Promise.resolve()
-      .then(() => dispatch(getTracesSuccessAction({
-        res: mockTraces,
+    return http.get(url)
+      .then(res => dispatch(getTracesSuccessAction({
+        res,
         req: {
           app, cluster, proc, workType,
         },

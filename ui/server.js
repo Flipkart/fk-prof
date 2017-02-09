@@ -1,5 +1,3 @@
-'use strict'
-
 const express = require('express');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
@@ -10,6 +8,10 @@ const isDevelopment = env !== 'production';
 const port = isDevelopment ? 3001 : process.env.PORT;
 const app = express();
 const publicPath = path.resolve(__dirname, 'public');
+const httpProxy = require('http-proxy');
+
+const proxy = httpProxy.createProxyServer({ target: 'http://localhost:8082' });
+function logProxyError (e) { console.log('Error occured in ', e); }
 
 app.use(cookieParser());
 
@@ -44,8 +46,9 @@ if (isDevelopment) {
   }));
 }
 
-app.get('/stacktrace', (req, res) => {
-  res.sendFile(path.join(__dirname, 'api-mocks/stacktrace.json'), { maxAge: 31536000 });
+app.all('/**api*', (req, res) => {
+  req.url = req.url.replace('/api', '');
+  proxy.web(req, res, logProxyError);
 });
 
 app.get('*', (req, res) => {
