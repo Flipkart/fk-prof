@@ -6,6 +6,7 @@ import { withRouter } from 'react-router';
 import fetchCPUSamplingAction from 'actions/CPUSamplingActions';
 import safeTraverse from 'utils/safeTraverse';
 import memoize from 'utils/memoize';
+import debounce from 'utils/debounce';
 import Loader from 'components/LoaderComponent';
 
 import styles from './CPUSamplingComponent.css';
@@ -40,6 +41,7 @@ export class CPUSamplingComponent extends Component {
     this.getTree = this.getTree.bind(this);
     this.toggle = this.toggle.bind(this);
     this.handleFilterChange = this.handleFilterChange.bind(this);
+    this.debouncedHandleFilterChange = debounce(this.handleFilterChange, 200);
   }
 
   componentDidMount () {
@@ -57,18 +59,20 @@ export class CPUSamplingComponent extends Component {
 
   getTree (nodes = [], pName = '') {
     const dedupedNodes = memoizedDedupeNodes(...nodes);
-    return dedupedNodes.map((n, i) => {
-      const uniqueId = i + pName.toString() + n.name.toString();
+    return dedupedNodes.map((n) => {
+      const uniqueId = pName.toString() + n.name.toString();
       const newNodes = n.parent;
       return (
         <TreeView
+          itemClassName={`${styles.relative} ${styles.hover}`}
           key={uniqueId}
           defaultCollapsed
           nodeLabel={
-            <span className={styles.listItem}>
-              <span className={styles.code}>{n.name}</span>
-              <span className={styles.pill}>On CPU: {n.onCPU}</span>
-            </span>
+            <div className={`${styles.listItem}`}>
+              <div className={styles.code} title={n.name}>{n.name}</div>
+              <div className={`${styles.pill} ${styles.onStack}`}>{n.onStack}</div>
+              <div className={`${styles.pill} ${styles.onCPU}`}>{n.onCPU}</div>
+            </div>
           }
           onClick={newNodes ? this.toggle.bind(this, newNodes, uniqueId) : noop}
         >
@@ -146,10 +150,15 @@ export class CPUSamplingComponent extends Component {
                 type="text"
                 placeholder="Type to filter"
                 autoFocus
-                value={filterText}
-                onChange={this.handleFilterChange}
+                defaultValue={filterText}
+                onChange={this.debouncedHandleFilterChange}
               />
             </h3>
+            <div style={{ width: '100%', position: 'relative', height: 20 }}>
+              <div className={`${styles.code} ${styles.heading}`}>Method name</div>
+              <div className={`${styles.onStack} ${styles.heading}`}>On Stack</div>
+              <div className={`${styles.onCPU} ${styles.heading}`}>On CPU</div>
+            </div>
             {this.getTree(filteredTerminalNodes)}
             {filterText && !filteredTerminalNodes.length && (
               <p className={styles.alert}>Sorry, no results found for your search query!</p>

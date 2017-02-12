@@ -28,21 +28,56 @@
 }
 
 .listItem {
-  padding: 4px;
+  /*position: absolute;
+  width: 98%;
+  padding: 4px;*/
+  display: inline-block;
+  height: 14px;
+  
+}
+
+.hover {
+  padding: 1px;
+  border-bottom: 1px solid rgba(158, 158, 158, 0.28);
   &:HOVER {
     background: #eee;
   }
 }
 
 .pill {
-  border-radius: 20px;
-  border: 1px solid #ff4081;
-  text-align: center;
   display: inline-block;
   width: 90px;
-  padding: 1px;
   font-weight: bold;
-  margin-left: 5px;
   color: #ff4081;
-  font-size: 10px;
+}
+
+.onStack {
+  position: absolute;
+  text-align: right;
+  right: 100px;
+  width: 80px;
+}
+
+.onCPU {
+  position: absolute;
+  text-align: right;
+  right: 0px;
+  width: 80px;
+}
+
+.relative {
+  position: relative;
+}
+
+.code {
+  position: absolute;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  left: 14px;
+  white-space: nowrap;
+  right: 200px;
+}
+
+.heading {
+  font-weight: bold;
 }

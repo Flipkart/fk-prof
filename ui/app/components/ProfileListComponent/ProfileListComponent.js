@@ -46,8 +46,8 @@ class ProfileListComponent extends Component {
           <tbody>
             {profiles.data.map(t => (
               <tr key={`${t.start}${t.end}`}>
-                <td>{t.start}</td>
-                <td>{t.end}</td>
+                <td>{moment(t.start).format('Do MMM YYYY, h:mm:ss a')}</td>
+                <td>{moment(t.end).format('Do MMM YYYY, h:mm:ss a')}</td>
                 <td>
                   {
                     t.values.map((workType, i) =>
