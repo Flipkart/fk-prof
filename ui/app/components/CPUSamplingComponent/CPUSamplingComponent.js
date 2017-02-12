@@ -66,7 +66,7 @@ export class CPUSamplingComponent extends Component {
         <TreeView
           itemClassName={`${styles.relative} ${styles.hover}`}
           key={uniqueId}
-          defaultCollapsed
+          defaultCollapsed={!(this.state[uniqueId] && newNodes)}
           nodeLabel={
             <div className={`${styles.listItem}`}>
               <div className={styles.code} title={n.name}>{n.name}</div>
@@ -85,10 +85,7 @@ export class CPUSamplingComponent extends Component {
   }
 
   toggle (newNodes = [], open) {
-    this.setState({
-      ...this.state,
-      [open]: !this.state[open],
-    });
+    this.setState({ [open]: !this.state[open] });
   }
 
   handleFilterChange (e) {
