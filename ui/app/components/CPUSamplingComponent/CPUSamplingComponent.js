@@ -12,10 +12,16 @@ import Loader from 'components/LoaderComponent';
 import styles from './CPUSamplingComponent.css';
 import 'react-treeview/react-treeview.css';
 
+let allNodes;
+let methodLookup;
 const noop = () => {};
+const nameFilterFunction = filterText => n => methodLookup[n.name].match(filterText);
 
 const dedupeNodes = (nodes) => {
   const dedupedNodes = nodes.reduce((prev, curr) => {
+    if (typeof curr === 'number') {
+      curr = allNodes[curr];
+    }
     const newPrev = Object.assign({}, prev);
     const newCurr = Object.assign({}, curr);
     if (!newPrev[newCurr.name]) {
@@ -31,8 +37,8 @@ const dedupeNodes = (nodes) => {
     .map(k => ({ ...dedupedNodes[k], deduped: true }))
     .sort((a, b) => b.onCPU - a.onCPU);
 };
-
-const memoizedDedupeNodes = memoize(dedupeNodes, a => a.name, true);
+const stringifierFunction = a => typeof a === 'number' ? a : a.name;
+const memoizedDedupeNodes = memoize(dedupeNodes, stringifierFunction, true);
 
 export class CPUSamplingComponent extends Component {
   constructor () {
@@ -41,7 +47,7 @@ export class CPUSamplingComponent extends Component {
     this.getTree = this.getTree.bind(this);
     this.toggle = this.toggle.bind(this);
     this.handleFilterChange = this.handleFilterChange.bind(this);
-    this.debouncedHandleFilterChange = debounce(this.handleFilterChange, 200);
+    this.debouncedHandleFilterChange = debounce(this.handleFilterChange, 250);
   }
 
   componentDidMount () {
@@ -62,6 +68,7 @@ export class CPUSamplingComponent extends Component {
     return dedupedNodes.map((n) => {
       const uniqueId = pName.toString() + n.name.toString();
       const newNodes = n.parent;
+      const displayName = this.props.tree.data.methodLookup[n.name];
       return (
         <TreeView
           itemClassName={`${styles.relative} ${styles.hover}`}
@@ -69,7 +76,7 @@ export class CPUSamplingComponent extends Component {
           defaultCollapsed={!(this.state[uniqueId] && newNodes)}
           nodeLabel={
             <div className={`${styles.listItem}`}>
-              <div className={styles.code} title={n.name}>{n.name}</div>
+              <div className={styles.code} title={uniqueId}>{displayName}</div>
               <div className={`${styles.pill} ${styles.onStack}`}>{n.onStack}</div>
               <div className={`${styles.pill} ${styles.onCPU}`}>{n.onCPU}</div>
             </div>
@@ -82,6 +89,13 @@ export class CPUSamplingComponent extends Component {
         </TreeView>
       );
     });
+  }
+
+  componentWillReceiveProps (nextProps) {
+    if (nextProps.tree.asyncStatus === 'SUCCESS') {
+      allNodes = safeTraverse(nextProps, ['tree', 'data', 'allNodes']);
+      methodLookup = safeTraverse(nextProps, ['tree', 'data', 'methodLookup']);
+    }
   }
 
   toggle (newNodes = [], open) {
@@ -98,7 +112,7 @@ export class CPUSamplingComponent extends Component {
     const { traceName } = this.props.params;
     const terminalNodes = safeTraverse(this.props, ['tree', 'data', 'terminalNodes']) || [];
     const filteredTerminalNodes = filterText
-      ? terminalNodes.filter(n => n.name.match(filterText)) : terminalNodes;
+      ? terminalNodes.filter(nameFilterFunction(filterText)) : terminalNodes;
     if (this.props.tree.asyncStatus === 'PENDING') {
       return (
         <div>
@@ -151,12 +165,16 @@ export class CPUSamplingComponent extends Component {
                 onChange={this.debouncedHandleFilterChange}
               />
             </h3>
-            <div style={{ width: '100%', position: 'relative', height: 20 }}>
-              <div className={`${styles.code} ${styles.heading}`}>Method name</div>
-              <div className={`${styles.onStack} ${styles.heading}`}>On Stack</div>
-              <div className={`${styles.onCPU} ${styles.heading}`}>On CPU</div>
-            </div>
-            {this.getTree(filteredTerminalNodes)}
+            {!!filteredTerminalNodes.length && (
+              <div>
+                <div style={{ width: '100%', position: 'relative', height: 20 }}>
+                  <div className={`${styles.code} ${styles.heading}`}>Method name</div>
+                  <div className={`${styles.onStack} ${styles.heading}`}>On Stack</div>
+                  <div className={`${styles.onCPU} ${styles.heading}`}>On CPU</div>
+                </div>
+                {this.getTree(filteredTerminalNodes)}
+              </div>
+            )}
             {filterText && !filteredTerminalNodes.length && (
               <p className={styles.alert}>Sorry, no results found for your search query!</p>
             )}
