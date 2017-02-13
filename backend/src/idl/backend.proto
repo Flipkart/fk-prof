@@ -1,0 +1,8 @@
+syntax = "proto2";
+option java_package = "fk.prof.backend.proto";
+option java_outer_classname = "BackendDTO";
+
+message LoadReportRequest {
+    required string ip = 1;
+    required float load = 2;
+}
