@@ -5,31 +5,36 @@ import {
 } from 'actions/CPUSamplingActions';
 
 function createTree (input, methodLookup, terminalNodes = []) {
+  const allNodes = [];
   function formTree (index) {
-    let current = input[index];
-    let nextChild = index;
-    current = {
-      childCount: current[1],
-      name: methodLookup[current[0]],
-      onStack: current[3][0],
-      onCPU: current[3][1],
+    let currentNode = input[index];
+    if (!currentNode) return;
+    currentNode = {
+      childCount: currentNode[1],
+      name: currentNode[0],
+      onStack: currentNode[3][0],
+      onCPU: currentNode[3][1],
       parent: [],
     };
-    if (current.childCount !== 0) {
-      for (let i = 0; i < current.childCount; i++) {
-        if (!current.children) current = { ...current, children: [] };
-        if (nextChild === input.length - 1) break;
-        const returnValue = formTree(nextChild + 1);
-        returnValue.node && (returnValue.node.parent = [current]);
-        nextChild = returnValue.index;
-        current.children = [...current.children, returnValue.node];
+    const currentNodeIndex = allNodes.push(currentNode) - 1;
+    if (currentNode.childCount !== 0) {
+      for (let i = 0; i < currentNode.childCount; i++) {
+        if (!currentNode.children) currentNode.children = [];
+        if (currentNodeIndex === input.length - 1) break;
+        const returnValue = formTree(currentNodeIndex + 1);
+        if (returnValue && returnValue.index) {
+          allNodes[returnValue.index].parent.push(currentNodeIndex);
+          currentNode.children.push(returnValue.index);
+        }
       }
     }
-    if (current.childCount === 0) terminalNodes.push(current);
-    return { index: nextChild, node: current };
+    if (currentNode.onCPU > 0) terminalNodes.push(currentNode);
+    return { index: currentNodeIndex };
   }
   return {
     treeRoot: formTree(0).node,
+    allNodes,
+    methodLookup,
     terminalNodes: terminalNodes.sort((a, b) => b.onCPU - a.onCPU),
   };
 }
