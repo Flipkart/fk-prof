@@ -54,15 +54,15 @@
 .onStack {
   position: absolute;
   text-align: right;
-  right: 100px;
-  width: 80px;
+  right: 110px;
+  width: 100px;
 }
 
 .onCPU {
   position: absolute;
   text-align: right;
   right: 0px;
-  width: 80px;
+  width: 100px;
 }
 
 .relative {
