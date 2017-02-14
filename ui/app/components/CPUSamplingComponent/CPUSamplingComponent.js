@@ -18,12 +18,18 @@ const noop = () => {};
 const nameFilterFunction = filterText => n => methodLookup[n.name].match(filterText);
 
 const dedupeNodes = (nodes) => {
+  let onStackSum = 0;
+  let onCPUSum = 0;
   const dedupedNodes = nodes.reduce((prev, curr) => {
+    let currIndex;
     if (typeof curr === 'number') {
+      currIndex = curr;
       curr = allNodes[curr];
     }
     const newPrev = Object.assign({}, prev);
     const newCurr = Object.assign({}, curr);
+    onStackSum += newCurr.onStack;
+    onCPUSum += newCurr.onCPU;
     if (!newPrev[newCurr.name]) {
       newPrev[newCurr.name] = newCurr;
     } else {
@@ -31,11 +37,20 @@ const dedupeNodes = (nodes) => {
       newPrev[newCurr.name].onCPU += newCurr.onCPU;
       newPrev[newCurr.name].parent = [...newPrev[newCurr.name].parent, ...newCurr.parent];
     }
+    // save the constituents
+    if (typeof currIndex === 'number') {
+      newPrev[newCurr.name].constituents = newPrev[newCurr.name].constituents || [];
+      newPrev[newCurr.name].constituents.push(currIndex);
+    }
     return newPrev;
   }, {});
-  return Object.keys(dedupedNodes)
-    .map(k => ({ ...dedupedNodes[k], deduped: true }))
-    .sort((a, b) => b.onCPU - a.onCPU);
+  return {
+    dedupedNodes: Object.keys(dedupedNodes)
+      .map(k => ({ ...dedupedNodes[k] }))
+      .sort((a, b) => b.onStack - a.onStack),
+    onStackSum,
+    onCPUSum,
+  };
 };
 const stringifierFunction = a => typeof a === 'number' ? a : a.name;
 const memoizedDedupeNodes = memoize(dedupeNodes, stringifierFunction, true);
@@ -63,12 +78,25 @@ export class CPUSamplingComponent extends Component {
     });
   }
 
+  componentWillReceiveProps (nextProps) {
+    if (nextProps.tree.asyncStatus === 'SUCCESS') {
+      allNodes = safeTraverse(nextProps, ['tree', 'data', 'allNodes']);
+      methodLookup = safeTraverse(nextProps, ['tree', 'data', 'methodLookup']);
+    }
+  }
+
   getTree (nodes = [], pName = '') {
-    const dedupedNodes = memoizedDedupeNodes(...nodes);
+    const { dedupedNodes, onStackSum, onCPUSum } = memoizedDedupeNodes(...nodes);
     return dedupedNodes.map((n) => {
       const uniqueId = pName.toString() + n.name.toString();
       const newNodes = n.parent;
       const displayName = this.props.tree.data.methodLookup[n.name];
+      const onStack = n.constituents && n.constituents.reduce((prev, curr) => {
+        curr = allNodes[curr];
+        prev += curr.onStack;
+      }, 0) || n.onStack;
+      const onStackPercentage = onStackSum && Number((n.onStack * 100) / onStackSum).toFixed(2);
+      const onCPUPercentage = onCPUSum && Number((n.onCPU * 100) / onCPUSum).toFixed(2);
       return (
         <TreeView
           itemClassName={`${styles.relative} ${styles.hover}`}
@@ -76,9 +104,19 @@ export class CPUSamplingComponent extends Component {
           defaultCollapsed={!(this.state[uniqueId] && newNodes)}
           nodeLabel={
             <div className={`${styles.listItem}`}>
-              <div className={styles.code} title={uniqueId}>{displayName}</div>
-              <div className={`${styles.pill} ${styles.onStack}`}>{n.onStack}</div>
-              <div className={`${styles.pill} ${styles.onCPU}`}>{n.onCPU}</div>
+              <div className={styles.code} title={displayName}>{displayName}</div>
+              {pName && (
+                <div className={`${styles.pill} ${styles.onStack}`}>
+                  {n.onStack} {!!onStackPercentage && (
+                    <span style={{ fontSize: 9 }}>({onStackPercentage}%)</span>
+                  )}
+                </div>
+              )}
+              <div className={`${styles.pill} ${styles.onCPU}`}>
+                {n.onCPU} {!!onCPUPercentage && (
+                  <span style={{ fontSize: 9 }}>({onCPUPercentage}%)</span>
+                )}
+              </div>
             </div>
           }
           onClick={newNodes ? this.toggle.bind(this, newNodes, uniqueId) : noop}
@@ -91,12 +129,6 @@ export class CPUSamplingComponent extends Component {
     });
   }
 
-  componentWillReceiveProps (nextProps) {
-    if (nextProps.tree.asyncStatus === 'SUCCESS') {
-      allNodes = safeTraverse(nextProps, ['tree', 'data', 'allNodes']);
-      methodLookup = safeTraverse(nextProps, ['tree', 'data', 'methodLookup']);
-    }
-  }
 
   toggle (newNodes = [], open) {
     this.setState({ [open]: !this.state[open] });
