@@ -1,0 +1,22 @@
+#!/bin/bash -e
+
+#CP="/usr/share/${PACKAGE}/${PACKAGE}.jar:/usr/share/${PACKAGE}/lib/*:/usr/share/${PACKAGE}/lib"
+#MAIN="io.vertx.core.Launcher"
+
+ULIMIT=150000
+PACKAGE="fk-prof-userapi"
+USER="profsvc"
+
+CONFIG="/etc/${PACKAGE}/conf/userapi-conf.json"
+LOG_DIR="/var/log/fk-prof-userapi/"
+VERTX_METRICS_OPTS="-Dvertx.metrics.options.enabled=true -Dvertx.metrics.options.registryName=userapi-registry -Dvertx.metrics.options.jmxEnabled=true"
+VERTX_LOG4J_OPTS="-Dlog4j.configuration=file:/etc/${PACKAGE}/resources/log4j.properties -Dvertx.logger-delegate-factory-class-name=io.vertx.core.logging.Log4jLogDelegateFactory"
+VERTX_CACHE_OPT="-Dvertx.cacheDirBase=${LOG_DIR}"
+
+JAVA_OPTS=""
+if [ -f /etc/default/${PACKAGE} ]; then
+    source /etc/default/${PACKAGE}
+fi
+
+ulimit -n ${ULIMIT}
+exec setuidgid ${USER}  ${JAVA_HOME}/bin/java ${VERTX_METRICS_OPTS} ${VERTX_LOG4J_OPTS} ${VERTX_CACHE_OPT} ${JAVA_OPTS} -jar /usr/share/${PACKAGE}/${PACKAGE}.jar -conf ${CONFIG} 2>&1 >${LOG_DIR}stdout.txt

@@ -8,8 +8,12 @@ import fk.prof.aggregation.AggregatedProfileFileNamingStrategy;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.FilteredProfiles;
-import io.vertx.core.*;
-import org.slf4j.LoggerFactory;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
+import io.vertx.core.WorkerExecutor;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 
 import java.nio.charset.Charset;
 import java.time.ZonedDateTime;
@@ -25,16 +29,13 @@ import java.util.stream.Collectors;
  */
 public class ProfileStoreAPIImpl implements ProfileStoreAPI {
 
-    private static final String VERSION = "v0001";
-    private static final String DELIMITER = "/";
-
     public static final String WORKER_POOL_NAME = "aggregation.loader.pool";
     public static final int WORKER_POOL_SIZE = 10;
     public static final int DEFAULT_LOAD_TIMEOUT = 10000;   // in ms
+    private static final String VERSION = "v0001";
+    private static final String DELIMITER = "/";
+    private static Logger LOGGER = LoggerFactory.getLogger(ProfileStoreAPIImpl.class);
     private int loadTimeout = DEFAULT_LOAD_TIMEOUT;
-
-    private static org.slf4j.Logger LOGGER = LoggerFactory.getLogger(ProfileStoreAPIImpl.class);
-
     private Vertx vertx;
     private AsyncStorage asyncStorage;
     private AggregatedProfileLoader profileLoader;
@@ -62,6 +63,10 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
                 .build();
 
         this.futuresForLoadingFiles = new HashMap<>();
+    }
+
+    private static Pair<ZonedDateTime, ZonedDateTime> getInterval(AggregatedProfileFileNamingStrategy fileName) {
+        return new Pair(fileName.startTime, fileName.startTime.plusSeconds(fileName.duration));
     }
 
     private String getLastFromCommonPrefix(String commonPrefix) {
@@ -146,7 +151,6 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
         }
     }
 
-
     synchronized private void saveRequestedFuture(String filename, Future<AggregatedProfileInfo> future) {
         FuturesList futures = futuresForLoadingFiles.get(filename);
         if(futures == null) {
@@ -193,10 +197,6 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
 
     private String decode(String str) {
         return new String(BaseEncoding.base32().decode(str), Charset.forName("utf-8"));
-    }
-
-    private static Pair<ZonedDateTime, ZonedDateTime> getInterval(AggregatedProfileFileNamingStrategy fileName) {
-        return new Pair(fileName.startTime, fileName.startTime.plusSeconds(fileName.duration));
     }
 
     private static class Pair<T,U> {

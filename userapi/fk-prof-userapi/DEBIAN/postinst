@@ -1,0 +1,26 @@
+#!/bin/bash -e
+
+PACKAGE="fk-prof-userapi"
+USER="profsvc"
+GROUP="profsvc"
+
+if [ "$1" == "configure" ]; then
+
+    # creating user & group if it doesn't exist
+    if ! getent group ${GROUP} > /dev/null; then
+        groupadd ${GROUP}
+    fi
+    if ! getent passwd ${USER} > /dev/null; then
+        adduser --system --no-create-home \
+        --ingroup ${GROUP} --disabled-password --shell /bin/false \
+        ${USER}
+    fi
+
+    # create log dir
+    mkdir -p /var/log/${PACKAGE}
+    chown -R ${USER}:${GROUP} /var/log/${PACKAGE}/
+
+    # create service
+    ln -s /etc/sv/${PACKAGE} /etc/service/${PACKAGE}
+
+fi

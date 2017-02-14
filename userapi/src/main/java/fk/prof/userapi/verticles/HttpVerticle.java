@@ -5,10 +5,13 @@ import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.FilteredProfiles;
-import io.vertx.core.*;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Future;
 import io.vertx.core.json.Json;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.LoggerHandler;
 import io.vertx.ext.web.handler.TimeoutHandler;
 
 import java.io.FileNotFoundException;
@@ -33,6 +36,7 @@ public class HttpVerticle extends AbstractVerticle {
 
     private Router configureRouter() {
         Router router = Router.router(vertx);
+        router.route().handler(LoggerHandler.create());
         router.route().handler(TimeoutHandler.create(config().getInteger("req.timeout")));
         router.route("/").handler(routingContext -> routingContext.response()
                 .putHeader("context-type", "text/html")
