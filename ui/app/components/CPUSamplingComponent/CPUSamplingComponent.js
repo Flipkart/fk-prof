@@ -21,26 +21,28 @@ const dedupeNodes = (nodes) => {
   let onStackSum = 0;
   let onCPUSum = 0;
   const dedupedNodes = nodes.reduce((prev, curr) => {
-    let currIndex;
-    if (typeof curr === 'number') {
-      currIndex = curr;
-      curr = allNodes[curr];
+    let childOnStack;
+    if (Array.isArray(curr)) {
+      childOnStack = curr[1];
+      curr = allNodes[curr[0]];
     }
     const newPrev = Object.assign({}, prev);
     const newCurr = Object.assign({}, curr);
-    onStackSum += newCurr.onStack;
+    // change structure of parent array, store onStack also
+    newCurr.parent = [[...curr.parent, newCurr.onStack]];
+    // use child's onStack value if available,
+    // will be available from penultimate node level
+    onStackSum += childOnStack || newCurr.onStack;
     onCPUSum += newCurr.onCPU;
     if (!newPrev[newCurr.name]) {
       newPrev[newCurr.name] = newCurr;
     } else {
-      newPrev[newCurr.name].onStack += newCurr.onStack;
+      newPrev[newCurr.name].onStack += childOnStack || newCurr.onStack;
       newPrev[newCurr.name].onCPU += newCurr.onCPU;
-      newPrev[newCurr.name].parent = [...newPrev[newCurr.name].parent, ...newCurr.parent];
-    }
-    // save the constituents
-    if (typeof currIndex === 'number') {
-      newPrev[newCurr.name].constituents = newPrev[newCurr.name].constituents || [];
-      newPrev[newCurr.name].constituents.push(currIndex);
+      newPrev[newCurr.name].parent = [
+        ...newPrev[newCurr.name].parent,
+        ...newCurr.parent,
+      ];
     }
     return newPrev;
   }, {});
@@ -52,7 +54,7 @@ const dedupeNodes = (nodes) => {
     onCPUSum,
   };
 };
-const stringifierFunction = a => typeof a === 'number' ? a : a.name;
+const stringifierFunction = a => Array.isArray(a) ? a[0] : a.name;
 const memoizedDedupeNodes = memoize(dedupeNodes, stringifierFunction, true);
 
 export class CPUSamplingComponent extends Component {
@@ -91,10 +93,6 @@ export class CPUSamplingComponent extends Component {
       const uniqueId = pName.toString() + n.name.toString();
       const newNodes = n.parent;
       const displayName = this.props.tree.data.methodLookup[n.name];
-      const onStack = n.constituents && n.constituents.reduce((prev, curr) => {
-        curr = allNodes[curr];
-        prev += curr.onStack;
-      }, 0) || n.onStack;
       const onStackPercentage = onStackSum && Number((n.onStack * 100) / onStackSum).toFixed(2);
       const onCPUPercentage = onCPUSum && Number((n.onCPU * 100) / onCPUSum).toFixed(2);
       return (
