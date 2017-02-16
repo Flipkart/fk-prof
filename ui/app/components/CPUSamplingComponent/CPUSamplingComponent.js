@@ -13,9 +13,8 @@ import styles from './CPUSamplingComponent.css';
 import 'react-treeview/react-treeview.css';
 
 let allNodes;
-let methodLookup;
+
 const noop = () => {};
-const nameFilterFunction = filterText => n => methodLookup[n.name].match(filterText);
 
 const dedupeNodes = (nodes) => {
   let onStackSum = 0;
@@ -28,16 +27,17 @@ const dedupeNodes = (nodes) => {
     }
     const newPrev = Object.assign({}, prev);
     const newCurr = Object.assign({}, curr);
+    const evaluatedOnStack = childOnStack || newCurr.onStack;
     // change structure of parent array, store onStack also
-    newCurr.parent = [[...curr.parent, newCurr.onStack]];
+    newCurr.parent = newCurr.name ? [[...curr.parent, evaluatedOnStack]] : [];
     // use child's onStack value if available,
     // will be available from penultimate node level
-    onStackSum += childOnStack || newCurr.onStack;
+    onStackSum += evaluatedOnStack;
     onCPUSum += newCurr.onCPU;
     if (!newPrev[newCurr.name]) {
       newPrev[newCurr.name] = newCurr;
     } else {
-      newPrev[newCurr.name].onStack += childOnStack || newCurr.onStack;
+      newPrev[newCurr.name].onStack += evaluatedOnStack;
       newPrev[newCurr.name].onCPU += newCurr.onCPU;
       newPrev[newCurr.name].parent = [
         ...newPrev[newCurr.name].parent,
@@ -83,13 +83,12 @@ export class CPUSamplingComponent extends Component {
   componentWillReceiveProps (nextProps) {
     if (nextProps.tree.asyncStatus === 'SUCCESS') {
       allNodes = safeTraverse(nextProps, ['tree', 'data', 'allNodes']);
-      methodLookup = safeTraverse(nextProps, ['tree', 'data', 'methodLookup']);
     }
   }
 
-  getTree (nodes = [], pName = '') {
+  getTree (nodes = [], pName = '', filterText) {
     const { dedupedNodes, onStackSum, onCPUSum } = memoizedDedupeNodes(...nodes);
-    return dedupedNodes.map((n) => {
+    const dedupedTreeNodes = dedupedNodes.map((n) => {
       const uniqueId = pName.toString() + n.name.toString();
       const newNodes = n.parent;
       const displayName = this.props.tree.data.methodLookup[n.name];
@@ -97,6 +96,7 @@ export class CPUSamplingComponent extends Component {
       const onCPUPercentage = onCPUSum && Number((n.onCPU * 100) / onCPUSum).toFixed(2);
       return (
         <TreeView
+          nodeName={displayName}
           itemClassName={`${styles.relative} ${styles.hover}`}
           key={uniqueId}
           defaultCollapsed={!(this.state[uniqueId] && newNodes)}
@@ -125,6 +125,9 @@ export class CPUSamplingComponent extends Component {
         </TreeView>
       );
     });
+    return filterText
+      ? dedupedTreeNodes.filter(node => node.props.nodeName.match(new RegExp(filterText, 'i')))
+      : dedupedTreeNodes;
   }
 
 
@@ -141,8 +144,7 @@ export class CPUSamplingComponent extends Component {
     const { app, cluster, proc, filterText } = this.props.location.query;
     const { traceName } = this.props.params;
     const terminalNodes = safeTraverse(this.props, ['tree', 'data', 'terminalNodes']) || [];
-    const filteredTerminalNodes = filterText
-      ? terminalNodes.filter(nameFilterFunction(filterText)) : terminalNodes;
+    const treeNodes = this.getTree(terminalNodes, '', filterText);
     if (this.props.tree.asyncStatus === 'PENDING') {
       return (
         <div>
@@ -195,17 +197,17 @@ export class CPUSamplingComponent extends Component {
                 onChange={this.debouncedHandleFilterChange}
               />
             </h3>
-            {!!filteredTerminalNodes.length && (
+            {!!treeNodes.length && (
               <div>
                 <div style={{ width: '100%', position: 'relative', height: 20 }}>
                   <div className={`${styles.code} ${styles.heading}`}>Method name</div>
                   <div className={`${styles.onStack} ${styles.heading}`}>On Stack</div>
                   <div className={`${styles.onCPU} ${styles.heading}`}>On CPU</div>
                 </div>
-                {this.getTree(filteredTerminalNodes)}
+                {treeNodes}
               </div>
             )}
-            {filterText && !filteredTerminalNodes.length && (
+            {filterText && !treeNodes.length && (
               <p className={styles.alert}>Sorry, no results found for your search query!</p>
             )}
           </div>
