@@ -51,18 +51,16 @@
   color: #ff4081;
 }
 
-.onStack {
-  position: absolute;
-  text-align: right;
-  right: 110px;
-  width: 100px;
-}
-
 .onCPU {
   position: absolute;
-  text-align: right;
+  right: 210px;
+  width: 200px;
+}
+
+.onStack {
+  position: absolute;
   right: 0px;
-  width: 100px;
+  width: 200px;
 }
 
 .relative {
@@ -80,4 +78,27 @@
 
 .heading {
   font-weight: bold;
+  text-align: center;
+}
+
+.number {
+  text-align: left;
+  display: inline-block;
+  width: 10%;
+}
+
+.percentage {
+  text-align: center;
+  display: inline-block;
+  position: relative;
+  width: 70%;
+  .shade {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: #ff4081;
+    opacity: 0.2;
+    height: inherit;
+  }
 }
