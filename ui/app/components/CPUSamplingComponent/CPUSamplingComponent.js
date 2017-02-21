@@ -28,6 +28,7 @@ const dedupeNodes = (nodes) => {
     const newPrev = Object.assign({}, prev);
     const newCurr = Object.assign({}, curr);
     const evaluatedOnStack = childOnStack || newCurr.onStack;
+    newCurr.onStack = evaluatedOnStack;
     // change structure of parent array, store onStack also
     newCurr.parent = newCurr.name ? [[...curr.parent, evaluatedOnStack]] : [];
     // use child's onStack value if available,
@@ -103,18 +104,28 @@ export class CPUSamplingComponent extends Component {
           nodeLabel={
             <div className={`${styles.listItem}`}>
               <div className={styles.code} title={displayName}>{displayName}</div>
-              {pName && (
-                <div className={`${styles.pill} ${styles.onStack}`}>
-                  {n.onStack} {!!onStackPercentage && (
-                    <span style={{ fontSize: 9 }}>({onStackPercentage}%)</span>
+              {!!n.onCPU && (
+                <div className={`${styles.pill} ${styles.onCPU}`}>
+                  <div className={styles.number}>{n.onCPU}</div>
+                  {!!onCPUPercentage && (
+                    <div className={styles.percentage}>
+                      <div className={styles.shade} style={{ width: `${onCPUPercentage}%` }} />
+                      {onCPUPercentage}%
+                    </div>
                   )}
                 </div>
               )}
-              <div className={`${styles.pill} ${styles.onCPU}`}>
-                {n.onCPU} {!!onCPUPercentage && (
-                  <span style={{ fontSize: 9 }}>({onCPUPercentage}%)</span>
-                )}
-              </div>
+              {pName && (
+                <div className={`${styles.pill} ${styles.onStack}`}>
+                  <div className={styles.number}>{n.onStack}</div>
+                  {!!onStackPercentage && (
+                    <div className={styles.percentage}>
+                      <div className={styles.shade} style={{ width: `${onStackPercentage}%` }} />
+                      {onStackPercentage}%
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           }
           onClick={newNodes ? this.toggle.bind(this, newNodes, uniqueId) : noop}
@@ -201,8 +212,8 @@ export class CPUSamplingComponent extends Component {
               <div>
                 <div style={{ width: '100%', position: 'relative', height: 20 }}>
                   <div className={`${styles.code} ${styles.heading}`}>Method name</div>
-                  <div className={`${styles.onStack} ${styles.heading}`}>On Stack</div>
                   <div className={`${styles.onCPU} ${styles.heading}`}>On CPU</div>
+                  <div className={`${styles.onStack} ${styles.heading}`}>On Stack</div>
                 </div>
                 {treeNodes}
               </div>
