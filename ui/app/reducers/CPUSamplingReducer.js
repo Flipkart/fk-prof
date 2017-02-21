@@ -8,7 +8,7 @@ function createTree (input, methodLookup, terminalNodes = []) {
   const allNodes = [];
   function formTree (index) {
     let currentNode = input[index];
-    if (!currentNode) return;
+    if (!currentNode) return {};
     currentNode = {
       childCount: currentNode[1],
       name: currentNode[0],
@@ -17,14 +17,15 @@ function createTree (input, methodLookup, terminalNodes = []) {
       parent: [],
     };
     const currentNodeIndex = allNodes.push(currentNode) - 1;
+    let nextChildIndex = currentNodeIndex;
     if (currentNode.childCount !== 0) {
       for (let i = 0; i < currentNode.childCount; i++) {
         if (!currentNode.children) currentNode.children = [];
-        if (currentNodeIndex === input.length - 1) break;
-        const returnValue = formTree(currentNodeIndex + 1);
-        if (returnValue && returnValue.index) {
+        const returnValue = formTree(allNodes.length);
+        if (returnValue && returnValue.index !== undefined) {
+          nextChildIndex = returnValue.index;
           allNodes[returnValue.index].parent.push(currentNodeIndex);
-          currentNode.children.push(returnValue.index);
+          currentNode.children.push(nextChildIndex);
         }
       }
     }
@@ -48,12 +49,12 @@ export default function (state = {}, action) {
 
     case GET_CPU_SAMPLING_SUCCESS: {
       const { aggregated_samples: { frame_nodes }, method_lookup } = action.res;
+      const data = createTree(frame_nodes, method_lookup);
       return {
         asyncStatus: 'SUCCESS',
-        data: createTree(frame_nodes, method_lookup),
+        data,
       };
     }
-
     case GET_CPU_SAMPLING_FAILURE:
       return {
         asyncStatus: 'ERROR',
