@@ -7,6 +7,7 @@ import {
 } from 'react-router';
 import { Provider } from 'react-redux';
 
+import 'react-select/dist/react-select.css';
 import 'material-design-lite/material.min';
 import 'material-design-lite/material.css';
 

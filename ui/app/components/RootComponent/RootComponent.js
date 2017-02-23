@@ -1,31 +1,65 @@
 import React, { Component } from 'react';
+import { withRouter } from 'react-router';
+
 import Header from 'components/HeaderComponent';
+import AppSelect from 'components/AppSelectComponent';
+import ClusterSelect from 'components/ClusterSelectComponent';
 
 import 'components/RootComponent/RootComponent.css';
 
-const BaseComponent = Component => class extends React.Component {
+const BaseComponent = Komponent => class extends Component {
   componentDidUpdate () {
       componentHandler.upgradeDom(); // eslint-disable-line
   }
 
   render () {
-    return <Component {...this.props} />;
+    return <Komponent {...this.props} />;
   }
-  };
+};
 
-class RootComponent extends Component {
-  render () {
-    return (
-      <div>
-        <Header />
-        <main className="app mdl-layout__content">
-          <div className="page-content">
-            {this.props.children}
+const RootComponent = props => {
+  const updateQueryParams = ({ pathname = '/', query }) => props.router.push({ pathname, query });
+  const updateAppIdQueryParam = o => updateQueryParams({ query: { app: o.name } });
+  const updateClusterQueryParam = o => updateQueryParams({ query: { ...props.location.query, cluster: o.name } });
+
+  const selectedAppId = props.location.query.app;
+  const selectedCluster = props.location.query.cluster;
+
+  return (
+    <div>
+      <Header />
+      <main style={{ paddingTop: 64 }}>
+        <div className="page-content">
+          <div className="mdl-grid">
+            <div className="mdl-cell mdl-cell--3-col">
+              <AppSelect
+                onChange={updateAppIdQueryParam}
+                value={selectedAppId}
+              />
+            </div>
+            <div className="mdl-cell mdl-cell--3-col">
+              {selectedAppId && (
+                <ClusterSelect
+                  app={selectedAppId}
+                  onChange={updateClusterQueryParam}
+                  value={selectedCluster}
+                />
+              )}
+            </div>
+            <div className="mdl-cell mdl-cell--3-col">
+            </div>
+            <div className="mdl-cell mdl-cell--3-col">
+            </div>
           </div>
-        </main>
-      </div>
-    );
-  }
-}
+          { props.children }
+        </div>
+      </main>
+    </div>
+  );
+};
 
-export default BaseComponent(RootComponent);
+RootComponent.propTypes = {
+  children: React.PropTypes.node,
+};
+
+export default BaseComponent(withRouter(RootComponent));
