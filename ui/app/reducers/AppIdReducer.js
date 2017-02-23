@@ -1,23 +1,23 @@
 import {
-  GET_POSTS_REQUEST,
-  GET_POSTS_SUCCESS,
-  GET_POSTS_FAILURE,
-} from 'actions/PostActions';
+  GET_APP_IDS_REQUEST,
+  GET_APP_IDS_SUCCESS,
+  GET_APP_IDS_FAILURE,
+} from 'actions/AppIdActions';
 
 const INITIAL_STATE = {
-  posts: [],
+  data: [],
   asyncStatus: 'INIT',
 };
 
 export default function (state = INITIAL_STATE, action) {
   switch (action.type) {
-    case GET_POSTS_REQUEST:
+    case GET_APP_IDS_REQUEST:
       return { ...state, asyncStatus: 'PENDING' };
 
-    case GET_POSTS_SUCCESS:
-      return { posts: action.data, asyncStatus: 'SUCCESS' };
+    case GET_APP_IDS_SUCCESS:
+      return { data: action.data, asyncStatus: 'SUCCESS' };
 
-    case GET_POSTS_FAILURE:
+    case GET_APP_IDS_FAILURE:
       return { ...state, asyncStatus: 'ERROR' };
 
     default: return state;
