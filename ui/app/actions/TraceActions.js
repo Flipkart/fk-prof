@@ -21,7 +21,7 @@ export default function fetchTracesAction ({ app, cluster, proc, workType, query
   return (dispatch) => {
     dispatch(getTracesRequestAction({
       req: {
-        app, cluster, proc, workType,
+        app, cluster, proc, workType, query,
       },
     }));
     const queryParams = objectToQueryParams(query);
@@ -31,13 +31,13 @@ export default function fetchTracesAction ({ app, cluster, proc, workType, query
       .then(res => dispatch(getTracesSuccessAction({
         res,
         req: {
-          app, cluster, proc, workType,
+          app, cluster, proc, workType, query,
         },
       })))
       .catch(err => dispatch(getTracesFailureAction({
         err,
         req: {
-          app, cluster, proc, workType,
+          app, cluster, proc, workType, query,
         },
       })));
   };
