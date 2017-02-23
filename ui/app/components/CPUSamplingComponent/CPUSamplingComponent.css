@@ -53,14 +53,14 @@
 
 .onCPU {
   position: absolute;
-  right: 210px;
-  width: 200px;
+  right: 110px;
+  width: 100px;
 }
 
 .onStack {
   position: absolute;
   right: 0px;
-  width: 200px;
+  width: 100px;
 }
 
 .relative {
@@ -73,7 +73,7 @@
   overflow: hidden;
   left: 14px;
   white-space: nowrap;
-  right: 200px;
+  right: 220px;
 }
 
 .heading {
@@ -84,7 +84,7 @@
 .number {
   text-align: left;
   display: inline-block;
-  width: 10%;
+  width: 30%;
 }
 
 .percentage {

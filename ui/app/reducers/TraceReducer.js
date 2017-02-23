@@ -4,7 +4,7 @@ import {
   GET_TRACES_FAILURE,
 } from 'actions/TraceActions';
 
-export const getUniqueId = r => `${r.app}/${r.cluster}/${r.proc}/${r.workType}`;
+export const getUniqueId = r => `${r.app}/${r.cluster}/${r.proc}/${r.workType}/${r.query.start}`;
 
 export default function (state = {}, action) {
   switch (action.type) {

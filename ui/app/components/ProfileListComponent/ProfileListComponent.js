@@ -2,11 +2,19 @@ import React, { Component, PropTypes } from 'react';
 import { connect } from 'react-redux';
 import { Link } from 'react-router';
 import moment from 'moment';
+import TreeView from 'react-treeview';
 
 import { fetchProfilesAction } from 'actions/ProfileActions';
+import { objectToQueryParams } from 'utils/UrlUtils';
+import fetchTracesAction from 'actions/TraceActions';
 import Loader from 'components/LoaderComponent';
+import safeTraverse from 'utils/safeTraverse';
+import { getUniqueId } from 'reducers/TraceReducer';
 
 import styles from './ProfileListComponent.css';
+import 'react-treeview/react-treeview.css';
+
+
 
 class ProfileListComponent extends Component {
   componentDidMount () {
@@ -44,36 +52,52 @@ class ProfileListComponent extends Component {
             </tr>
           </thead>
           <tbody>
-            {profiles.data.map(t => (
-              <tr key={`${t.start}${t.end}`}>
-                <td>{moment(t.start).format('Do MMM YYYY, h:mm:ss a')}</td>
-                <td>{moment(t.end).format('Do MMM YYYY, h:mm:ss a')}</td>
+            {profiles.data.map(profile => (
+              <tr key={`${profile.start}${profile.end}`}>
+                <td>{moment(profile.start).format('Do MMM YYYY, h:mm:ss a')}</td>
+                <td>{moment(profile.end).format('Do MMM YYYY, h:mm:ss a')}</td>
                 <td>
                   {
-                    t.values.map((workType, i) =>
-                      (
-                        <Link
+                    profile.values.map((workType) => {
+                      const payload = {
+                        cluster,
+                        app,
+                        proc,
+                        query: { start: profile.start },
+                        workType,
+                      };
+                      const traces = this.props.traces[getUniqueId(payload)] || {};
+                      const queryParams = { workType, cluster, app, proc, profileStart: profile.start };
+                      const content = {
+                        PENDING: <Loader />,
+                        SUCCESS: traces && traces.data && traces.data.map(traceName => (
+                          <TreeView
+                            key={traceName.name}
+                            defaultCollapsed
+                            className={styles.hidden}
+                            nodeLabel={
+                              <a
+                                rel="noopener noreferrer"
+                                target="_blank"
+                                href={`/work-type/${workType}/${traceName.name}?${objectToQueryParams(queryParams)}`}
+                              >
+                                {traceName.name}
+                              </a>
+                            }
+                          />
+                        )),
+                      }[traces.asyncStatus];
+                      return (
+                        <TreeView
+                          defaultCollapsed
+                          nodeLabel={workType}
                           key={workType}
-                          to={{
-                            pathname: '/',
-                            query: {
-                              app,
-                              cluster,
-                              proc,
-                              start,
-                              end,
-                              profileStart: t.start,
-                              workType,
-                            },
-                          }}
-                          htmlFor="Select worktype"
-                          className={styles.workType}
+                          onClick={this.props.getTraces.bind(null, payload)}
                         >
-                          {workType}
-                          {i < (t.values.length - 1) && <span>,</span>}
-                        </Link>
-                      ),
-                    )
+                          { content }
+                        </TreeView>
+                      );
+                    })
                   }
                 </td>
               </tr>
@@ -94,14 +118,18 @@ ProfileListComponent.propTypes = {
   end: PropTypes.string.isRequired,
   fetchProfiles: PropTypes.func.isRequired,
   profiles: PropTypes.object.isRequired,
+  getTraces: PropTypes.func.isRequired,
+  traces: PropTypes.object,
 };
 
 const mapStateToProps = state => ({
   profiles: state.profiles || {},
+  traces: safeTraverse(state, ['traces']),
 });
 
 const mapDispatchToProps = dispatch => ({
   fetchProfiles: params => dispatch(fetchProfilesAction(params)),
+  getTraces: params => dispatch(fetchTracesAction(params)),
 });
 
 export default connect(mapStateToProps, mapDispatchToProps)(ProfileListComponent);

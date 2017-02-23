@@ -57,3 +57,7 @@
 .workType {
   margin-right: 3px;
 }
+
+.hidden {
+  display: none !important;
+}

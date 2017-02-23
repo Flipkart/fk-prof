@@ -6,7 +6,6 @@ import AppSelect from 'components/AppSelectComponent';
 import ClusterSelect from 'components/ClusterSelectComponent';
 import ProcSelect from 'components/ProcSelectComponent';
 import ProfileList from 'components/ProfileListComponent';
-import TraceList from 'components/TraceListComponent';
 
 import styles from './AppComponent.css';
 
@@ -16,8 +15,6 @@ const AppComponent = (props) => {
   const selectedProc = props.location.query.proc;
   const start = props.location.query.start;
   const end = props.location.query.end;
-  const workType = props.location.query.workType;
-  const profileStart = props.location.query.profileStart;
 
   const updateQueryParams = ({ pathname = '/', query }) => props.router.push({ pathname, query });
   const updateAppQueryParam = o => updateQueryParams({ query: { app: o.name } });
@@ -79,28 +76,19 @@ const AppComponent = (props) => {
         </div>
         {
           selectedApp && selectedCluster && selectedProc && (
-            <div className="mdl-cell mdl-cell--2-col">
+            <div className="mdl-cell mdl-cell--4-col">
+              <label className={styles['label']} htmlFor="startTime">Profiles started between</label>
               <div>
-                <label className={styles['label']} htmlFor="startTime">Select Start time</label>
                 <DateTime
                   className={styles['date-time']}
                   defaultValue={start ? new Date(start) : ''}
-                  onBlur={updateStartTime}
+                  onChange={updateStartTime}
                   dateFormat="DD-MM-YYYY"
                 />
-              </div>
-            </div>
-          )
-        }
-        {
-          selectedApp && selectedCluster && selectedProc && (
-            <div className="mdl-cell mdl-cell--2-col">
-              <div>
-                <label className={styles['label']} htmlFor="endTime">Select End time</label>
                 <DateTime
                   className={styles['date-time']}
                   defaultValue={end ? new Date(end) : ''}
-                  onBlur={updateEndTime}
+                  onChange={updateEndTime}
                   dateFormat="DD-MM-YYYY"
                 />
               </div>
@@ -111,7 +99,7 @@ const AppComponent = (props) => {
       {
         selectedProc && start && end && (
           <div className="mdl-grid">
-            <div className={`mdl-cell mdl-cell--${workType ? '8' : '12'}-col`}>
+            <div className="mdl-cell mdl-cell--12-col">
               <ProfileList
                 app={selectedApp}
                 cluster={selectedCluster}
@@ -120,20 +108,6 @@ const AppComponent = (props) => {
                 end={end}
               />
             </div>
-            {
-              workType && (
-                <div className="mdl-cell mdl-cell--4-col">
-                  <TraceList
-                    app={selectedApp}
-                    cluster={selectedCluster}
-                    proc={selectedProc}
-                    workType={workType}
-                    start={start}
-                    profileStart={profileStart}
-                  />
-                </div>
-              )
-            }
           </div>
         )}
     </div>
