@@ -28,12 +28,8 @@
 }
 
 .listItem {
-  /*position: absolute;
-  width: 98%;
-  padding: 4px;*/
   display: inline-block;
   height: 14px;
-  
 }
 
 .hover {

@@ -95,10 +95,11 @@ export class CPUSamplingComponent extends Component {
       const displayName = this.props.tree.data.methodLookup[n.name];
       const onStackPercentage = onStackSum && Number((n.onStack * 100) / onStackSum).toFixed(2);
       const onCPUPercentage = onCPUSum && Number((n.onCPU * 100) / onCPUSum).toFixed(2);
+      const showDottedLine = dedupedNodes.length >= 2 && this.state[uniqueId];
       return (
         <TreeView
           nodeName={displayName}
-          itemClassName={`${styles.relative} ${styles.hover}`}
+          itemClassName={`${styles.relative} ${styles.hover} ${showDottedLine ? 'dotted-line' : ''}`}
           key={uniqueId}
           defaultCollapsed={!(this.state[uniqueId] && newNodes)}
           nodeLabel={
