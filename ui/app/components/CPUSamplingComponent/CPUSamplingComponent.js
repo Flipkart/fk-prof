@@ -13,17 +13,20 @@ import styles from './CPUSamplingComponent.css';
 import 'react-treeview/react-treeview.css';
 
 let allNodes;
+let globalOnCPUSum = 0;
 
 const noop = () => {};
 
 const dedupeNodes = (nodes) => {
-  let onStackSum = 0;
-  let onCPUSum = 0;
   const dedupedNodes = nodes.reduce((prev, curr) => {
     let childOnStack;
     if (Array.isArray(curr)) {
       childOnStack = curr[1];
       curr = allNodes[curr[0]];
+    } else {
+      // will be executed only for top level nodes
+      // store the global onCPU count
+      globalOnCPUSum += curr.onCPU;
     }
     const newPrev = Object.assign({}, prev);
     const newCurr = Object.assign({}, curr);
@@ -33,8 +36,7 @@ const dedupeNodes = (nodes) => {
     newCurr.parent = newCurr.name ? [[...curr.parent, evaluatedOnStack]] : [];
     // use child's onStack value if available,
     // will be available from penultimate node level
-    onStackSum += evaluatedOnStack;
-    onCPUSum += newCurr.onCPU;
+
     if (!newPrev[newCurr.name]) {
       newPrev[newCurr.name] = newCurr;
     } else {
@@ -51,8 +53,6 @@ const dedupeNodes = (nodes) => {
     dedupedNodes: Object.keys(dedupedNodes)
       .map(k => ({ ...dedupedNodes[k] }))
       .sort((a, b) => b.onStack - a.onStack),
-    onStackSum,
-    onCPUSum,
   };
 };
 const stringifierFunction = a => Array.isArray(a) ? a[0] : a.name;
@@ -88,14 +88,15 @@ export class CPUSamplingComponent extends Component {
   }
 
   getTree (nodes = [], pName = '', filterText) {
-    const { dedupedNodes, onStackSum, onCPUSum } = memoizedDedupeNodes(...nodes);
-    const dedupedTreeNodes = dedupedNodes.map((n) => {
+    const { dedupedNodes } = memoizedDedupeNodes(...nodes);
+    const dedupedTreeNodes = dedupedNodes.map((n, i) => {
       const uniqueId = pName.toString() + n.name.toString();
       const newNodes = n.parent;
       const displayName = this.props.tree.data.methodLookup[n.name];
-      const onStackPercentage = onStackSum && Number((n.onStack * 100) / onStackSum).toFixed(2);
-      const onCPUPercentage = onCPUSum && Number((n.onCPU * 100) / onCPUSum).toFixed(2);
-      const showDottedLine = dedupedNodes.length >= 2 && this.state[uniqueId];
+      const onStackPercentage = Number((n.onStack * 100) / globalOnCPUSum).toFixed(2);
+      const onCPUPercentage = Number((n.onCPU * 100) / globalOnCPUSum).toFixed(2);
+      const showDottedLine = pName && dedupedNodes.length >= 2 && dedupedNodes.length !== i + 1 &&
+        this.state[uniqueId];
       return (
         <TreeView
           nodeName={displayName}
@@ -108,23 +109,19 @@ export class CPUSamplingComponent extends Component {
               {!!n.onCPU && (
                 <div className={`${styles.pill} ${styles.onCPU}`}>
                   <div className={styles.number}>{n.onCPU}</div>
-                  {!!onCPUPercentage && (
-                    <div className={styles.percentage}>
-                      <div className={styles.shade} style={{ width: `${onCPUPercentage}%` }} />
-                      {onCPUPercentage}%
-                    </div>
-                  )}
+                  <div className={styles.percentage}>
+                    <div className={styles.shade} style={{ width: `${onCPUPercentage}%` }} />
+                    {onCPUPercentage}%
+                  </div>
                 </div>
               )}
               {pName && (
                 <div className={`${styles.pill} ${styles.onStack}`}>
                   <div className={styles.number}>{n.onStack}</div>
-                  {!!onStackPercentage && (
-                    <div className={styles.percentage}>
-                      <div className={styles.shade} style={{ width: `${onStackPercentage}%` }} />
-                      {onStackPercentage}%
-                    </div>
-                  )}
+                  <div className={styles.percentage}>
+                    <div className={styles.shade} style={{ width: `${onStackPercentage}%` }} />
+                    {onStackPercentage}%
+                  </div>
                 </div>
               )}
             </div>
