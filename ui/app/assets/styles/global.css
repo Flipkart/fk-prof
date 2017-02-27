@@ -1,0 +1,3 @@
+.dotted-line + div.tree-view_children > div.tree-view {
+  border-left: 1px dashed #CCCCCC;
+}

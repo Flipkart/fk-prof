@@ -19,6 +19,8 @@ import Root from 'components/RootComponent';
 import App from 'components/AppComponent';
 import CPUSampling from 'components/CPUSamplingComponent';
 
+import './assets/styles/global.css';
+
 const routes = (
   <Route path="/" component={Root}>
     <IndexRoute component={App} />
