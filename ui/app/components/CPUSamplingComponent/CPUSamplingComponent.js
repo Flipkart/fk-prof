@@ -16,10 +16,7 @@ let allNodes;
 let globalOnCPUSum = 0;
 
 const noop = () => {};
-const filterPaths = (pathSubset, k) => {
-  const reducedKey = k.slice(0, pathSubset.length);
-  return reducedKey === pathSubset;
-};
+const filterPaths = (pathSubset, k) => k.indexOf(pathSubset) === 0;
 
 const dedupeNodes = (nodes) => {
   const dedupedNodes = nodes.reduce((prev, curr) => {
@@ -157,17 +154,25 @@ export class CPUSamplingComponent extends Component {
 
   highlight (path) {
     if (path in this.state.highlighted) {
-      let state = Object.assign({}, this.state);
+      const state = Object.assign({}, this.state);
       delete state.highlighted[path];
       this.setState(state);
       return;
     }
     // so no exact path matches
     // what if click was on a parent node
-    // bail!
-    const shouldIBail = Object.keys(this.state.highlighted).filter(filterPaths.bind(null, path));
+    const partialMatchedPaths = Object.keys(this.state.highlighted)
+      .filter(filterPaths.bind(null, path));
 
-    if (shouldIBail.length) return;
+    if (partialMatchedPaths.length) {
+      // delete the partial matches from state,
+      // so that new tree would get highlighted
+      let state = Object.assign({}, this.state);
+      partialMatchedPaths.forEach((p) => {
+        delete state.highlighted[p];
+      });
+      this.setState(state);
+    }
 
     // all good, highlight!
     this.setState({
