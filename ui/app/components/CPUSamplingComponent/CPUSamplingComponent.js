@@ -16,6 +16,7 @@ let allNodes;
 let globalOnCPUSum = 0;
 
 const noop = () => {};
+const filterPaths = (pathSubset, k) => k.indexOf(pathSubset) === 0;
 
 const dedupeNodes = (nodes) => {
   const dedupedNodes = nodes.reduce((prev, curr) => {
@@ -61,10 +62,14 @@ const memoizedDedupeNodes = memoize(dedupeNodes, stringifierFunction, true);
 export class CPUSamplingComponent extends Component {
   constructor () {
     super();
-    this.state = {};
+    this.state = {
+      opened: {}, // keeps track of all opened/closed nodes
+      highlighted: {}, // keeps track of all highlighted nodes
+    };
     this.getTree = this.getTree.bind(this);
     this.toggle = this.toggle.bind(this);
     this.handleFilterChange = this.handleFilterChange.bind(this);
+    this.highlight = this.highlight.bind(this);
     this.debouncedHandleFilterChange = debounce(this.handleFilterChange, 250);
   }
 
@@ -90,22 +95,30 @@ export class CPUSamplingComponent extends Component {
   getTree (nodes = [], pName = '', filterText) {
     const { dedupedNodes } = memoizedDedupeNodes(...nodes);
     const dedupedTreeNodes = dedupedNodes.map((n, i) => {
-      const uniqueId = pName.toString() + n.name.toString();
+      const uniqueId = `${pName.toString()}->${n.name.toString()}`;
       const newNodes = n.parent;
       const displayName = this.props.tree.data.methodLookup[n.name];
       const onStackPercentage = Number((n.onStack * 100) / globalOnCPUSum).toFixed(2);
       const onCPUPercentage = Number((n.onCPU * 100) / globalOnCPUSum).toFixed(2);
       const showDottedLine = pName && dedupedNodes.length >= 2 && dedupedNodes.length !== i + 1 &&
-        this.state[uniqueId];
+        this.state.opened[uniqueId];
+      const isHighlighted = Object.keys(this.state.highlighted)
+        .filter(filterPaths.bind(null, uniqueId));
       return (
         <TreeView
           nodeName={displayName}
           itemClassName={`${styles.relative} ${styles.hover} ${showDottedLine ? 'dotted-line' : ''}`}
           key={uniqueId}
-          defaultCollapsed={!(this.state[uniqueId] && newNodes)}
+          defaultCollapsed={!(this.state.opened[uniqueId] && newNodes)}
           nodeLabel={
-            <div className={`${styles.listItem}`}>
-              <div className={styles.code} title={displayName}>{displayName}</div>
+            <div className={styles.listItem}>
+              <div
+                className={`${styles.code} ${isHighlighted.length && styles.yellow}`}
+                title={displayName}
+                onClick={this.highlight.bind(this, uniqueId)}
+              >
+                {displayName}
+              </div>
               {!!n.onCPU && (
                 <div className={`${styles.pill} ${styles.onCPU}`}>
                   <div className={styles.number}>{n.onCPU}</div>
@@ -126,10 +139,10 @@ export class CPUSamplingComponent extends Component {
               )}
             </div>
           }
-          onClick={newNodes ? this.toggle.bind(this, newNodes, uniqueId) : noop}
+          onClick={newNodes ? this.toggle.bind(this, uniqueId) : noop}
         >
           {
-            this.state[uniqueId] && newNodes && this.getTree(newNodes, uniqueId)
+            this.state.opened[uniqueId] && newNodes && this.getTree(newNodes, uniqueId)
           }
         </TreeView>
       );
@@ -139,9 +152,44 @@ export class CPUSamplingComponent extends Component {
       : dedupedTreeNodes;
   }
 
+  highlight (path) {
+    if (path in this.state.highlighted) {
+      const state = Object.assign({}, this.state);
+      delete state.highlighted[path];
+      this.setState(state);
+      return;
+    }
+    // so no exact path matches
+    // what if click was on a parent node
+    const partialMatchedPaths = Object.keys(this.state.highlighted)
+      .filter(filterPaths.bind(null, path));
 
-  toggle (newNodes = [], open) {
-    this.setState({ [open]: !this.state[open] });
+    if (partialMatchedPaths.length) {
+      // delete the partial matches from state,
+      // so that new tree would get highlighted
+      let state = Object.assign({}, this.state);
+      partialMatchedPaths.forEach((p) => {
+        delete state.highlighted[p];
+      });
+      this.setState(state);
+    }
+
+    // all good, highlight!
+    this.setState({
+      highlighted: {
+        ...this.state.highlighted,
+        [path]: true,
+      },
+    });
+  }
+
+  toggle (open) {
+    this.setState({
+      opened: {
+        ...this.state.opened,
+        [open]: !this.state.opened[open],
+      },
+    });
   }
 
   handleFilterChange (e) {
