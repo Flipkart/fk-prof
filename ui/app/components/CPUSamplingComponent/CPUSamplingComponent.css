@@ -98,3 +98,7 @@
     height: inherit;
   }
 }
+
+.yellow {
+  background: #9DFF0A;
+}
