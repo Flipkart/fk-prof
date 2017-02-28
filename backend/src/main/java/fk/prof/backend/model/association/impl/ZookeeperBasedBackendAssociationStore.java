@@ -76,42 +76,55 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
   public Future<Recorder.ProcessGroups> reportBackendLoad(BackendDTO.LoadReportRequest payload) {
     String backendIPAddress = payload.getIp();
     Future<Recorder.ProcessGroups> result = Future.future();
-    vertx.executeBlocking(future -> {
-      try {
-        //TODO: Implement a cleanup job for backends which have been defunct for a long time, remove them from backenddetaillookup map
-        BackendDetail backendDetail = backendDetailLookup.computeIfAbsent(backendIPAddress, (key) -> {
-          try {
-            BackendDetail updatedBackendDetail = new BackendDetail(key, loadReportIntervalInSeconds, loadMissTolerance);
-            String zNodePath = getZNodePathForBackend(key);
-            ZookeeperUtil.writeZNode(curatorClient, zNodePath, new byte[0], true);
-            return updatedBackendDetail;
-          } catch (Exception ex) {
-            throw new RuntimeException(ex);
-          }
-        });
 
-        boolean timeUpdated = backendDetail.reportLoad(payload.getLoad(), payload.getCurrTick());
-        if(timeUpdated) {
-          availableBackendsByPriority.add(backendDetail);
+    BackendDetail existingBackendDetail;
+    if((existingBackendDetail = backendDetailLookup.get(backendIPAddress)) != null) {
+      boolean timeUpdated = existingBackendDetail.reportLoad(payload.getLoad(), payload.getCurrTick());
+      if(timeUpdated) {
+        availableBackendsByPriority.add(existingBackendDetail);
+      }
+      result.complete(existingBackendDetail.buildProcessGroupsProto());
+    } else {
+      vertx.executeBlocking(future -> {
+        try {
+          /**TODO: Implement a cleanup job for backends which have been defunct for a long time, remove them from backenddetaillookup map
+           * When implementing above, ensure cleanup operations in backenddetaillookup are consistent wrt get/iteration/update in
+           * {@link #getAssociatedBackend(Recorder.ProcessGroup)} and {@link #reportBackendLoad(BackendDTO.LoadReportRequest)}
+           */
+          BackendDetail backendDetail = backendDetailLookup.computeIfAbsent(backendIPAddress, (key) -> {
+            try {
+              BackendDetail updatedBackendDetail = new BackendDetail(key, loadReportIntervalInSeconds, loadMissTolerance);
+              String zNodePath = getZNodePathForBackend(key);
+              ZookeeperUtil.writeZNode(curatorClient, zNodePath, new byte[0], true);
+              return updatedBackendDetail;
+            } catch (Exception ex) {
+              throw new RuntimeException(ex);
+            }
+          });
+
+          boolean timeUpdated = backendDetail.reportLoad(payload.getLoad(), payload.getCurrTick());
+          if (timeUpdated) {
+            availableBackendsByPriority.add(backendDetail);
+          }
+
+          /**
+           * NOTE: There is a possible race condition above
+           * t0(time) => request1: a recorder belonging to pg1(process group) calls /association which invokes {@link #getAssociatedBackend(Recorder.ProcessGroup)}
+           *             pg1 is associated with b1(backend) which has become defunct so next operation to be executed is removal of b1 from available backends set
+           * t1 => request2 b1 reports load and is added to available backend set (if not already present), response is returned
+           * t2 => request1: {@link #getAssociatedBackend(Recorder.ProcessGroup)} attempts to remove b1 from available backends set since it assumes it to be defunct and returns response by associating recorder with some other backend b2
+           * Above results in inconsistent state of availableBackends because even though b1 has reported load, it is not present in the set
+           *
+           * The above race-condition should not lead to a permanent inconsistent state because on subsequent load reports, b1 will get added to available backends set again
+           */
+
+          future.complete(backendDetail.buildProcessGroupsProto());
+        } catch (Exception ex) {
+          future.fail(ex);
         }
 
-        /**
-         * NOTE: There is a possible race condition above
-         * t0(time) => request1: a recorder belonging to pg1(process group) calls /association which invokes {@link #getAssociatedBackend(Recorder.ProcessGroup)}
-         *             pg1 is associated with b1(backend) which has become defunct so next operation to be executed is removal of b1 from available backends set
-         * t1 => request2 b1 reports load and is added to available backend set (if not already present), response is returned
-         * t2 => request1: {@link #getAssociatedBackend(Recorder.ProcessGroup)} attempts to remove b1 from available backends set since it assumes it to be defunct and returns response by associating recorder with some other backend b2
-         * Above results in inconsistent state of availableBackends because even though b1 has reported load, it is not present in the set
-         *
-         * The above race-condition should not lead to a permanent inconsistent state because on subsequent load reports, b1 will get added to available backends set again
-         */
-
-        future.complete(backendDetail.buildProcessGroupsProto());
-      } catch (Exception ex) {
-        future.fail(ex);
-      }
-
-    }, result.completer());
+      }, result.completer());
+    }
     return result;
   }
 
