@@ -39,7 +39,7 @@ if (isDevelopment) {
   app.use(express.static(publicPath));
 } else {
   app.use(compression());
-  app.use(express.static(publicPath, {
+  app.use('/public', express.static(publicPath, {
     setHeaders: (res) => {
       res.append('Cache-Control', 'public, max-age=31536000');
     },

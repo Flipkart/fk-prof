@@ -5,6 +5,7 @@ import fetchCPUSamplingAction from 'actions/AggregatedProfileDataActions';
 import safeTraverse from 'utils/safeTraverse';
 import Loader from 'components/LoaderComponent';
 import MethodTree from 'components/MethodTreeComponent';
+import Tabs from 'components/Tabs';
 import styles from './CPUSamplingComponent.css';
 
 
@@ -26,7 +27,7 @@ export class CPUSamplingComponent extends Component {
   render () {
     const { app, cluster, proc } = this.props.location.query;
     const { traceName } = this.props.params;
-    
+
     if (!this.props.tree.asyncStatus) return null;
 
     if (this.props.tree.asyncStatus === 'PENDING') {
@@ -68,12 +69,30 @@ export class CPUSamplingComponent extends Component {
             </div>
           </div>
         </div>
-        <MethodTree
-          allNodes={safeTraverse(this.props, ['tree', 'data', 'allNodes'])}
-          nodes={safeTraverse(this.props, ['tree', 'data', 'terminalNodes'])}
-          nextNodesAccessorField="parent"
-          methodLookup={safeTraverse(this.props, ['tree', 'data', 'methodLookup'])}
-        />
+        <Tabs>
+          <div>
+            <div>Hot Methods</div>
+            <div>
+              <MethodTree
+                allNodes={safeTraverse(this.props, ['tree', 'data', 'allNodes'])}
+                nodes={safeTraverse(this.props, ['tree', 'data', 'terminalNodes'])}
+                nextNodesAccessorField="parent"
+                methodLookup={safeTraverse(this.props, ['tree', 'data', 'methodLookup'])}
+              />
+            </div>
+          </div>
+          <div>
+            <div>Call Tree</div>
+            <div>
+              <MethodTree
+                allNodes={safeTraverse(this.props, ['tree', 'data', 'allNodes'])}
+                nodes={safeTraverse(this.props, ['tree', 'data', 'treeRoot', 'children'])}
+                nextNodesAccessorField="children"
+                methodLookup={safeTraverse(this.props, ['tree', 'data', 'methodLookup'])}
+              />
+            </div>
+          </div>
+        </Tabs>
       </div>
     );
   }
@@ -81,6 +100,26 @@ export class CPUSamplingComponent extends Component {
 
 CPUSamplingComponent.propTypes = {
   fetchCPUSampling: PropTypes.func,
+  params: PropTypes.shape({
+    traceName: PropTypes.string.isRequired,
+  }),
+  tree: PropTypes.shape({
+    asyncStatus: PropTypes.string,
+    data: PropTypes.shape({
+      allNodes: PropTypes.array,
+      methodLookup: PropTypes.array,
+      terminalNodes: PropTypes.array,
+    }),
+  }),
+  location: PropTypes.shape({
+    query: PropTypes.shape({
+      app: PropTypes.string,
+      cluster: PropTypes.string,
+      proc: PropTypes.string,
+      workType: PropTypes.string,
+      profileStart: PropTypes.string,
+    }),
+  }),
 };
 
 const mapStateToProps = state => ({

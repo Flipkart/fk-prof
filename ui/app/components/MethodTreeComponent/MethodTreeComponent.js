@@ -8,18 +8,19 @@ import debounce from 'utils/debounce';
 import 'react-treeview/react-treeview.css';
 import styles from './MethodTreeComponent.css';
 
-let allNodes;
 let globalOnCPUSum = 0;
 
 const noop = () => {};
 const filterPaths = (pathSubset, k) => k.indexOf(pathSubset) === 0;
 
-const dedupeNodes = nextNodesAccessorField => (nodes) => {
+const dedupeNodes = allNodes => nextNodesAccessorField => (nodes) => {
   const dedupedNodes = nodes.reduce((prev, curr) => {
     let childOnStack;
     if (Array.isArray(curr)) {
       childOnStack = curr[1];
       curr = allNodes[curr[0]];
+    } else if (Number.isInteger(curr)) {
+      curr = allNodes[curr];
     } else {
       // will be executed only for top level nodes
       // store the global onCPU count
@@ -29,8 +30,15 @@ const dedupeNodes = nextNodesAccessorField => (nodes) => {
     const newCurr = Object.assign({}, curr);
     const evaluatedOnStack = childOnStack || newCurr.onStack;
     newCurr.onStack = evaluatedOnStack;
+    // only do this if it's bottom-up or nextNodesAccessorField === 'parent'
     // change structure of parent array, store onStack also
-    newCurr[nextNodesAccessorField] = newCurr.name ? [[...curr[nextNodesAccessorField], evaluatedOnStack]] : [];
+    if (nextNodesAccessorField === 'parent') {
+      newCurr[nextNodesAccessorField] = newCurr.name
+        ? [[...curr[nextNodesAccessorField], evaluatedOnStack]] : [];
+    } else {
+      // children case, as children [] might not be present
+      newCurr[nextNodesAccessorField] = newCurr[nextNodesAccessorField] || [];
+    }
     // use child's onStack value if available,
     // will be available from penultimate node level
 
@@ -52,7 +60,12 @@ const dedupeNodes = nextNodesAccessorField => (nodes) => {
       .sort((a, b) => b.onStack - a.onStack),
   };
 };
-const stringifierFunction = a => Array.isArray(a) ? a[0] : a.name;
+
+const stringifierFunction = function (a) {
+  if (Array.isArray(a)) return a[0];
+  if (Number.isInteger(a)) return a;
+  return a.name;
+};
 
 
 class MethodTreeComponent extends Component {
@@ -67,11 +80,9 @@ class MethodTreeComponent extends Component {
     this.handleFilterChange = this.handleFilterChange.bind(this);
     this.highlight = this.highlight.bind(this);
     this.debouncedHandleFilterChange = debounce(this.handleFilterChange, 250);
-    this.memoizedDedupeNodes = memoize(dedupeNodes(props.nextNodesAccessorField), stringifierFunction, true);
-  }
-
-  componentDidMount () {
-    allNodes = safeTraverse(this.props, ['allNodes']);
+    this.memoizedDedupeNodes = memoize(
+      dedupeNodes(props.allNodes)(props.nextNodesAccessorField), stringifierFunction, true,
+    );
   }
 
   getTree (nodes = [], pName = '', filterText) {
@@ -185,28 +196,25 @@ class MethodTreeComponent extends Component {
     const treeNodes = this.getTree(this.props.nodes, '', filterText);
     return (
       <div style={{ padding: '0 10px', margin: '20px 0px' }}>
-        <div className={styles.card}>
-          <h3 style={{ display: 'flex', alignItems: 'center' }}>
-            <span>Hot Methods</span>
-            <input
-              className={styles.filter}
-              type="text"
-              placeholder="Type to filter"
-              autoFocus
-              defaultValue={filterText}
-              onChange={this.debouncedHandleFilterChange}
-            />
-          </h3>
-          {!!treeNodes.length && (
-            <div>
-              <div style={{ width: '100%', position: 'relative', height: 20 }}>
-                <div className={`${styles.code} ${styles.heading}`}>Method name</div>
-                <div className={`${styles.onCPU} ${styles.heading}`}>On CPU</div>
-                <div className={`${styles.onStack} ${styles.heading}`}>On Stack</div>
+        <div>
+          <div>
+            <div style={{ width: '100%', position: 'relative', height: 30 }}>
+              <div className={`${styles.code} ${styles.heading}`}>
+                Method name
+                <input
+                  className={styles.filter}
+                  type="text"
+                  placeholder="Type to filter"
+                  autoFocus
+                  defaultValue={filterText}
+                  onChange={this.debouncedHandleFilterChange}
+                />
               </div>
-              {treeNodes}
+              <div className={`${styles.onCPU} ${styles.heading}`}>On CPU</div>
+              <div className={`${styles.onStack} ${styles.heading}`}>On Stack</div>
             </div>
-          )}
+            {treeNodes}
+          </div>
           {filterText && !treeNodes.length && (
             <p className={styles.alert}>Sorry, no results found for your search query!</p>
           )}

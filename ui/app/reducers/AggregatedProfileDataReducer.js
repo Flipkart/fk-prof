@@ -33,7 +33,7 @@ function createTree (input, methodLookup, terminalNodes = []) {
     return { index: currentNodeIndex };
   }
   return {
-    treeRoot: formTree(0).node,
+    treeRoot: allNodes[formTree(0).index],
     allNodes,
     methodLookup,
     terminalNodes: terminalNodes.sort((a, b) => b.onCPU - a.onCPU),
