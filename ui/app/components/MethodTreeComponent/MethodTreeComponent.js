@@ -1,19 +1,19 @@
 import React, { Component } from 'react';
 import TreeView from 'react-treeview';
 import { withRouter } from 'react-router';
-import safeTraverse from 'utils/safeTraverse';
 import memoize from 'utils/memoize';
 import debounce from 'utils/debounce';
 
 import 'react-treeview/react-treeview.css';
 import styles from './MethodTreeComponent.css';
 
-let globalOnCPUSum = 0;
-
 const noop = () => {};
 const filterPaths = (pathSubset, k) => k.indexOf(pathSubset) === 0;
 
+const getNode = allNodes => node => Number.isInteger(node) ? allNodes[node] : node;
+
 const dedupeNodes = allNodes => nextNodesAccessorField => (nodes) => {
+  let globalOnCPUSum = 0;
   const dedupedNodes = nodes.reduce((prev, curr) => {
     let childOnStack;
     if (Array.isArray(curr)) {
@@ -58,6 +58,7 @@ const dedupeNodes = allNodes => nextNodesAccessorField => (nodes) => {
     dedupedNodes: Object.keys(dedupedNodes)
       .map(k => ({ ...dedupedNodes[k] }))
       .sort((a, b) => b.onStack - a.onStack),
+    globalOnCPUSum,
   };
 };
 
@@ -85,21 +86,32 @@ class MethodTreeComponent extends Component {
     );
   }
 
-  getTree (nodes = [], pName = '', filterText) {
-    const { dedupedNodes } = this.memoizedDedupeNodes(...nodes);
+  getTree = percentageDenominator => (nodes = [], pName = '', filterText) => {
+    // only need to de-dupe for bottom-up not top-down,
+    // hence the ternary :/
+    const { dedupedNodes, globalOnCPUSum } = this.props.nextNodesAccessorField === 'parent'
+      ? this.memoizedDedupeNodes(...nodes)
+      : { dedupedNodes: nodes.map(getNode(this.props.allNodes)) };
+    
+    // for call tree, it'll be passed from the parent
+    // and for bottom-up we'll use the top level globalOnCPUSum,
+    // and pass it around till the leaf level
+    percentageDenominator = percentageDenominator || globalOnCPUSum;
     const dedupedTreeNodes = dedupedNodes.map((n, i) => {
-      const uniqueId = `${pName.toString()}->${n.name.toString()}`;
+      // using the index because in call tree the name of sibling nodes
+      // can be same, react will throw up, argh!
+      const uniqueId = `${this.props.nextNodesAccessorField !== 'parent' ? i : ''}${pName.toString()}->${n.name.toString()}`;
       const newNodes = n[this.props.nextNodesAccessorField];
       const displayName = this.props.methodLookup[n.name];
-      const onStackPercentage = Number((n.onStack * 100) / globalOnCPUSum).toFixed(2);
-      const onCPUPercentage = Number((n.onCPU * 100) / globalOnCPUSum).toFixed(2);
+      const onStackPercentage = Number((n.onStack * 100) / percentageDenominator).toFixed(2);
+      const onCPUPercentage = Number((n.onCPU * 100) / percentageDenominator).toFixed(2);
       const showDottedLine = pName && dedupedNodes.length >= 2 && dedupedNodes.length !== i + 1 &&
         this.state.opened[uniqueId];
       const isHighlighted = Object.keys(this.state.highlighted)
         .filter(filterPaths.bind(null, uniqueId));
       return (
         <TreeView
-          nodeName={displayName}
+          data-nodename={displayName}
           itemClassName={`${styles.relative} ${styles.hover} ${showDottedLine ? 'dotted-line' : ''}`}
           key={uniqueId}
           defaultCollapsed={!(this.state.opened[uniqueId] && newNodes)}
@@ -121,7 +133,7 @@ class MethodTreeComponent extends Component {
                   </div>
                 </div>
               )}
-              {pName && (
+              {(this.props.nextNodesAccessorField !== 'parent' || pName) && (
                 <div className={`${styles.pill} ${styles.onStack}`}>
                   <div className={styles.number}>{n.onStack}</div>
                   <div className={styles.percentage}>
@@ -135,13 +147,13 @@ class MethodTreeComponent extends Component {
           onClick={newNodes ? this.toggle.bind(this, uniqueId) : noop}
         >
           {
-            this.state.opened[uniqueId] && newNodes && this.getTree(newNodes, uniqueId)
+            this.state.opened[uniqueId] && newNodes && this.getTree(percentageDenominator)(newNodes, uniqueId)
           }
         </TreeView>
       );
     });
     return filterText
-      ? dedupedTreeNodes.filter(node => node.props.nodeName.match(new RegExp(filterText, 'i')))
+      ? dedupedTreeNodes.filter(node => node.props['data-nodename'].match(new RegExp(filterText, 'i')))
       : dedupedTreeNodes;
   }
 
@@ -193,7 +205,7 @@ class MethodTreeComponent extends Component {
   render () {
     const { filterText } = this.props.location.query;
     const { nextNodesAccessorField } = this.props;
-    const treeNodes = this.getTree(this.props.nodes, '', filterText);
+    const treeNodes = this.getTree(this.props.percentageDenominator)(this.props.nodes, '', filterText);
     return (
       <div style={{ padding: '0 10px', margin: '20px 0px' }}>
         <div>

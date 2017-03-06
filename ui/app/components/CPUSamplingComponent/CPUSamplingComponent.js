@@ -89,6 +89,7 @@ export class CPUSamplingComponent extends Component {
                 nodes={safeTraverse(this.props, ['tree', 'data', 'treeRoot', 'children'])}
                 nextNodesAccessorField="children"
                 methodLookup={safeTraverse(this.props, ['tree', 'data', 'methodLookup'])}
+                percentageDenominator={safeTraverse(this.props, ['tree', 'data', 'treeRoot', 'onStack'])}
               />
             </div>
           </div>
