@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import {
   Route,
   Router,
-  IndexRoute,
+  IndexRedirect,
   browserHistory,
 } from 'react-router';
 import { Provider } from 'react-redux';
@@ -18,12 +18,16 @@ import store from './store';
 import Root from 'components/RootComponent';
 import App from 'components/AppComponent';
 import CPUSampling from 'components/CPUSamplingComponent';
+import AggregatedProfileDataContainer from 'components/AggregatedProfileDataContainer';
 
 import './assets/styles/global.css';
 
 const routes = (
   <Route path="/" component={Root}>
-    <IndexRoute component={App} />
+    <IndexRedirect to="/profiler" />
+    <Route path="/profiler" component={App}>
+      <Route path="/profiler/profile-data/:traceName" component={AggregatedProfileDataContainer} />
+    </Route>
     <Route path="/work-type/cpu_sample_work/:traceName" component={CPUSampling} />
   </Route>
 );

@@ -14,7 +14,7 @@ const AppComponent = (props) => {
   const selectedCluster = props.location.query.cluster;
   const selectedProc = props.location.query.proc;
   const start = props.location.query.start;
-  const end = props.location.query.end;
+  const end = start ? (new Date(start).getTime() + ((24 * 3600 * 1000) - 1)) : '';
 
   const updateQueryParams = ({ pathname = '/', query }) => props.router.push({ pathname, query });
   const updateAppQueryParam = o => updateQueryParams({ query: { app: o.name } });
@@ -31,17 +31,6 @@ const AppComponent = (props) => {
         cluster: selectedCluster,
         proc: selectedProc,
         start: dateTimeObject.toISOString(),
-      },
-    });
-  };
-  const updateEndTime = (dateTimeObject) => {
-    updateQueryParams({
-      query: {
-        app: selectedApp,
-        cluster: selectedCluster,
-        proc: selectedProc,
-        start,
-        end: dateTimeObject.toISOString(),
       },
     });
   };
@@ -64,7 +53,7 @@ const AppComponent = (props) => {
             />
           )}
         </div>
-        <div className="mdl-cell mdl-cell--2-col">
+        <div className="mdl-cell mdl-cell--3-col">
           {selectedApp && selectedCluster && (
             <ProcSelect
               app={selectedApp}
@@ -76,20 +65,15 @@ const AppComponent = (props) => {
         </div>
         {
           selectedApp && selectedCluster && selectedProc && (
-            <div className="mdl-cell mdl-cell--4-col">
-              <label className={styles['label']} htmlFor="startTime">Profiles started between</label>
+            <div className="mdl-cell mdl-cell--3-col">
+              <label className={styles['label']} htmlFor="startTime">Date</label>
               <div>
                 <DateTime
                   className={styles['date-time']}
                   defaultValue={start ? new Date(start) : ''}
                   onChange={updateStartTime}
                   dateFormat="DD-MM-YYYY"
-                />
-                <DateTime
-                  className={styles['date-time']}
-                  defaultValue={end ? new Date(end) : ''}
-                  onChange={updateEndTime}
-                  dateFormat="DD-MM-YYYY"
+                  timeFormat={false}
                 />
               </div>
             </div>
@@ -99,7 +83,7 @@ const AppComponent = (props) => {
       {
         selectedProc && start && end && (
           <div className="mdl-grid">
-            <div className="mdl-cell mdl-cell--12-col">
+            <div className="mdl-cell mdl-cell--4-col">
               <ProfileList
                 app={selectedApp}
                 cluster={selectedCluster}
@@ -107,6 +91,9 @@ const AppComponent = (props) => {
                 start={start}
                 end={end}
               />
+            </div>
+            <div className="mdl-cell mdl-cell--8-col">
+              {props.children || <h2 className={styles.ingrained}>Select a Trace</h2>}
             </div>
           </div>
         )}
@@ -116,6 +103,7 @@ const AppComponent = (props) => {
 
 AppComponent.propTypes = {
   location: React.PropTypes.object,
+  children: React.PropTypes.node,
 };
 
 export default withRouter(AppComponent);

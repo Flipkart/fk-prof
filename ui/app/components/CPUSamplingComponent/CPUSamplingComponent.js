@@ -3,7 +3,7 @@ import TreeView from 'react-treeview';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router';
 
-import fetchCPUSamplingAction from 'actions/CPUSamplingActions';
+import fetchCPUSamplingAction from 'actions/AggregatedProfileDataActions';
 import safeTraverse from 'utils/safeTraverse';
 import memoize from 'utils/memoize';
 import debounce from 'utils/debounce';
@@ -74,13 +74,14 @@ export class CPUSamplingComponent extends Component {
   }
 
   componentDidMount () {
-    const { app, cluster, proc, workType, profileStart } = this.props.location.query;
+    const { app, cluster, proc, workType, profileStart, selectedWorkType } = this.props.location.query;
     const { traceName } = this.props.params;
     this.props.fetchCPUSampling({
       app,
       cluster,
       proc,
       workType,
+      selectedWorkType,
       traceName,
       query: { start: profileStart },
     });
@@ -279,7 +280,7 @@ CPUSamplingComponent.propTypes = {
 };
 
 const mapStateToProps = state => ({
-  tree: state.cpuSampling || {},
+  tree: state.aggregatedProfileData || {},
 });
 
 const mapDispatchToProps = dispatch => ({

@@ -4,8 +4,6 @@ import {
   GET_PROFILES_FAILURE,
 } from 'actions/ProfileActions';
 
-export const getUniqueId = r => `${r.app}/${r.cluster}/${r.proc}/${r.workType}`;
-
 export default function (state = {}, action) {
   switch (action.type) {
     case GET_PROFILES_REQUEST:

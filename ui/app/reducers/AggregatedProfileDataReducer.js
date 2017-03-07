@@ -1,8 +1,8 @@
 import {
-  GET_CPU_SAMPLING_REQUEST,
-  GET_CPU_SAMPLING_SUCCESS,
-  GET_CPU_SAMPLING_FAILURE,
-} from 'actions/CPUSamplingActions';
+  AGGREGATED_PROFILE_DATA_REQUEST,
+  AGGREGATED_PROFILE_DATA_SUCCESS,
+  AGGREGATED_PROFILE_DATA_FAILURE,
+} from 'actions/AggregatedProfileDataActions';
 
 function createTree (input, methodLookup, terminalNodes = []) {
   const allNodes = [];
@@ -42,12 +42,12 @@ function createTree (input, methodLookup, terminalNodes = []) {
 
 export default function (state = {}, action) {
   switch (action.type) {
-    case GET_CPU_SAMPLING_REQUEST:
+    case AGGREGATED_PROFILE_DATA_REQUEST:
       return {
         asyncStatus: 'PENDING',
       };
 
-    case GET_CPU_SAMPLING_SUCCESS: {
+    case AGGREGATED_PROFILE_DATA_SUCCESS: {
       const { aggregated_samples: { frame_nodes }, method_lookup } = action.res;
       const data = createTree(frame_nodes, method_lookup);
       return {
@@ -55,7 +55,7 @@ export default function (state = {}, action) {
         data,
       };
     }
-    case GET_CPU_SAMPLING_FAILURE:
+    case AGGREGATED_PROFILE_DATA_FAILURE:
       return {
         asyncStatus: 'ERROR',
       };

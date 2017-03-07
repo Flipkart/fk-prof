@@ -1,0 +1,10 @@
+.aggregated-container {
+  border: 1px solid #F5B800;
+
+  .header {
+    text-align: center;
+    button {
+      border-radius: 0px;
+    }
+  }
+}

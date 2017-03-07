@@ -4,8 +4,6 @@
 }
 
 .date-time {
-  display: inline-block;
-  width: 50%;
   input {
     width: 100%;
     border-radius: 5px;
@@ -14,4 +12,10 @@
     padding: 0px 10px;
     box-sizing: border-box;
   }
+}
+
+.ingrained {
+  color: #ADADAD;
+  text-align: center;
+  margin: 30px;
 }

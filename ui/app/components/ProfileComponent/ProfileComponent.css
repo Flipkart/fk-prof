@@ -1,0 +1,14 @@
+.main {
+  margin-bottom: 4px;
+  border: 1px solid #F5B800;
+  .heading {
+    background: #ffe7a1;
+    padding: 8px;
+    margin: 0;
+    text-align: center;
+  }
+
+  .center {
+    text-align: center;
+  }
+}

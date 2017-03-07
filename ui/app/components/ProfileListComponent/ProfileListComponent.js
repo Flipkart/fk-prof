@@ -2,14 +2,13 @@ import React, { Component, PropTypes } from 'react';
 import { connect } from 'react-redux';
 import { Link } from 'react-router';
 import moment from 'moment';
-import TreeView from 'react-treeview';
 
 import { fetchProfilesAction } from 'actions/ProfileActions';
 import { objectToQueryParams } from 'utils/UrlUtils';
-import fetchTracesAction from 'actions/TraceActions';
 import Loader from 'components/LoaderComponent';
 import safeTraverse from 'utils/safeTraverse';
-import { getUniqueId } from 'reducers/TraceReducer';
+import dateFormat from 'utils/dateFormat';
+import Profile from 'components/ProfileComponent';
 
 import styles from './ProfileListComponent.css';
 import 'react-treeview/react-treeview.css';
@@ -32,8 +31,29 @@ class ProfileListComponent extends Component {
     });
   }
 
+  componentWillReceiveProps (nextProps) {
+    const { app, cluster, proc, start, end } = nextProps;
+    const didAppChange = app !== this.props.app;
+    const didClusterChange = cluster !== this.props.cluster;
+    const didProcChange = proc !== this.props.proc;
+    const didStartDateChange = start !== this.props.start;
+    if (didAppChange || didClusterChange || didProcChange || didStartDateChange) {
+      const startObject = moment(start);
+      const endObject = moment(end);
+      this.props.fetchProfiles({
+        app,
+        cluster,
+        proc,
+        query: {
+          start,
+          duration: endObject.diff(startObject, 'seconds'),
+        },
+      });
+    }
+  }
+
   render () {
-    const { profiles, app, cluster, proc, start, end } = this.props;
+    const { profiles, app, cluster, proc } = this.props;
     if (!profiles) return null;
     if (profiles.asyncStatus === 'PENDING') {
       return (
@@ -42,68 +62,27 @@ class ProfileListComponent extends Component {
     }
 
     if (profiles.asyncStatus === 'SUCCESS') {
+      if (!profiles.data.succeeded.length) {
+        return <h2 className={styles.error}>No profiles found</h2>;
+      }
+
+      const sortedProfiles = profiles.data.succeeded.slice().sort((a, b) => {
+        return new Date(b.start).getTime() - new Date(a.start).getTime();
+      });
       return (
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Start Time</th>
-              <th>End Time</th>
-              <th>Worktypes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {profiles.data.map(profile => (
-              <tr key={`${profile.start}${profile.end}`}>
-                <td>{moment(profile.start).format('Do MMM YYYY, h:mm:ss a')}</td>
-                <td>{moment(profile.end).format('Do MMM YYYY, h:mm:ss a')}</td>
-                <td>
-                  {
-                    profile.values.map((workType) => {
-                      const payload = {
-                        cluster,
-                        app,
-                        proc,
-                        query: { start: profile.start },
-                        workType,
-                      };
-                      const traces = this.props.traces[getUniqueId(payload)] || {};
-                      const queryParams = { workType, cluster, app, proc, profileStart: profile.start };
-                      const content = {
-                        PENDING: <Loader />,
-                        SUCCESS: traces && traces.data && traces.data.map(traceName => (
-                          <TreeView
-                            key={traceName.name}
-                            defaultCollapsed
-                            className={styles.hidden}
-                            nodeLabel={
-                              <a
-                                rel="noopener noreferrer"
-                                target="_blank"
-                                href={`/work-type/${workType}/${traceName.name}?${objectToQueryParams(queryParams)}`}
-                              >
-                                {traceName.name}
-                              </a>
-                            }
-                          />
-                        )),
-                      }[traces.asyncStatus];
-                      return (
-                        <TreeView
-                          defaultCollapsed
-                          nodeLabel={workType}
-                          key={workType}
-                          onClick={this.props.getTraces.bind(null, payload)}
-                        >
-                          { content }
-                        </TreeView>
-                      );
-                    })
-                  }
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
+          {sortedProfiles.map((profile) => {
+            const date = new Date(profile.start);
+            return (
+              <Profile
+                key={profile.start}
+                heading={dateFormat(date, 'profileList')}
+                traces={profile.traces}
+                start={profile.start}
+              />
+            );
+          })}
+        </div>
       );
     }
     return null;
@@ -115,7 +94,7 @@ ProfileListComponent.propTypes = {
   cluster: PropTypes.string.isRequired,
   proc: PropTypes.string.isRequired,
   start: PropTypes.string.isRequired,
-  end: PropTypes.string.isRequired,
+  end: PropTypes.number.isRequired,
   fetchProfiles: PropTypes.func.isRequired,
   profiles: PropTypes.object.isRequired,
   getTraces: PropTypes.func.isRequired,
