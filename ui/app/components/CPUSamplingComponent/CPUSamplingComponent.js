@@ -25,7 +25,7 @@ export class CPUSamplingComponent extends Component {
   }
 
   render () {
-    const { app, cluster, proc } = this.props.location.query;
+    const { app, cluster, proc, fullScreen, profileStart } = this.props.location.query;
     const { traceName } = this.props.params;
 
     if (!this.props.tree.asyncStatus) return null;
@@ -49,26 +49,43 @@ export class CPUSamplingComponent extends Component {
 
     return (
       <div>
-        <div className={styles.card} style={{ background: '#C5CAE9' }}>
-          <div className="mdl-grid">
-            <div className="mdl-cell mdl-cell--3-col">
-              <div className={styles.label}>App</div>
-              <strong className={styles.bold}>{app}</strong>
-            </div>
-            <div className="mdl-cell mdl-cell--3-col">
-              <div className={styles.label}>Cluster</div>
-              <strong className={styles.bold}>{cluster}</strong>
-            </div>
-            <div className="mdl-cell mdl-cell--3-col">
-              <div className={styles.label}>Proc</div>
-              <strong className={styles.bold}>{proc}</strong>
-            </div>
-            <div className="mdl-cell mdl-cell--3-col">
-              <div className={styles.label}>Trace Name</div>
-              <strong className={styles.bold}>{traceName} (CPU Sampling)</strong>
+        {!fullScreen && (
+          <div style={{ position: 'relative' }}>
+            <a
+              href={`/work-type/cpu_sample_work/${traceName}?app=${app}&cluster=${cluster}&proc=${proc}&profileStart=${profileStart}&workType=cpu_sample_work&fullScreen=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ position: 'absolute', right: 10, top: 20, zIndex: 1 }}
+            >
+              <i
+                className="material-icons"
+                display
+              >launch</i>
+            </a>
+          </div>
+        )}
+        {fullScreen && (
+          <div className={styles.card} style={{ background: '#C5CAE9' }}>
+            <div className="mdl-grid">
+              <div className="mdl-cell mdl-cell--3-col">
+                <div className={styles.label}>App</div>
+                <strong className={styles.bold}>{app}</strong>
+              </div>
+              <div className="mdl-cell mdl-cell--3-col">
+                <div className={styles.label}>Cluster</div>
+                <strong className={styles.bold}>{cluster}</strong>
+              </div>
+              <div className="mdl-cell mdl-cell--3-col">
+                <div className={styles.label}>Proc</div>
+                <strong className={styles.bold}>{proc}</strong>
+              </div>
+              <div className="mdl-cell mdl-cell--3-col">
+                <div className={styles.label}>Trace Name</div>
+                <strong className={styles.bold}>{traceName} (CPU Sampling)</strong>
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <Tabs>
           <div>
             <div>Hot Methods</div>
@@ -82,7 +99,9 @@ export class CPUSamplingComponent extends Component {
             </div>
           </div>
           <div>
-            <div>Call Tree</div>
+            <div>
+              Call Tree
+            </div>
             <div>
               <MethodTree
                 allNodes={safeTraverse(this.props, ['tree', 'data', 'allNodes'])}
@@ -119,6 +138,7 @@ CPUSamplingComponent.propTypes = {
       proc: PropTypes.string,
       workType: PropTypes.string,
       profileStart: PropTypes.string,
+      selectedWorkType: PropTypes.string,
     }),
   }),
 };

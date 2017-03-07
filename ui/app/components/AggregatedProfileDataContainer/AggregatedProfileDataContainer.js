@@ -64,7 +64,12 @@ class AggregatedProfileDataContainer extends React.Component {
           ))}
         </div>
         <div>
-          {Komponent && <Komponent />}
+          {Komponent && (
+            <Komponent
+              location={this.props.location}
+              params={this.props.params}
+            />
+          )}
         </div>
       </div>
     );
