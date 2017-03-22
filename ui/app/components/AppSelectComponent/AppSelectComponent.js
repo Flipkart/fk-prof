@@ -8,32 +8,38 @@ import styles from './AppSelectComponent.css';
 
 const noop = () => {};
 
-const AppSelectComponent = props => {
-  const options = props.apps.asyncStatus === 'SUCCESS'
-    ? props.apps.data.map(a => ({ name: a })) : [];
+class AppSelectComponent extends React.Component {
+  componentDidMount () {
+    this.props.getApps('');
+  }
 
-  const noResultsText = props.apps.asyncStatus === 'SUCCESS'
-    && props.apps.data.length === 0 ? 'No results found!' : 'Searching...';
-  const valueOption = props.value && { name: props.value };
-  return (
-    <div>
-      <label className={styles.label} htmlFor="appid">Select App</label>
-      <Select
-        clearable={false}
-        id="appid"
-        options={options}
-        value={valueOption}
-        onChange={props.onChange || noop}
-        labelKey="name"
-        valueKey="name"
-        onInputChange={debounce(props.getApps, 500)}
-        isLoading={props.apps.asyncStatus === 'PENDING'}
-        noResultsText={noResultsText}
-        placeholder="Type to search..."
-      />
-    </div>
-  );
-};
+  render () {
+    const options = this.props.apps.asyncStatus === 'SUCCESS'
+      ? this.props.apps.data.map(a => ({ name: a })) : [];
+
+    const noResultsText = this.props.apps.asyncStatus === 'SUCCESS'
+      && this.props.apps.data.length === 0 ? 'No results found!' : 'Searching...';
+    const valueOption = this.props.value && { name: this.props.value };
+    return (
+      <div>
+        <label className={styles.label} htmlFor="appid">Select App</label>
+        <Select
+          clearable={false}
+          id="appid"
+          options={options}
+          value={valueOption}
+          onChange={this.props.onChange || noop}
+          labelKey="name"
+          valueKey="name"
+          onInputChange={debounce(this.props.getApps, 500)}
+          isLoading={this.props.apps.asyncStatus === 'PENDING'}
+          noResultsText={noResultsText}
+          placeholder="Type to search..."
+        />
+      </div>
+    );
+  }
+}
 
 const mapStateToProps = state => ({ apps: state.apps });
 const mapDispatchToProps = dispatch => ({
