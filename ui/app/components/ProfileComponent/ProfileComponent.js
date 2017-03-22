@@ -23,7 +23,7 @@ class ProfileComponent extends React.Component {
       ? this.props.traces.slice(0, 3) : this.props.traces;
     return (
       <div className={styles['main']}>
-        <h3 className={styles.heading}>{this.props.heading}</h3>
+        <h4 className={styles.heading}>{this.props.heading}</h4>
         <ol>
           {list && list.map(l => (
             <li key={l}>

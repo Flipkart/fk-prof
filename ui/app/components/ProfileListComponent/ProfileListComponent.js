@@ -72,11 +72,14 @@ class ProfileListComponent extends Component {
       return (
         <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
           {sortedProfiles.map((profile) => {
-            const date = new Date(profile.start);
+            const startTime = new Date(profile.start);
+            const endTime = new Date(startTime.getTime() + profile.duration);
             return (
               <Profile
                 key={profile.start}
-                heading={dateFormat(date, 'profileList')}
+                heading={`
+                  ${dateFormat(startTime, 'profileList')} - ${dateFormat(endTime, 'profileList')}
+                `}
                 traces={profile.traces}
                 start={profile.start}
               />
