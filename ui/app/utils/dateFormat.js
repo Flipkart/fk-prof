@@ -5,7 +5,7 @@ function pad (number) {
 }
 
 function getProfileListFormat (date) {
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 // takes in date object and view

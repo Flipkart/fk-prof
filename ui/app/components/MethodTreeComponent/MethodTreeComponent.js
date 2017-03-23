@@ -18,13 +18,14 @@ const dedupeNodes = allNodes => nextNodesAccessorField => (nodes) => {
     let childOnStack;
     if (Array.isArray(curr)) {
       childOnStack = curr[1];
-      curr = allNodes[curr[0]];
+      curr = Object.assign({}, allNodes[curr[0]]);
     } else if (Number.isInteger(curr)) {
-      curr = allNodes[curr];
+      curr = Object.assign({}, allNodes[curr]);
     } else {
       // will be executed only for top level nodes
       // store the global onCPU count
       globalOnCPUSum += curr.onCPU;
+      curr.onStack = curr.onCPU;
     }
     const newPrev = Object.assign({}, prev);
     const newCurr = Object.assign({}, curr);
@@ -91,7 +92,7 @@ class MethodTreeComponent extends Component {
     // hence the ternary :/
     const { dedupedNodes, globalOnCPUSum } = this.props.nextNodesAccessorField === 'parent'
       ? this.memoizedDedupeNodes(...nodes)
-      : { dedupedNodes: nodes.map(getNode(this.props.allNodes)) };
+      : { dedupedNodes: nodes.map(getNode(this.props.allNodes)).slice().sort((a, b) => b.onStack - a.onStack) };
     
     // for call tree, it'll be passed from the parent
     // and for bottom-up we'll use the top level globalOnCPUSum,

@@ -1,10 +1,8 @@
 import React, { Component, PropTypes } from 'react';
 import { connect } from 'react-redux';
-import { Link } from 'react-router';
 import moment from 'moment';
 
 import { fetchProfilesAction } from 'actions/ProfileActions';
-import { objectToQueryParams } from 'utils/UrlUtils';
 import Loader from 'components/LoaderComponent';
 import safeTraverse from 'utils/safeTraverse';
 import dateFormat from 'utils/dateFormat';
@@ -12,7 +10,6 @@ import Profile from 'components/ProfileComponent';
 
 import styles from './ProfileListComponent.css';
 import 'react-treeview/react-treeview.css';
-
 
 
 class ProfileListComponent extends Component {
@@ -53,7 +50,7 @@ class ProfileListComponent extends Component {
   }
 
   render () {
-    const { profiles, app, cluster, proc } = this.props;
+    const { profiles } = this.props;
     if (!profiles) return null;
     if (profiles.asyncStatus === 'PENDING') {
       return (
@@ -66,14 +63,15 @@ class ProfileListComponent extends Component {
         return <h2 className={styles.error}>No profiles found</h2>;
       }
 
-      const sortedProfiles = profiles.data.succeeded.slice().sort((a, b) => {
-        return new Date(b.start).getTime() - new Date(a.start).getTime();
-      });
+      const sortedProfiles = profiles.data.succeeded
+        .slice()
+        .sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime());
+
       return (
         <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
           {sortedProfiles.map((profile) => {
             const startTime = new Date(profile.start);
-            const endTime = new Date(startTime.getTime() + profile.duration);
+            const endTime = new Date(startTime.getTime() + (profile.duration * 1000));
             return (
               <Profile
                 key={profile.start}
@@ -101,8 +99,6 @@ ProfileListComponent.propTypes = {
   end: PropTypes.number.isRequired,
   fetchProfiles: PropTypes.func.isRequired,
   profiles: PropTypes.object.isRequired,
-  getTraces: PropTypes.func.isRequired,
-  traces: PropTypes.object,
 };
 
 const mapStateToProps = state => ({
@@ -112,7 +108,6 @@ const mapStateToProps = state => ({
 
 const mapDispatchToProps = dispatch => ({
   fetchProfiles: params => dispatch(fetchProfilesAction(params)),
-  getTraces: params => dispatch(fetchTracesAction(params)),
 });
 
 export default connect(mapStateToProps, mapDispatchToProps)(ProfileListComponent);
