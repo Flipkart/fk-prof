@@ -82,6 +82,7 @@ class ProfileListComponent extends Component {
                 `}
                 traces={profile.traces}
                 start={profile.start}
+                workTypeSummary={profile.ws_summary}
               />
             );
           })}
