@@ -1,0 +1,21 @@
+#!/bin/bash -e
+
+function logmsg(){
+	echo "[`date`] $*"
+}
+
+function die()
+{
+	logmsg "*** ERROR: $*" >&2
+	exit 1
+}
+
+[ -z "${DEB_DIR}" ] && die "No debian directory specified"
+[ -z "${DEB}" ] && die "No destination for debian specified"
+[ -z "${PACKAGE}" ] && die "No base dir specified"
+
+echo "=============== Cleaning up ==============="
+rm -rf ${DEB_DIR} ${DEB}
+
+echo "========= Clean up moved resources========"
+rm -rf ${PACKAGE}/etc/${PACKAGE}

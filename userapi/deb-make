@@ -1,0 +1,53 @@
+#!/bin/bash -e
+
+
+function logmsg(){
+	echo "[`date`] $*"
+}
+
+function die()
+{
+	logmsg "*** ERROR: $*" >&2
+	exit 1
+}
+
+[ -z "${PACKAGE}" ] && die "No base dir specified"
+[ -z "${VERSION}" ] && die "No version for deb specified"
+[ -z "${DEB_DIR}" ] && die "No debian directory specified"
+[ -z "${DEB}" ] && die "No destination for debian specified"
+
+
+echo "=============== Build Config ================="
+echo "PACKAGE: ${PACKAGE}"
+echo "VERSION: ${VERSION}"
+echo "TEMP_DIR: ${DEB_DIR}"
+echo "DEB: ${DEB}"
+
+echo "=============== Maven Build ==================="
+cd ..
+mvn -q clean install
+cd -
+
+echo "=============== Copying Package Files ==================="
+mkdir -p ${PACKAGE}/etc/${PACKAGE}/
+cp -a src/main/conf ${PACKAGE}/etc/${PACKAGE}/
+cp -a src/main/resources ${PACKAGE}/etc/${PACKAGE}/
+mkdir -p ${DEB_DIR} && cp -a ${PACKAGE}/* ${DEB_DIR}
+
+echo "=============== Copying Jars ==================="
+mkdir -p ${DEB_DIR}/usr/share/${PACKAGE}
+JAR=$(ls target | egrep "userapi-[0-9.]+-[a-zA-Z-]+.jar" | head -n1)
+cp -a target/${JAR} ${DEB_DIR}/usr/share/${PACKAGE}/${JAR}
+cd ${DEB_DIR}/usr/share/${PACKAGE}
+ln -s ${JAR} "${PACKAGE}.jar"
+cd -
+
+
+echo "=============== Copying dependencies ==================="
+cp -a target/lib  ${DEB_DIR}/usr/share/${PACKAGE}
+
+echo "=============== Creating DEB ====================="
+sed -i -e "s/_PACKAGE_/${PACKAGE}/g" ${DEB_DIR}/DEBIAN/control
+sed -i -e "s/_VERSION_/${VERSION}/g" ${DEB_DIR}/DEBIAN/control
+echo "PomVersion: $(mvn validate | grep -E 'Building .*' | cut -f3- -d ' ' | rev | cut -f1 -d ' ' | rev)"  >> ${DEB_DIR}/DEBIAN/control
+dpkg -b ${DEB_DIR} ${DEB}

@@ -1,0 +1,8 @@
+Package: _PACKAGE_
+Version: _VERSION_
+Architecture: all
+Section: flipkart/infra
+Priority: standard
+Maintainer: Prof Dev <fk-prof-dev@flipkart.com>
+Depends: default-jre | java8-runtime
+Description: Profiler Backend

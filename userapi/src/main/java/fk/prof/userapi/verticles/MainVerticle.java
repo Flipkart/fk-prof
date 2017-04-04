@@ -5,11 +5,13 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.StorageFactory;
+import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.model.json.ProtoSerializers;
 import io.vertx.core.*;
 import io.vertx.core.json.Json;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +31,8 @@ import java.util.List;
  * Created by rohit.patiyal on 02/02/17.
  */
 public class MainVerticle extends AbstractVerticle {
+    private static Logger logger = LoggerFactory.getLogger(MainVerticle.class);
+
     @Override
     public void start(Future<Void> startFuture) throws Exception {
         // register serializers
@@ -47,14 +51,16 @@ public class MainVerticle extends AbstractVerticle {
         }
         CompositeFuture.all(futureList).setHandler(event -> {
             if (event.succeeded()) {
+                logger.info("Deployment of all HttpVerticles succeeded");
                 startFuture.complete();
             } else {
+                logger.error("Deployment of HttpVerticles failed, Cause from MainVerticle = " + event.cause());
                 startFuture.fail(event.cause());
             }
         });
     }
 
-    public void registerSerializers(ObjectMapper mapper) {
+    private void registerSerializers(ObjectMapper mapper) {
         // protobuf
         ProtoSerializers.registerSerializers(mapper);
 

@@ -1,0 +1,3 @@
+/etc/default/fk-prof-userapi
+/etc/fk-prof-userapi/conf/userapi-conf.json
+/etc/fk-prof-userapi/resources/log4j.properties

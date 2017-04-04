@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -e
+
+PACKAGE="fk-prof-backend"
+SERVICE=/etc/service/${PACKAGE}
+
+case $1 in
+  start)
+	echo "Starting service ..."
+    svc -u ${SERVICE}
+    ;;
+  stop)
+	echo "Stopping service ..."
+    svc -d ${SERVICE}
+    ;;
+  restart)
+	echo "Stopping service ..."
+	svc -d ${SERVICE}
+	sleep 3
+	echo "Starting service ..."
+    svc -u ${SERVICE}
+	;;
+  status)
+    svstat ${SERVICE}
+    ;;
+  shell)
+	exec setuidgid ${PACKAGE} bash
+	;;
+  *)
+  echo "Usage $0 {start|stop|restart|status}"
+    ;;
+esac

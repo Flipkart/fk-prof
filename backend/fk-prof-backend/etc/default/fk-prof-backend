@@ -1,0 +1,51 @@
+#!/bin/bash -e
+
+# java_home
+for loc in java-8-oracle jdk-8-oracle-x64 j2sdk1.8-oracle; do
+	if [ -d "/usr/lib/jvm/$loc" ]; then
+		JAVA_HOME="/usr/lib/jvm/$loc"
+	fi
+done
+
+# Ulimit
+ULIMIT=100000
+
+# process config
+JMX_PORT=8123
+
+# Heap space
+JAVA_OPTS="${JAVA_OPTS} -Xms6g"
+JAVA_OPTS="${JAVA_OPTS} -Xmx6g"
+
+# Set Server JVM
+JAVA_OPTS="${JAVA_OPTS} -server"
+
+# Set to headless, just in case
+JAVA_OPTS="${JAVA_OPTS} -Djava.awt.headless=true"
+
+# Set encoding to UTF-8
+JAVA_OPTS="${JAVA_OPTS} -Dfile.encoding=UTF-8"
+
+# Force the JVM to use IPv4 stack
+JAVA_OPTS="${JAVA_OPTS} -Djava.net.preferIPv4Stack=true"
+
+# Set language and region
+JAVA_OPTS="${JAVA_OPTS} -Duser.language=en -Duser.region=CA"
+
+# GC Options
+JAVA_OPTS="${JAVA_OPTS} -XX:+UseG1GC"
+JAVA_OPTS="${JAVA_OPTS} -verbose:gc  -XX:+PrintTenuringDistribution"
+
+# Flight Recorder
+JAVA_OPTS="${JAVA_OPTS} -XX:+UnlockCommercialFeatures"
+JAVA_OPTS="${JAVA_OPTS} -XX:+FlightRecorder"
+
+# Setup remote JMX monitoring
+JAVA_OPTS="${JAVA_OPTS} -Dcom.sun.management.jmxremote"
+JAVA_OPTS="${JAVA_OPTS} -Dcom.sun.management.jmxremote.authenticate=false"
+JAVA_OPTS="${JAVA_OPTS} -Dcom.sun.management.jmxremote.ssl=false"
+JAVA_OPTS="${JAVA_OPTS} -Dcom.sun.management.jmxremote.port=$JMX_PORT"
+
+# Setup GC logs
+JAVA_OPTS="${JAVA_OPTS} -Xloggc:/var/log/fk-prof-backend/gc.$(date +%Y-%m-%d).log"
+JAVA_OPTS="${JAVA_OPTS} -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps -XX:+PrintGCDetails"

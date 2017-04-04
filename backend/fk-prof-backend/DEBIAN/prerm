@@ -1,0 +1,6 @@
+#!/bin/bash -e
+
+PACKAGE="fk-prof-backend"
+
+svc -dx /etc/service/${PACKAGE}
+rm -rf /etc/sv/${PACKAGE}

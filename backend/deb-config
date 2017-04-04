@@ -1,0 +1,11 @@
+#!/bin/bash -e
+
+#version
+MAJOR_VERSION=1
+MINOR_VERSION=$(git log -n1 --format="%ct")
+export VERSION="${MAJOR_VERSION}.${MINOR_VERSION}"
+
+# deb directory
+export PACKAGE="fk-prof-$(pwd | rev | cut -f1 -d'/' | rev)"
+export DEB_DIR="/tmp/deb-${PACKAGE}-${VERSION}"
+export DEB="/tmp/${PACKAGE}-${VERSION}.deb"
