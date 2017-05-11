@@ -38,8 +38,10 @@ public class ConfigManager {
   private static final String THREAD_POOL = "thread.pool";
   private static final String BUFFER_POOL_OPTIONS_KEY = "bufferPoolOptions";
   private static final String SERIALIZATION_WORKER_POOL_KEY = "serializationWorkerPool";
+  private static final String POLICY_OPTIONS_KEY = "policyOptions";
 
   public static final String METRIC_REGISTRY = "backend-metric-registry";
+  private static final String POLICY_PATH_KEY = "policy.path";
 
   private final JsonObject config;
 
@@ -127,6 +129,14 @@ public class ConfigManager {
       deploymentConfig.put("config", new JsonObject());
     }
     return deploymentConfig;
+  }
+
+  private JsonObject getPolicyConfig() {
+    return config.getJsonObject(POLICY_OPTIONS_KEY, new JsonObject());
+  }
+
+  String getPolicyPath() {
+    return getPolicyConfig().getString(POLICY_PATH_KEY, "/policy");
   }
 
   public static void setDefaultSystemProperties() {

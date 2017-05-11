@@ -3,11 +3,12 @@ package fk.prof.backend.http;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
-import com.google.protobuf.util.JsonFormat;
 import fk.prof.backend.ConfigManager;
 import fk.prof.backend.exception.HttpFailure;
 import fk.prof.backend.model.association.BackendAssociationStore;
 import fk.prof.backend.model.policy.PolicyStore;
+import fk.prof.backend.model.policy.impl.PolicyApiResponse;
+import fk.prof.backend.model.policy.json.PolicyProtobufSerializers;
 import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.ProtoUtil;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
@@ -20,10 +21,12 @@ import io.vertx.core.Future;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.json.Json;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.LoggerHandler;
+import policy.PolicyDetails;
 import recording.Recorder;
 
 import java.io.IOException;
@@ -46,6 +49,8 @@ public class LeaderHttpVerticle extends AbstractVerticle {
   @Override
   public void start(Future<Void> fut) {
     Router router = setupRouting();
+    PolicyProtobufSerializers.registerSerializer(Json.mapper);
+    PolicyProtobufSerializers.registerSerializer(Json.prettyMapper);
     vertx.createHttpServer(HttpHelper.getHttpServerOptions(configManager.getLeaderHttpServerConfig()))
         .requestHandler(router::accept)
         .listen(configManager.getLeaderHttpPort(),
@@ -66,10 +71,12 @@ public class LeaderHttpVerticle extends AbstractVerticle {
     HttpHelper.attachHandlersToRoute(router, HttpMethod.GET, apiPathForGetWork,
         BodyHandler.create().setBodyLimit(1024 * 100), this::handleGetWork);
 
-    //TODO: Rework this once policy store hack is removed
-    String apiPathForUpdatingPolicy = ApiPathConstants.LEADER_POST_POLICY + "/:appId/:clusterId/:procName";
-    HttpHelper.attachHandlersToRoute(router, HttpMethod.POST, apiPathForUpdatingPolicy,
-            BodyHandler.create().setBodyLimit(1024 * 100), this::handlePostPolicy);
+    HttpHelper.attachHandlersToRoute(router, HttpMethod.GET, ApiPathConstants.LEADER_GET_POLICIES_GIVEN_APPID, this::handleGetPoliciesGivenAppId);
+    HttpHelper.attachHandlersToRoute(router, HttpMethod.GET, ApiPathConstants.LEADER_GET_POLICIES_GIVEN_APPID_CLUSTERID, this::handleGetPoliciesGivenAppIdClusterId);
+    HttpHelper.attachHandlersToRoute(router, HttpMethod.GET, ApiPathConstants.LEADER_GET_POLICIES_GIVEN_APPID_CLUSTERID_PROCESS, this::handleGetPolicyGivenAppIdClusterIdProcess);
+
+    HttpHelper.attachHandlersToRoute(router, HttpMethod.PUT, ApiPathConstants.LEADER_PUT_POLICY_GIVEN_APPID_CLUSTERID_PROCESS, BodyHandler.create().setBodyLimit(1024), this::handlePutPolicy);
+    HttpHelper.attachHandlersToRoute(router, HttpMethod.DELETE, ApiPathConstants.LEADER_DELETE_POLICY_GIVEN_APPID_CLUSTERID_PROCESS, BodyHandler.create().setBodyLimit(1024), this::handleDeletePolicy);
 
     return router;
   }
@@ -162,7 +169,7 @@ public class LeaderHttpVerticle extends AbstractVerticle {
         context.response().setStatusCode(400);
         context.response().end("Calling backend=" + RecorderProtoUtil.assignedBackendCompactRepr(callingBackend) + " not assigned to process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup));
       } else {
-        BackendDTO.RecordingPolicy recordingPolicy = this.policyStore.get(processGroup);
+        BackendDTO.RecordingPolicy recordingPolicy = this.policyStore.getRecordingPolicy(processGroup);
         if (recordingPolicy == null) {
           mtrPolicyMiss.mark();
           context.response().setStatusCode(400);
@@ -177,25 +184,64 @@ public class LeaderHttpVerticle extends AbstractVerticle {
     }
   }
 
-  private void handlePostPolicy(RoutingContext context) {
+  private void handleGetPoliciesGivenAppId(RoutingContext context) {
+    final String appId = context.request().getParam("appId");
+    String response = Json.encode(PolicyApiResponse.getNewInstance(policyStore.getUserPolicies(appId)));
+    context.response().putHeader("content-type", "application/json").end(response);
+  }
+
+  private void handleGetPoliciesGivenAppIdClusterId(RoutingContext context) {
+    final String appId = context.request().getParam("appId");
+    final String clusterId = context.request().getParam("clusterId");
+    String response = Json.encode(PolicyApiResponse.getNewInstance(policyStore.getUserPolicies(appId, clusterId)));
+    context.response().putHeader("content-type", "application/json").end(response);
+  }
+
+  private void handleGetPolicyGivenAppIdClusterIdProcess(RoutingContext context) {
+    final String appId = context.request().getParam("appId");
+    final String clusterId = context.request().getParam("clusterId");
+    final String process = context.request().getParam("process");
+    String response = Json.encode(PolicyApiResponse.getNewInstance(policyStore.getUserPolicies(appId, clusterId, process)));
+    context.response().putHeader("content-type", "application/json").end(response);
+  }
+
+  private void handlePutPolicy(RoutingContext context) {
+    final String appId = context.request().getParam("appId");
+    final String clusterId = context.request().getParam("clusterId");
+    final String process = context.request().getParam("process");
     try {
-      String appId = context.request().getParam("appId");
-      String clusterId = context.request().getParam("clusterId");
-      String procName = context.request().getParam("procName");
-
-      // for now expecting a json payload
-      String payload = context.getBodyAsString("utf-8");
-
-      BackendDTO.RecordingPolicy.Builder builder = BackendDTO.RecordingPolicy.newBuilder();
-      JsonFormat.parser().merge(payload, builder);
-
-      BackendDTO.RecordingPolicy policy = builder.build();
-      Recorder.ProcessGroup pg = Recorder.ProcessGroup.newBuilder().setAppId(appId).setCluster(clusterId).setProcName(procName).build();
-
-      policyStore.put(pg, policy);
-      context.response().end();
+      Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId(appId).setCluster(clusterId).setProcName(process).build();
+      PolicyDetails policyDetails = PolicyDetails.parseFrom(context.getBody().getBytes());
+      policyStore.setUserPolicy(processGroup, policyDetails).whenComplete((aVoid, throwable) -> {
+        if (throwable == null) {
+          context.response().setStatusCode(200).end();
+        } else {
+          HttpFailure httpFailure = HttpFailure.failure(throwable);
+          HttpHelper.handleFailure(context, httpFailure);
+        }
+      });
+    } catch (Exception ex) {
+      HttpFailure httpFailure = HttpFailure.failure(ex);
+      HttpHelper.handleFailure(context, httpFailure);
     }
-    catch (Exception ex) {
+  }
+
+  private void handleDeletePolicy(RoutingContext context) {
+    final String appId = context.request().getParam("appId");
+    final String clusterId = context.request().getParam("clusterId");
+    final String process = context.request().getParam("process");
+    try {
+      Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId(appId).setCluster(clusterId).setProcName(process).build();
+      String admin = context.getBodyAsJson().getString("administrator");
+      policyStore.removeUserPolicy(processGroup, admin).whenComplete((aVoid, throwable) -> {
+        if (throwable == null) {
+          context.response().setStatusCode(200).end();
+        } else {
+          HttpFailure httpFailure = HttpFailure.failure(throwable);
+          HttpHelper.handleFailure(context, httpFailure);
+        }
+      });
+    } catch (Exception ex) {
       HttpFailure httpFailure = HttpFailure.failure(ex);
       HttpHelper.handleFailure(context, httpFailure);
     }

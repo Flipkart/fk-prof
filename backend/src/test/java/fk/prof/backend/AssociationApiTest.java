@@ -38,6 +38,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
@@ -55,6 +56,7 @@ public class AssociationApiTest {
   private ConfigManager configManager;
 
   private final String backendAssociationPath = "/assoc";
+  private static final String policyPath = "/policy";
 
   @Before
   public void setBefore() throws Exception {
@@ -65,7 +67,7 @@ public class AssociationApiTest {
     curatorClient.start();
     curatorClient.blockUntilConnected(10, TimeUnit.SECONDS);
     curatorClient.create().forPath(backendAssociationPath);
-
+    curatorClient.create().forPath(policyPath);
     configManager = new ConfigManager(AssociationApiTest.class.getClassLoader().getResource("config.json").getFile());
     vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
     port = configManager.getBackendHttpPort();
@@ -74,7 +76,7 @@ public class AssociationApiTest {
     backendAssociationStore = new ZookeeperBasedBackendAssociationStore(vertx, curatorClient, "/assoc", 1, 1, new ProcessGroupCountBasedBackendComparator());
     inMemoryLeaderStore = spy(new InMemoryLeaderStore(configManager.getIPAddress(), configManager.getLeaderHttpPort()));
     associatedProcessGroups = new AssociatedProcessGroupsImpl(configManager.getRecorderDefunctThresholdInSeconds());
-    policyStore = new PolicyStore(curatorClient);
+    policyStore = mock(PolicyStore.class);
 
     VerticleDeployer backendHttpVerticleDeployer = new BackendHttpVerticleDeployer(vertx, configManager, inMemoryLeaderStore, new ActiveAggregationWindowsImpl(), associatedProcessGroups);
     backendHttpVerticleDeployer.deploy();

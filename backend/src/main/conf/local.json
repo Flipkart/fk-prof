@@ -85,5 +85,8 @@
     "max.total": 20,
     "max.idle": 20,
     "buffer.size": 10000000
+  },
+  "policyOptions": {
+    "policy.path": "/policy"
   }
 }

@@ -10,12 +10,13 @@ import fk.prof.backend.model.aggregation.ActiveAggregationWindows;
 import fk.prof.backend.model.aggregation.impl.ActiveAggregationWindowsImpl;
 import fk.prof.backend.model.assignment.AssociatedProcessGroups;
 import fk.prof.backend.model.assignment.impl.AssociatedProcessGroupsImpl;
-import fk.prof.backend.model.slot.WorkSlotPool;
 import fk.prof.backend.model.association.BackendAssociationStore;
 import fk.prof.backend.model.association.ProcessGroupCountBasedBackendComparator;
 import fk.prof.backend.model.association.impl.ZookeeperBasedBackendAssociationStore;
 import fk.prof.backend.model.election.impl.InMemoryLeaderStore;
 import fk.prof.backend.model.policy.PolicyStore;
+import fk.prof.backend.model.policy.impl.ZKWithCacheBasedPolicyStore;
+import fk.prof.backend.model.slot.WorkSlotPool;
 import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.BitOperationUtil;
 import fk.prof.backend.util.ProtoUtil;
@@ -36,8 +37,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 import recording.Recorder;
 
 import java.io.File;
@@ -70,6 +69,7 @@ public class PollAndLoadApiTest {
 
   private String backendDaemonVerticleDeployment;
   private List<String> backendHttpVerticleDeployments;
+  private String policyPath = "/policy";
 
   @Before
   public void setBefore(TestContext context) throws Exception {
@@ -90,6 +90,7 @@ public class PollAndLoadApiTest {
     curatorClient.start();
     curatorClient.blockUntilConnected(10, TimeUnit.SECONDS);
     curatorClient.create().forPath(backendAssociationPath);
+    curatorClient.create().forPath(policyPath);
 
     vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
     backendAssociationStore = new ZookeeperBasedBackendAssociationStore(vertx, curatorClient, backendAssociationPath, 1, 1, new ProcessGroupCountBasedBackendComparator());
@@ -98,7 +99,7 @@ public class PollAndLoadApiTest {
     associatedProcessGroups = new AssociatedProcessGroupsImpl(configManager.getRecorderDefunctThresholdInSeconds());
     workSlotPool = new WorkSlotPool(configManager.getSlotPoolCapacity());
     activeAggregationWindows = new ActiveAggregationWindowsImpl();
-    policyStore = spy(new PolicyStore(curatorClient));
+    policyStore = spy(new ZKWithCacheBasedPolicyStore(curatorClient, policyPath));
     aggregationWindowStorage = mock(AggregationWindowStorage.class);
 
     VerticleDeployer backendHttpVerticleDeployer = new BackendHttpVerticleDeployer(vertx, configManager, leaderStore,
@@ -192,14 +193,11 @@ public class PollAndLoadApiTest {
   public void testFetchForWorkForAggregationWindow(TestContext context) throws Exception {
     final Async async = context.async();
     Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
-    policyStore.put(processGroup, buildRecordingPolicy(1));
+    policyStore.putRecordingPolicy(processGroup, buildRecordingPolicy(1));
     CountDownLatch latch = new CountDownLatch(1);
-    when(policyStore.get(processGroup)).then(new Answer<BackendDTO.RecordingPolicy>() {
-      @Override
-      public BackendDTO.RecordingPolicy answer(InvocationOnMock invocationOnMock) throws Throwable {
-        latch.countDown();
-        return (BackendDTO.RecordingPolicy)invocationOnMock.callRealMethod();
-      }
+    when(policyStore.getRecordingPolicy(processGroup)).then(invocationOnMock -> {
+      latch.countDown();
+      return invocationOnMock.callRealMethod();
     });
 
     //Wait for sometime for load to get reported twice, so that backend gets marked as available
@@ -234,9 +232,9 @@ public class PollAndLoadApiTest {
   public void testAggregationWindowSetupAndPollResponse(TestContext context) throws Exception {
     final Async async = context.async();
     Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
-    policyStore.put(processGroup, buildRecordingPolicy(1));
+    policyStore.putRecordingPolicy(processGroup, buildRecordingPolicy(1));
     CountDownLatch latch = new CountDownLatch(1);
-    when(policyStore.get(processGroup)).then(invocationOnMock -> {
+    when(policyStore.getRecordingPolicy(processGroup)).then(invocationOnMock -> {
       //Induce delay here so that before work is fetched, poll request of recorder succeeds and it gets marked healthy
       latch.await(8, TimeUnit.SECONDS);
       return invocationOnMock.callRealMethod();
@@ -341,7 +339,7 @@ public class PollAndLoadApiTest {
               future.fail(ex);
             }
           });
-        }).exceptionHandler(ex -> future.fail(ex));
+        }).exceptionHandler(future::fail);
     request.end(ProtoUtil.buildBufferFromProto(payload));
     return future;
   }
@@ -359,7 +357,7 @@ public class PollAndLoadApiTest {
               future.fail(ex);
             }
           });
-        }).exceptionHandler(ex -> future.fail(ex));
+        }).exceptionHandler(future::fail);
     request.end(ProtoUtil.buildBufferFromProto(payload));
     return future;
   }

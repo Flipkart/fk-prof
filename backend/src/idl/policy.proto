@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package policy;
+
+option java_multiple_files = true;
+
+message PolicyDetails {
+    WorkSchedule policy = 1;
+    string administrator = 2;
+    string modified_at = 3;
+    string created_at = 4;
+    string last_scheduled = 5;
+}
+
+message WorkSchedule {
+    Schedule scheduling = 1;
+    repeated WorkDetails work = 2;
+    int32 vms_coverage = 3;
+    int32 vms_live = 4;
+    int32 profiles_discarded = 5;
+    int32 failures_observed = 6;
+    float effective_vmid_coverage_pct = 7;
+    string last_scheduled = 8;
+
+    message Schedule {
+        int32 duration = 1;
+        int32 interval = 2;
+        float vmid_coverage_pct = 3;
+        string after = 4;
+    }
+}
+
+enum WorkType {
+    cpu_sample = 0;
+    monitor_contention = 1;
+    monitor_wait = 2;
+    thread_sample = 3;
+}
+
+message WorkDetails {
+    WorkType work_type = 1;
+    CpuSamplingAttributes cpu_sampling_attributes = 2;
+    MonitorContentionAttributes montior_contention_attributes = 3;
+
+    message CpuSamplingAttributes {
+        int32 frequency = 1;
+        int32 max_stack_depth = 2;
+    }
+    message MonitorContentionAttributes {
+        int32 max_monitor_count = 1;
+        int32 max_stack_depth = 2;
+    }
+
+}

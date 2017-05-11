@@ -5,6 +5,7 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
+import fk.prof.backend.ConfigManager;
 import fk.prof.backend.model.policy.PolicyStore;
 import fk.prof.backend.proto.BackendDTO;
 import fk.prof.recorder.main.Burn20And80PctCpu;
@@ -49,11 +50,13 @@ public class E2EIntegrationTest {
     public final static int zkPort = 2191;
     public final static String baseS3Bucket = "profiles";
     public final static String zkNamespace = "fkprof";
+    private static final String policyPath = "/policy";
     private static S3Mock s3;
     private static TestingServer zookeeper;
 
     private static AmazonS3Client client;
     private static CuratorFramework curator;
+    private static String policyStorePath = "/policy_store_temp";
 
     private UserapiProcess userapi;
     private BackendProcess[] backends;
@@ -413,7 +416,7 @@ public class E2EIntegrationTest {
         }
 
         try {
-            curator.create().forPath("/" + zkNamespace + PolicyStore.policyStorePath);
+            curator.create().forPath("/" + zkNamespace + policyStorePath);
         } catch (KeeperException.NodeExistsException ex) {
             // ignore
         }
@@ -444,7 +447,7 @@ public class E2EIntegrationTest {
         pgBuilder.build().writeDelimitedTo(bout);
         policy.writeDelimitedTo(bout);
 
-        curator.setData().forPath("/" + zkNamespace + PolicyStore.policyStorePath, bout.toByteArray());
+        curator.setData().forPath("/" + zkNamespace + policyStorePath, bout.toByteArray());
     }
 
     private static void buildDefaultRecorderParams() {

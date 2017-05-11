@@ -17,6 +17,7 @@ import fk.prof.backend.model.election.LeaderWriteContext;
 import fk.prof.backend.model.election.impl.InMemoryLeaderStore;
 import fk.prof.backend.model.aggregation.impl.ActiveAggregationWindowsImpl;
 import fk.prof.backend.model.policy.PolicyStore;
+import fk.prof.backend.model.policy.impl.ZKWithCacheBasedPolicyStore;
 import fk.prof.backend.proto.BackendDTO;
 import io.vertx.core.*;
 import io.vertx.core.impl.CompositeFutureImpl;
@@ -184,7 +185,7 @@ public class LeaderElectionTest {
   }
 
   @Test(timeout = 3000)
-  public void testBeckendAssociationAndPolicyStoreInitOnLeaderSelect(TestContext context) throws Exception {
+  public void testBackendAssociationAndPolicyStoreInitOnLeaderSelect(TestContext context) throws Exception {
     vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
 
     Recorder.ProcessGroup pg1 = Recorder.ProcessGroup.newBuilder().setAppId("a1").setCluster("c1").setProcName("p1").build();
@@ -209,7 +210,7 @@ public class LeaderElectionTest {
         try {
           // create fresh instance.
           BackendAssociationStore backendAssociationStore = createBackendAssociationStore(vertx, curatorClient);
-          PolicyStore policyStore = new PolicyStore(curatorClient);
+          PolicyStore policyStore = createBackendPolicyStore(curatorClient);
 
           // get the httpVerticleDeployedFuture for reference.
           MutableObject<Future> httpVerticleDeployedFuture = new MutableObject<>();
@@ -250,7 +251,7 @@ public class LeaderElectionTest {
           }
 
           // check the values in store
-          context.assertEquals(policy, policyStore.get(pg1), "policy should match");
+          context.assertEquals(policy, policyStore.getRecordingPolicy(pg1), "policy should match");
           Recorder.AssignedBackend backend1 = backendAssociationStore.getAssociatedBackend(pg1);
           context.assertEquals(cf.resultAt(0), backend1);
           Recorder.AssignedBackend backend2 = backendAssociationStore.getAssociatedBackend(pg2);
@@ -274,7 +275,7 @@ public class LeaderElectionTest {
     BackendAssociationStore backendAssociationStore = createBackendAssociationStore(vertx, curatorClient);
     backendAssociationStore.init();
 
-    PolicyStore policyStore = new PolicyStore(curatorClient);
+    PolicyStore policyStore = createBackendPolicyStore(curatorClient);
     policyStore.init();
 
     backendAssociationStore.reportBackendLoad(BackendDTO.LoadReportRequest.newBuilder().setCurrTick(1).setIp("1").setLoad(0.5f).setPort(1234).build());
@@ -283,7 +284,7 @@ public class LeaderElectionTest {
     Future f1 = backendAssociationStore.associateAndGetBackend(pg1);
     Future f2 = backendAssociationStore.associateAndGetBackend(pg2);
 
-    policyStore.put(pg1, policy);
+    policyStore.putRecordingPolicy(pg1, policy);
 
     return CompositeFuture.all(f1, f2);
   }
@@ -298,4 +299,10 @@ public class LeaderElectionTest {
     return new ZookeeperBasedBackendAssociationStore(vertx, curatorClient, backendAssociationPath,
             loadReportIntervalInSeconds, loadMissTolerance, new ProcessGroupCountBasedBackendComparator());
   }
+
+  private PolicyStore createBackendPolicyStore(CuratorFramework curatorClient) {
+    String policyPath = configManager.getPolicyPath();
+    return new ZKWithCacheBasedPolicyStore(curatorClient, policyPath);
+  }
+
 }

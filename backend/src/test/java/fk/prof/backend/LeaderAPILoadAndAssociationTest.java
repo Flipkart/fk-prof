@@ -33,6 +33,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static org.mockito.Mockito.mock;
+
 @RunWith(VertxUnitRunner.class)
 public class LeaderAPILoadAndAssociationTest {
   private Vertx vertx;
@@ -71,7 +73,7 @@ public class LeaderAPILoadAndAssociationTest {
         configManager.getLoadReportIntervalInSeconds(),
         leaderHttpConfig.getInteger("load.miss.tolerance", 1),
         new ProcessGroupCountBasedBackendComparator());
-    PolicyStore policyStore = new PolicyStore(curatorClient);
+    PolicyStore policyStore = mock(PolicyStore.class);
 
     VerticleDeployer leaderHttpDeployer = new LeaderHttpVerticleDeployer(vertx, configManager, backendAssociationStore, policyStore);
     leaderHttpDeployer.deploy();

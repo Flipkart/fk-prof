@@ -8,22 +8,25 @@ import fk.prof.backend.deployer.impl.*;
 import fk.prof.backend.http.ApiPathConstants;
 import fk.prof.backend.leader.election.LeaderElectedTask;
 import fk.prof.backend.model.aggregation.ActiveAggregationWindows;
+import fk.prof.backend.model.aggregation.impl.ActiveAggregationWindowsImpl;
 import fk.prof.backend.model.assignment.AssociatedProcessGroups;
 import fk.prof.backend.model.assignment.impl.AssociatedProcessGroupsImpl;
-import fk.prof.backend.model.slot.WorkSlotPool;
 import fk.prof.backend.model.association.BackendAssociationStore;
 import fk.prof.backend.model.association.ProcessGroupCountBasedBackendComparator;
 import fk.prof.backend.model.association.impl.ZookeeperBasedBackendAssociationStore;
 import fk.prof.backend.model.election.impl.InMemoryLeaderStore;
-import fk.prof.backend.model.aggregation.impl.ActiveAggregationWindowsImpl;
 import fk.prof.backend.model.policy.PolicyStore;
 import fk.prof.metrics.MetricName;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.S3AsyncStorage;
 import fk.prof.storage.S3ClientFactory;
 import fk.prof.storage.buffer.ByteBufferPoolFactory;
-import io.vertx.core.*;
 import io.vertx.core.Future;
+import fk.prof.backend.model.policy.impl.ZKWithCacheBasedPolicyStore;
+import fk.prof.backend.model.slot.WorkSlotPool;
+import io.vertx.core.CompositeFuture;
+import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -110,8 +113,7 @@ public class BackendManager {
               .collect(Collectors.toList());
 
           BackendAssociationStore backendAssociationStore = createBackendAssociationStore(vertx, curatorClient);
-          PolicyStore policyStore = new PolicyStore(curatorClient);
-
+          PolicyStore policyStore = createPolicyStore(curatorClient);
           VerticleDeployer leaderHttpVerticleDeployer = new LeaderHttpVerticleDeployer(vertx, configManager, backendAssociationStore, policyStore);
           Runnable leaderElectedTask = createLeaderElectedTask(vertx, leaderHttpVerticleDeployer, backendDeployments, backendAssociationStore, policyStore);
 
@@ -162,6 +164,12 @@ public class BackendManager {
 
     this.bufferPool = new GenericObjectPool<>(new ByteBufferPoolFactory(bufferPoolConfig.getInteger("buffer.size"), false), poolConfig);
   }
+
+  private PolicyStore createPolicyStore(CuratorFramework curatorClient) {
+    String policyPath = configManager.getPolicyPath();
+    return new ZKWithCacheBasedPolicyStore(curatorClient, policyPath);
+  }
+
 
   private CuratorFramework createCuratorClient() {
     JsonObject curatorConfig = configManager.getCuratorConfig();
