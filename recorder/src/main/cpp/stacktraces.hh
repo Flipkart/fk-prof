@@ -139,8 +139,18 @@ private:
     DISALLOW_IMPLICIT_CONSTRUCTORS(Asgct);
 };
 
-namespace Stacktraces {
-    std::uint32_t fill_backtrace(NativeFrame* buff, std::uint32_t capacity);
-}
+class Backtracer {
+public:
+    typedef std::pair<NativeFrame, NativeFrame> Entry;
+
+    Backtracer(const std::string& path, bool enabled = true);
+    
+    std::uint32_t fill_in(NativeFrame* buff, std::uint32_t capacity, bool& bt_unreadable);
+    
+private:
+    std::vector<Entry> mapped;//TODO: rename this NativeFrame to NativeAddr (because it really isn't a frame, its an address)
+
+    bool enabled;
+};
 
 #endif // STACKTRACES_H

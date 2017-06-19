@@ -75,6 +75,8 @@ namespace MRegion {
 
         bool feed(std::istream& input);
     };
+
+    std::string file();
 }
 
 #endif

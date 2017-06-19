@@ -16,6 +16,8 @@
 #include <random>
 #include "test_helpers.hh"
 #include <algorithm>
+#include <mapping_parser.hh>
+#include "mapping_helper.hh"
 
 namespace std {
     template <> struct hash<std::tuple<std::int64_t, jint>> {
@@ -95,7 +97,8 @@ jmethodID mid(std::uint64_t id) {
 #define ASSERT_METHOD_INFO_IS(mthd_info, mthd_id, kls_file, kls_fqdn, fn_name, fn_sig, code_cls) \
     {                                                                   \
         CHECK_EQUAL(mthd_id, mthd_info.method_id());                    \
-        CHECK_EQUAL(kls_file, mthd_info.file_name());                   \
+        auto mthd_file = mthd_info.file_name();                         \
+        CHECK_EQUAL(kls_file, (mthd_file[0] == '/') ? abs_path(mthd_file) : mthd_file); \
         CHECK_EQUAL(kls_fqdn, mthd_info.class_fqdn());                  \
         CHECK_EQUAL(fn_name, mthd_info.method_name());                  \
         CHECK_EQUAL(fn_sig, mthd_info.signature());                     \
@@ -158,7 +161,8 @@ std::tuple<F_mid, F_bci, F_line> fr(F_mid mid, F_bci bci, F_line line) {
     }
 
 //[#]  calling convention will take a few instructions
-//[##] just a guess, these functions are fairly small, so won't have more than 100 bytes worth of text
+//[##] just a guess, these functions are fairly small, so won't have more than 300 bytes
+//     (it was 100 bytes, but then uniq-ptr and g++ changed things) worth of text
 #define ASSERT_NATIVE_STACK_SAMPLE_IS(ss, time_offset, thd_id, frames, ctx_ids, is_snipped) \
     {                                                                   \
         CHECK_EQUAL(time_offset, ss.start_offset_micros());             \
@@ -173,7 +177,7 @@ std::tuple<F_mid, F_bci, F_line> fr(F_mid mid, F_bci bci, F_line line) {
             auto f = ss.frame(i);                                       \
             CHECK_EQUAL((*it), f.method_id());                          \
             CHECK(f.bci() > 0); /* [#] */                               \
-            CHECK(f.bci() < 100); /* [##] */                            \
+            CHECK(f.bci() < 300); /* [##] */                            \
         }                                                               \
         CHECK_EQUAL(frames.size(), i);                                  \
         CHECK_EQUAL(ctx_ids.size(), ss.trace_id_size());                \
@@ -194,10 +198,13 @@ bool mark_default_ctx = false;
 std::random_device rd;
 std::uniform_int_distribution<int> dist(0, 10000);
 
+std::unique_ptr<Backtracer> b_tracer{nullptr};
+
 void bt_pusher() {
     STATIC_ARRAY(frames, NativeFrame, native_bt_max_depth, native_bt_max_depth);
-    auto len = Stacktraces::fill_backtrace(frames, native_bt_max_depth);
-    bt_q->push(frames, len, bt_err, mark_default_ctx, bt_tinfo);
+    bool bt_unreadable;
+    auto len = b_tracer->fill_in(frames, native_bt_max_depth, bt_unreadable);
+    bt_q->push(frames, len, bt_err, mark_default_ctx, bt_unreadable, bt_tinfo);
 }
 
 void push_native_backtrace(ThreadBucket* t, BacktraceError err, CircularQueue& q, bool default_ctx = false, int capture_bt_at = 4) {
@@ -216,8 +223,18 @@ void push_native_backtrace(ThreadBucket* t, BacktraceError err, CircularQueue& q
     bt_tinfo = nullptr;
 }
 
+void corrupted_frame_pointer_backtrace(ThreadBucket* t, BacktraceError err, CircularQueue& q, std::uint64_t unmapped_addr) {
+    std::size_t capacity = 10;
+    STATIC_ARRAY(frames, NativeFrame, capacity, capacity);
+    bool bt_unreadable;
+    auto len = bt_test_quux(*b_tracer, frames, capacity, bt_unreadable, unmapped_addr);
+    q.push(frames, len, err, false, bt_unreadable, t);
+}
+
 TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     BlockingRingBuffer buff(1024 * 1024);
     std::shared_ptr<RawWriter> raw_w_ptr(new AccumulatingRawWriter(buff));
     Buff pw_buff;
@@ -410,8 +427,110 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
     ASSERT_NATIVE_STACK_SAMPLE_IS(cse.stack_sample(5), 0, NO_THD, sn2, sn2_ctxs, false);
 }
 
+TEST(ProfileSerializer__should_handle_frame_pointer_omitted_code_gracefully) {
+    TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
+    BlockingRingBuffer buff(1024 * 1024);
+    std::shared_ptr<RawWriter> raw_w_ptr(new AccumulatingRawWriter(buff));
+    Buff pw_buff;
+    ProfileWriter pw(raw_w_ptr, pw_buff);
+
+    method_lookup_stub.clear();
+    line_no_lookup_stub.clear();
+    
+    std::int64_t capture_bt = 1, bt_foo = 2, bt_bar = 3, bt_baz = 4;
+
+    PerfCtx::Registry reg;
+    auto to_parent_semantic = static_cast<std::uint8_t>(PerfCtx::MergeSemantic::to_parent);
+    auto ctx_foo = reg.find_or_bind("foo", 20, to_parent_semantic);
+    
+    ProbPct ppct;
+    prob_pct = &ppct;
+    ctx_reg = &reg;
+
+    jvmtiEnv* ti = nullptr;
+
+    SerializationFlushThresholds sft;
+    TruncationThresholds tts(7);
+    ProfileSerializingWriter ps(ti, pw, test_mthd_info_resolver, test_line_no_resolver, reg, sft, tts, 15);
+
+    CircularQueue q(ps, 10);
+    
+    std::uint64_t start, end;
+    find_atleast_16_bytes_wide_unmapped_range(start, end);
+
+    ThreadBucket t25(25, "Thread No. 25", 5, true);
+
+    t25.ctx_tracker.enter(ctx_foo);
+    corrupted_frame_pointer_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q, start);
+    t25.ctx_tracker.exit(ctx_foo);
+
+    CHECK(q.pop());
+    CHECK(! q.pop());//because only 1 sample was pushed
+
+    ps.flush();
+
+    std::shared_ptr<std::uint8_t> tmp_buff(new std::uint8_t[1024 * 1024], std::default_delete<std::uint8_t[]>());
+    auto bytes_sz = buff.read(tmp_buff.get(), 0, 1024 * 1024, false);
+    CHECK(bytes_sz > 0);
+
+    google::protobuf::io::CodedInputStream cis(tmp_buff.get(), bytes_sz);
+
+    std::uint32_t len;
+    CHECK(cis.ReadVarint32(&len));
+
+    auto lim = cis.PushLimit(len);
+
+    recording::Wse wse;
+    CHECK(wse.ParseFromCodedStream(&cis));
+
+    cis.PopLimit(lim);
+
+    auto pos = cis.CurrentPosition();
+
+    std::uint32_t csum;
+    CHECK(cis.ReadVarint32(&csum));
+
+    Checksum c_calc;
+    auto computed_csum = c_calc.chksum(tmp_buff.get(), pos);
+
+    CHECK_EQUAL(computed_csum, csum);
+
+    CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse.w_type());
+    auto idx_data = wse.indexed_data();
+    CHECK_EQUAL(0, idx_data.monitor_info_size());
+    
+    CHECK_EQUAL(1, idx_data.thread_info_size());
+    ASSERT_THREAD_INFO_IS(idx_data.thread_info(0), 3, "Thread No. 25", 5, true, 25);
+
+    CHECK_EQUAL(5, idx_data.method_info_size());
+    ASSERT_METHOD_INFO_IS(idx_data.method_info(0), 0, "?", "?", "?", "?", Java_Sym);
+    auto test_executable = my_executable();
+    auto test_helper_lib = my_test_helper_lib();
+    ASSERT_METHOD_INFO_IS(idx_data.method_info(1), capture_bt, test_helper_lib, "", "capture_bt(Backtracer&, unsigned long*, unsigned long, bool&)", "", Native_Sym);
+    ASSERT_METHOD_INFO_IS(idx_data.method_info(2), bt_foo, test_helper_lib, "", "bt_test_foo(Backtracer&, unsigned long*, unsigned long, bool&)", "", Native_Sym);
+    ASSERT_METHOD_INFO_IS(idx_data.method_info(3), bt_bar, test_helper_lib, "", "bt_test_bar(Backtracer&, unsigned long*, unsigned long, bool&, unsigned long)", "", Native_Sym);
+    ASSERT_METHOD_INFO_IS(idx_data.method_info(4), bt_baz, test_helper_lib, "", "bt_test_baz(Backtracer&, unsigned long*, unsigned long, bool&, unsigned long)", "", Native_Sym);
+    //observe there is no bt_quux here
+
+    CHECK_EQUAL(3, idx_data.trace_ctx_size());
+    ASSERT_TRACE_CTX_INFO_IS(idx_data.trace_ctx(0), 0, DEFAULT_CTX_NAME, 15, 0, false);
+    ASSERT_TRACE_CTX_INFO_IS(idx_data.trace_ctx(1), 1, UNKNOWN_CTX_NAME, 0, 0, true);
+    ASSERT_TRACE_CTX_INFO_IS(idx_data.trace_ctx(2), 5, "foo", 20, 0, false);
+
+    auto cse = wse.cpu_sample_entry();
+
+    CHECK_EQUAL(1, cse.stack_sample_size());
+    auto sn1 = {capture_bt, bt_foo, bt_bar, bt_baz};
+    auto sn1_ctxs = {5};
+    ASSERT_NATIVE_STACK_SAMPLE_IS(cse.stack_sample(0), 0, 3, sn1, sn1_ctxs, true);
+}
+
 TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     BlockingRingBuffer buff(1024 * 1024);
     std::shared_ptr<RawWriter> raw_w_ptr(new AccumulatingRawWriter(buff));
     Buff pw_buff;
@@ -534,9 +653,10 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
     ASSERT_STACK_SAMPLE_IS(cse.stack_sample(2), 0, 3, s2, s2_ctxs, false);
 }
 
-
 TEST(ProfileSerializer__should_auto_flush__at_buffering_threshold) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     BlockingRingBuffer buff(1024 * 1024);
     std::shared_ptr<RawWriter> raw_w_ptr(new AccumulatingRawWriter(buff));
     Buff pw_buff;
@@ -651,6 +771,8 @@ TEST(ProfileSerializer__should_auto_flush__at_buffering_threshold) {
 
 TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_should_incrementally_push___index_data_mapping) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     BlockingRingBuffer buff(1024 * 1024);
     std::shared_ptr<RawWriter> raw_w_ptr(new AccumulatingRawWriter(buff));
     Buff pw_buff;
@@ -828,6 +950,8 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
 
 TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_should_incrementally_push___index_data_mapping_for_native_frames_too) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     BlockingRingBuffer buff(1024 * 1024);
     std::shared_ptr<RawWriter> raw_w_ptr(new AccumulatingRawWriter(buff));
     Buff pw_buff;
@@ -985,6 +1109,8 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
 
 TEST(ProfileSerializer__should_write_cpu_samples__with_forte_error) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     BlockingRingBuffer buff(1024 * 1024);
     std::shared_ptr<RawWriter> raw_w_ptr(new AccumulatingRawWriter(buff));
     Buff pw_buff;
@@ -1080,6 +1206,8 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_forte_error) {
 
 TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     BlockingRingBuffer buff(1024 * 1024);
     std::shared_ptr<RawWriter> raw_w_ptr(new AccumulatingRawWriter(buff));
     Buff pw_buff;
@@ -1199,6 +1327,8 @@ TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
 
 void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
     BlockingRingBuffer buff(1024 * 1024);
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     std::shared_ptr<RawWriter> raw_w_ptr(new AccumulatingRawWriter(buff));
     Buff pw_buff;
 
@@ -1336,6 +1466,8 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
 
 TEST(ProfileSerializer__should_report_unflushed_trace__and_EOF_after_last_flush) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     recording::Wse last;
     play_last_flush_scenario(last, 1);
 
@@ -1374,6 +1506,8 @@ TEST(ProfileSerializer__should_report_unflushed_trace__and_EOF_after_last_flush)
 
 TEST(ProfileSerializer__should_report_all_user_tracepoints_that_were_never_reported_before__and_EOF_after_last_flush) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     recording::Wse last;
     play_last_flush_scenario(last, 0);
 

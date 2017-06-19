@@ -8,7 +8,7 @@ class ItemHolder : public QueueListener {
 public:
   explicit ItemHolder() {}
 
-    virtual void record(const Backtrace &trace, ThreadBucket *info, std::uint8_t ctx_len, PerfCtx::ThreadTracker::EffectiveCtx* ctx, bool default_ctx) {
+    virtual void record(const Backtrace &trace, ThreadBucket *info, std::uint8_t ctx_len, PerfCtx::ThreadTracker::EffectiveCtx* ctx, bool default_ctx, bool unreadable_bt) {
         CHECK_EQUAL(2, trace.num_frames);
         CHECK_EQUAL(BacktraceType::Java, trace.type);
 

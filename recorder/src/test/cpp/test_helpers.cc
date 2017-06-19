@@ -2,6 +2,11 @@
 #include <unordered_map>
 #include <fstream>
 #include <libgen.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sstream>
+#include <list>
 
 __attribute__ ((noinline)) void some_lambda_caller(std::function<void()> fn) {
     fn();
@@ -69,4 +74,88 @@ std::string my_test_helper_lib() {
     std::string dir_name_str {dir_name};
     dir_name_str += LIB_TEST_UTIL;
     return dir_name_str;
+}
+
+static bool is_symlink(const std::string& path) {
+    struct stat s;
+    assert(lstat(path.c_str(), &s) == 0);
+    return S_ISLNK(s.st_mode);
+}
+
+static void fragment_path(const std::string& path, std::list<std::string>& frags) {
+    auto j = path.length();
+    for (int i = j; i > 0; i--) {
+        if (path[i] == '/') {
+            auto f = path.substr(i + 1, j - i);
+            frags.push_front(f);
+            j = i - 1;
+        }
+    }
+    frags.push_front(path.substr(1, j));
+}
+
+static void dereference_symlink(std::stringstream& path) {
+    char dest[PATH_MAX];
+    auto curr_path = path.str();
+    auto ret = readlink(curr_path.c_str(), dest, PATH_MAX);
+    assert(ret > 0);
+    dest[ret] = '\0';
+    path.str(dest);
+    path.clear();
+}
+
+std::string abs_path(const std::string& path) {
+    std::list<std::string> frags;
+    fragment_path(path, frags);
+    std::stringstream curr_path;
+    while (! frags.empty()) {
+        auto f = frags.front();
+        frags.pop_front();
+        curr_path << '/' << f;
+        if (is_symlink(curr_path.str())) {
+            dereference_symlink(curr_path);
+            fragment_path(curr_path.str(), frags);
+            curr_path.str("");
+            curr_path.clear();
+        }
+    }
+    return curr_path.str();
+}
+
+__attribute__ ((noinline)) std::uint32_t capture_bt(Backtracer& b_tracer, NativeFrame* bt, std::size_t capacity, bool& bt_unreadable) {
+    bt_unreadable = false;
+    return b_tracer.fill_in(bt, capacity, bt_unreadable);
+}
+
+__attribute__ ((noinline)) std::uint32_t bt_test_foo(Backtracer& b_tracer, NativeFrame* bt, std::size_t capacity, bool& bt_unreadable) {
+    return capture_bt(b_tracer, bt, capacity, bt_unreadable);
+}
+
+__attribute__ ((noinline)) std::uint32_t bt_test_bar(Backtracer& b_tracer, NativeFrame* bt, std::size_t capacity, bool& bt_unreadable, std::uint64_t unmapped_address) {
+    std::uint64_t rbp, old_rbp;
+    asm("movq %%rbp, %%rax;"
+        "movq %%rax, %0;"
+        : "=r"(rbp)
+        :
+        : "rax");
+
+    std::uint64_t* rbp_ptr = reinterpret_cast<std::uint64_t*>(rbp);
+
+    old_rbp = *rbp_ptr;
+
+    *rbp_ptr = unmapped_address;
+
+    auto len = bt_test_foo(b_tracer, bt, capacity, bt_unreadable);
+
+    *rbp_ptr = old_rbp;
+
+    return len;
+}
+
+__attribute__ ((noinline)) std::uint32_t bt_test_baz(Backtracer& b_tracer, NativeFrame* bt, std::size_t capacity, bool& bt_unreadable, std::uint64_t unmapped_address) {
+    return bt_test_bar(b_tracer, bt, capacity, bt_unreadable, unmapped_address);
+}
+
+__attribute__ ((noinline)) std::uint32_t bt_test_quux(Backtracer& b_tracer, NativeFrame* bt, std::size_t capacity, bool& bt_unreadable, std::uint64_t unmapped_address) {
+    return bt_test_baz(b_tracer, bt, capacity, bt_unreadable, unmapped_address);
 }

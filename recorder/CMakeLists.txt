@@ -179,6 +179,8 @@ set(TEST_FILES
     ${SRC_TEST}/test_syslog_tsdb_metric_formatter.cc
     ${SRC_TEST}/test_unique_readsafe_ptr.cc
     ${SRC_TEST}/test_site_resolver.cc
+    ${SRC_TEST}/test_backtracer.cc
+    ${SRC_TEST}/mapping_helper.cc
     ${SRC_TEST}/test.cc)
 
 set(TEST_UTIL_FILES
@@ -200,7 +202,7 @@ set(GLOBAL_WARNINGS "${GLOBAL_WARNINGS} -Wno-sign-compare -Wno-strict-overflow -
 set(GLOBAL_WARNINGS "${GLOBAL_WARNINGS} -Wnon-virtual-dtor -Woverloaded-virtual")
 
 set(GLOBAL_COPTS "-fdiagnostics-show-option -fno-omit-frame-pointer -fno-strict-aliasing -DHAS_VALGRIND=${HAS_VALGRIND_H}")
-set(GLOBAL_COPTS "${GLOBAL_COPTS} -funsigned-char -fno-asynchronous-unwind-tables -msse2 -g -D__STDC_FORMAT_MACROS -O2 -fPIC")
+set(GLOBAL_COPTS "${GLOBAL_COPTS} -funsigned-char -fno-asynchronous-unwind-tables -msse2 -g -D__STDC_FORMAT_MACROS -fPIC")
 
 # Platform Specific
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -225,8 +227,8 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     set(GLOBAL_WARNINGS, "${GLOBAL_WARNINGS} -Wno-unknown-pragmas -Wno-builtin-macro-redefined -Wl,-fatal_warnings")
 endif()
 
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO  "-g3 -ggdb")
-set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O0") # -fsanitize=address when needed
+set(CMAKE_CXX_FLAGS_RELWITHDEBUGINFO  "-O2 -g3 -ggdb")
+set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g3 -ggdb") # -fsanitize=address when needed
 SET(VERBOSE_LOGS "n" CACHE STRING "'Enable Verbose Logging' flag, turns on compile-time controlled debug and trace logs, defaults to 'n'")
 if (${VERBOSE_LOGS} MATCHES "y")
   set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} -DSPDLOG_TRACE_ON -DSPDLOG_DEBUG_ON")

@@ -12,6 +12,7 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.hamcrest.Matcher;
+import org.hamcrest.Matchers;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.junit.After;
@@ -37,7 +38,7 @@ import static fk.prof.recorder.utils.Matchers.approximatelyBetween;
 import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.lessThan;
-import static org.junit.Assert.assertEquals;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.junit.Assert.assertThat;
 
 public class CpuSamplingTest {
@@ -132,7 +133,7 @@ public class CpuSamplingTest {
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
 
-        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES);
+        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES, true);
 
         runner = new AgentRunner(Burn20And80PctCpu.class.getCanonicalName(), USUAL_RECORDER_ARGS);
         runner.start();
@@ -147,7 +148,7 @@ public class CpuSamplingTest {
 
         assertPolledInStatusIsGood(pollReqs);
 
-        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES);
+        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES, true);
 
         assertProfileCallAndContent(profileCalledSecondTime, profileEntries, new HashMap<String, StackNodeMatcher>() {{
             put(wrap(DEFAULT_CTX_NAME), zeroSampleRoot());
@@ -163,16 +164,15 @@ public class CpuSamplingTest {
         }}, new TraceIdPivotResolver(), new HashMap<Integer, TraceInfo>(), new HashMap<Integer, ThreadInfo>(), new HashMap<Long, MthdInfo>(), new HashMap<String, SampledStackNode>());
     }
 
-    @Test
-    public void should_Report_Alloc_Burn() throws ExecutionException, InterruptedException, IOException, TimeoutException {
+    public List<Recorder.Wse> getProfile(boolean captureErrorBt, Class<?> mainClass) throws IOException, InterruptedException, ExecutionException, TimeoutException {
         List<Recorder.Wse> profileEntries = new ArrayList<>();
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
 
-        stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES);
+        stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES, captureErrorBt);
 
-        runner = new AgentRunner(AllocBurner.class.getCanonicalName(), USUAL_RECORDER_ARGS + ",noctx_cov_pct=50");
+        runner = new AgentRunner(mainClass.getCanonicalName(), USUAL_RECORDER_ARGS + ",noctx_cov_pct=50");
         runner.start();
 
         assocAction[0].get(4, TimeUnit.SECONDS);
@@ -180,48 +180,59 @@ public class CpuSamplingTest {
         assertThat(assocAction[0].isDone(), is(true));
         pollAction[poll.length - 1].get(poll.length + 4, TimeUnit.SECONDS); //some grace time
 
-        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES);
-
+        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES, captureErrorBt);
+        
         //debug aid
         //Map<Integer, TraceInfo> traceInfoMap = new HashMap<>();
         //Map<Integer, ThreadInfo> thdInfoMap = new HashMap<>();
         //Map<Long, MthdInfo> mthdInfoMap = new HashMap<>();
         //Map<String, SampledStackNode> aggregations = new HashMap<>();
         //makeTree(profileEntries, false, new TraceIdPivotResolver(), traceInfoMap, thdInfoMap, mthdInfoMap, aggregations);
+        
+        return profileEntries;
+    }
+
+    private void assertBlankTracesPctHigherThan(List<Recorder.Wse> profileEntries, double minPct) {
+        long emptyBtCount = 0;
+        long totalBtCount = 0;
+        for (Recorder.Wse entry : profileEntries) {
+            for (Recorder.StackSample stackSample : entry.getCpuSampleEntry().getStackSampleList()) {
+                if (stackSample.getFrameCount() == 0) {
+                    assertThat(stackSample.getError(), not(Recorder.StackSample.Error.fkp_no_error));
+                    emptyBtCount++;
+                }
+                totalBtCount++;
+            }
+        }
+        assertThat(((double) emptyBtCount * 100)/totalBtCount, greaterThan(minPct));
+    }
+
+    @Test
+    public void should_Not_Report_Native_Backtraces_when_Profiling_Policy_Has_It_Disabled() throws ExecutionException, InterruptedException, IOException, TimeoutException {
+        List<Recorder.Wse> profileEntries = getProfile(false, AllocBurner.class);
+        assertOnStackPctIsBetween(Pattern.compile(".*ParallelScavengeHeap::mem_allocate.*"), profileEntries, 0.0, 0.0);
+        assertBlankTracesPctHigherThan(profileEntries, 90.0);
+    }
+
+    @Test
+    public void should_Report_Alloc_Burn() throws ExecutionException, InterruptedException, IOException, TimeoutException {
+        List<Recorder.Wse> profileEntries = getProfile(true, AllocBurner.class);
 
         assertOnStackPctIsAbove(Pattern.compile(".*ParallelScavengeHeap::mem_allocate.*"), 90.0, profileEntries);
     }
 
     @Test
     public void should_Report_Intrinsic_Burn() throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
-        MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
-        MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
-        String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
-
-        stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES);
-
-        runner = new AgentRunner(IntrinsicBurner.class.getCanonicalName(), USUAL_RECORDER_ARGS + ",noctx_cov_pct=50");
-        runner.start();
-
-        assocAction[0].get(4, TimeUnit.SECONDS);
-
-        assertThat(assocAction[0].isDone(), is(true));
-        pollAction[poll.length - 1].get(poll.length + 4, TimeUnit.SECONDS); //some grace time
-
-        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES);
-
-        //debug aid
-        //Map<Integer, TraceInfo> traceInfoMap = new HashMap<>();
-        //Map<Integer, ThreadInfo> thdInfoMap = new HashMap<>();
-        //Map<Long, MthdInfo> mthdInfoMap = new HashMap<>();
-        //Map<String, SampledStackNode> aggregations = new HashMap<>();
-        //makeTree(profileEntries, false, new TraceIdPivotResolver(), traceInfoMap, thdInfoMap, mthdInfoMap, aggregations);
+        List<Recorder.Wse> profileEntries = getProfile(true, IntrinsicBurner.class);
 
         assertOnStackPctIsAbove(Pattern.compile(".*(sin|cos).*"), 2.0, profileEntries);
     }
 
     private void assertOnStackPctIsAbove(Pattern pattern, double minPct, List<Recorder.Wse> entries) {
+        assertOnStackPctIsBetween(pattern, entries, minPct, 100);
+    }
+
+    private void assertOnStackPctIsBetween(Pattern pattern, List<Recorder.Wse> entries, double minPct, final double maxPct) {
         Set<Long> methodIds = new TreeSet<>();
         long matchCount = 0;
         long totalCount = 0;
@@ -233,7 +244,7 @@ public class CpuSamplingTest {
                     methodIds.add(methodInfo.getMethodId());
                 }
             }
-            assertThat(methodIds.size(), greaterThan(0));
+            if (maxPct > minPct && minPct > 0) assertThat(methodIds.size(), greaterThan(0));
             Recorder.StackSampleWse cpuSampleEntry = entry.getCpuSampleEntry();
             for (Recorder.StackSample sample : cpuSampleEntry.getStackSampleList()) {
                 totalCount++;
@@ -248,7 +259,8 @@ public class CpuSamplingTest {
 
         double pct = ((double) matchCount * 100) / totalCount;
         //System.out.println("pct = " + pct);
-        assertThat(pct, greaterThan(minPct));
+        assertThat(pct, Matchers.greaterThanOrEqualTo(minPct));
+        assertThat(pct, lessThanOrEqualTo(maxPct));
     }
 
     @Test
@@ -262,7 +274,7 @@ public class CpuSamplingTest {
         int workAllocatingPoll = 1;
         int gracePeriod = 1;
         int duration = 10;
-        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES, duration, delay, workAllocatingPoll);
+        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES, duration, delay, workAllocatingPoll, true);
 
         runner = new AgentRunner(Burn20And80PctCpu.class.getCanonicalName(), USUAL_RECORDER_ARGS);
         runner.start();
@@ -273,17 +285,17 @@ public class CpuSamplingTest {
         assertThat(assocAction[0].isDone(), is(true));
         int runningWorkPoll = workAllocatingPoll + delay + gracePeriod;
         pollAction[runningWorkPoll].get(runningWorkPoll + 4, TimeUnit.SECONDS); //some grace time
-        
+
         assertThat(runner.stop(), is(true));//this actually waits for the process to be reaped
         assertThat(runner.exitCode(), is(128 + 15)); //15 == SIGTERM
 
         assertWorkStateAndResultIs(pollReqs[1].req.getWorkLastIssued(), 100, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
         assertWorkStateAndResultIs(pollReqs[runningWorkPoll].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.running, Recorder.WorkResponse.WorkResult.unknown, gracePeriod);
-        
+
         //This assertion requires that runner.stop or something else above this assertion in this test waits for target process to return
         //   else this assertion would be meaningless (because target-process is live implies more polls can happen).
         int firstMissedPollIdx = runningWorkPoll;
-        while ((firstMissedPollIdx < pollReqs.length) && 
+        while ((firstMissedPollIdx < pollReqs.length) &&
                 (pollAction[firstMissedPollIdx].isDone())) {
             firstMissedPollIdx++;
         }
@@ -298,7 +310,7 @@ public class CpuSamplingTest {
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
 
-        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES);
+        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES, true);
 
         runner = new AgentRunner(Burn50And50PctCpu.class.getCanonicalName(), USUAL_RECORDER_ARGS);
         runner.start();
@@ -313,7 +325,7 @@ public class CpuSamplingTest {
 
         assertPolledInStatusIsGood(pollReqs);
 
-        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES);
+        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES, true);
 
         HashMap<Integer, TraceInfo> traceInfoMap = new HashMap<>();
         HashMap<String, SampledStackNode> aggregations = new HashMap<>();
@@ -389,7 +401,7 @@ public class CpuSamplingTest {
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
 
-        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES);
+        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES, true);
 
         runner = new AgentRunner(MultiThreadedCpuBurner.class.getCanonicalName(), USUAL_RECORDER_ARGS);
         runner.start();
@@ -404,7 +416,7 @@ public class CpuSamplingTest {
 
         assertPolledInStatusIsGood(pollReqs);
 
-        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES);
+        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES, true);
 
         HashMap<Integer, ThreadInfo> thdInfoMap = new HashMap<>();
         HashMap<Long, MthdInfo> mthdInfoMap = new HashMap<>();
@@ -426,7 +438,7 @@ public class CpuSamplingTest {
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
 
-        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES);
+        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES, true);
 
         runner = new AgentRunner(BurnCpuScoped.class.getCanonicalName(), USUAL_RECORDER_ARGS);
         runner.start();
@@ -441,7 +453,7 @@ public class CpuSamplingTest {
 
         assertPolledInStatusIsGood(pollReqs);
 
-        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES);
+        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES, true);
 
         HashMap<Integer, TraceInfo> traceInfoMap = new HashMap<>();
         assertProfileCallAndContent(profileCalledSecondTime, profileEntries, new HashMap<String, StackNodeMatcher>() {{
@@ -469,7 +481,7 @@ public class CpuSamplingTest {
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
 
-        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES);
+        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES, true);
 
         runner = new AgentRunner(BurnCpuStacked.class.getCanonicalName(), USUAL_RECORDER_ARGS);
         runner.start();
@@ -484,7 +496,7 @@ public class CpuSamplingTest {
 
         assertPolledInStatusIsGood(pollReqs);
 
-        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES);
+        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES, true);
 
         HashMap<Integer, TraceInfo> traceInfoMap = new HashMap<>();
         assertProfileCallAndContent(profileCalledSecondTime, profileEntries, new HashMap<String, StackNodeMatcher>() {{
@@ -514,7 +526,7 @@ public class CpuSamplingTest {
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
 
-        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES);
+        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, WorkHandlingTest.CPU_SAMPLING_MAX_FRAMES, true);
 
         runner = new AgentRunner(BurnHalfInHalfOut.class.getCanonicalName(), USUAL_RECORDER_ARGS + ",noctx_cov_pct=50");
         runner.start();
@@ -529,7 +541,7 @@ public class CpuSamplingTest {
 
         assertPolledInStatusIsGood(pollReqs);
 
-        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES);
+        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, CPU_SAMPLING_MAX_FRAMES, true);
 
         HashMap<Integer, TraceInfo> traceInfoMap = new HashMap<>();
         assertProfileCallAndContent(profileCalledSecondTime, profileEntries, new HashMap<String, StackNodeMatcher>() {{
@@ -551,7 +563,7 @@ public class CpuSamplingTest {
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
 
         int maxFrames = 2;
-        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, maxFrames);
+        PollReqWithTime[] pollReqs = stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, maxFrames, true);
 
         runner = new AgentRunner(BurnCpuUsingRunnable.class.getCanonicalName(), USUAL_RECORDER_ARGS);
         runner.start();
@@ -566,7 +578,7 @@ public class CpuSamplingTest {
 
         assertPolledInStatusIsGood(pollReqs);
 
-        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, maxFrames);
+        assertRecordingHeaderIsGood(cpuSamplingWorkIssueTime, hdr, maxFrames, true);
 
         HashMap<String, SampledStackNode> aggregation = new HashMap<>();
         assertProfileCallAndContent(profileCalledSecondTime, profileEntries, new HashMap<String, StackNodeMatcher>() {{
@@ -602,11 +614,11 @@ public class CpuSamplingTest {
                                 nodeMatcher(Blackhole.class, "consumeCPU", "(J)V", expectedOncpuPct, 20, Collections.emptySet())))))));
     }
 
-    private PollReqWithTime[] stubRecorderInteraction(List<Recorder.Wse> profileEntries, MutableObject<Recorder.RecordingHeader> hdr, MutableBoolean profileCalledSecondTime, String cpuSamplingWorkIssueTime, final int maxFrames) {
-        return stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, maxFrames, 10, 2, 1);
+    private PollReqWithTime[] stubRecorderInteraction(List<Recorder.Wse> profileEntries, MutableObject<Recorder.RecordingHeader> hdr, MutableBoolean profileCalledSecondTime, String cpuSamplingWorkIssueTime, final int maxFrames, final boolean captureErrorBt) {
+        return stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, maxFrames, 10, 2, 1, captureErrorBt);
     }
 
-    private PollReqWithTime[] stubRecorderInteraction(List<Recorder.Wse> profileEntries, MutableObject<Recorder.RecordingHeader> hdr, MutableBoolean profileCalledSecondTime, String cpuSamplingWorkIssueTime, int maxFrames, int duration, int delay, final int workAllocatingPoll) {
+    private PollReqWithTime[] stubRecorderInteraction(List<Recorder.Wse> profileEntries, MutableObject<Recorder.RecordingHeader> hdr, MutableBoolean profileCalledSecondTime, String cpuSamplingWorkIssueTime, int maxFrames, int duration, int delay, final int workAllocatingPoll, final boolean captureErrorBt) {
         PollReqWithTime pollReqs[] = new PollReqWithTime[poll.length];
 
         MutableObject<Recorder.RecorderInfo> recInfo = new MutableObject<>();
@@ -617,7 +629,7 @@ public class CpuSamplingTest {
             if (i == workAllocatingPoll) continue;
             poll[i] = tellRecorderWeHaveNoWork(pollReqs, i);
         }
-        poll[workAllocatingPoll] = issueCpuProfilingWork(pollReqs, 1, duration, delay, cpuSamplingWorkIssueTime, CPU_SAMPLING_WORK_ID, maxFrames);
+        poll[workAllocatingPoll] = issueCpuProfilingWork(pollReqs, 1, duration, delay, cpuSamplingWorkIssueTime, CPU_SAMPLING_WORK_ID, maxFrames, captureErrorBt);
 
         profile[0] = (req) -> {
             recordProfile(req, hdr, profileEntries);
@@ -660,12 +672,13 @@ public class CpuSamplingTest {
         }
     }
 
-    private void assertRecordingHeaderIsGood(String cpuSamplingWorkIssueTime, MutableObject<Recorder.RecordingHeader> hdr, final int maxFrames) {
+    private void assertRecordingHeaderIsGood(String cpuSamplingWorkIssueTime, MutableObject<Recorder.RecordingHeader> hdr, final int maxFrames, final boolean captureErrorBt) {
         Recorder.Work w = Recorder.Work.newBuilder()
                 .setWType(Recorder.WorkType.cpu_sample_work)
                 .setCpuSample(Recorder.CpuSampleWork.newBuilder()
                         .setMaxFrames(maxFrames)
                         .setFrequency(CPU_SAMPLING_FREQ)
+                        .setCaptureErrorBt(captureErrorBt)
                         .build())
                 .build();
         WorkHandlingTest.assertRecordingHeaderIsGood(hdr.getValue(), CONTROLLER_ID, CPU_SAMPLING_WORK_ID, cpuSamplingWorkIssueTime, 10, 2, 1, new Recorder.Work[]{w});

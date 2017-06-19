@@ -42,11 +42,11 @@ bool CircularQueue::push(const JVMPI_CallTrace &item, const BacktraceError error
     return true;
 }
 
-bool CircularQueue::push(const NativeFrame* item, const std::uint32_t num_frames, const BacktraceError error, bool default_ctx, ThreadBucket *info) {
+bool CircularQueue::push(const NativeFrame* item, const std::uint32_t num_frames, const BacktraceError error, bool default_ctx, bool unreadable_bt, ThreadBucket *info) {
     size_t current_input;
     if (! acquire_write_slot(current_input)) return false;
 
-    write(item, num_frames, current_input, info, error, default_ctx);
+    write(item, num_frames, current_input, info, error, default_ctx, unreadable_bt);
     mark_committed(current_input);
     return true;
 }
@@ -61,19 +61,19 @@ void CircularQueue::write(const JVMPI_CallTrace &trace, const size_t slot, Threa
         fb[frame_num].jvmpi_frame.method_id = trace.frames[frame_num].method_id;
     }
 
-    update_trace_info(fb, BacktraceType::Java, slot, trace.num_frames, info, error, default_ctx);
+    update_trace_info(fb, BacktraceType::Java, slot, trace.num_frames, info, error, default_ctx, false);
 }
 
-void CircularQueue::write(const NativeFrame* trace, const std::uint32_t num_frames, const size_t slot, ThreadBucket* info, const BacktraceError error, bool default_ctx) {
+void CircularQueue::write(const NativeFrame* trace, const std::uint32_t num_frames, const size_t slot, ThreadBucket* info, const BacktraceError error, bool default_ctx, bool unreadable_bt) {
     StackFrame* fb = frame_buffer_[slot];
     for (int frame_num = 0; frame_num < num_frames; ++frame_num) {
         fb[frame_num].native_frame = trace[frame_num];
     }
 
-    update_trace_info(fb, BacktraceType::Native, slot, num_frames, info, error, default_ctx);
+    update_trace_info(fb, BacktraceType::Native, slot, num_frames, info, error, default_ctx, unreadable_bt);
 }
 
-void CircularQueue::update_trace_info(StackFrame* fb, const BacktraceType type, const size_t slot, const std::uint32_t num_frames, ThreadBucket* info, const BacktraceError error, bool default_ctx) {
+void CircularQueue::update_trace_info(StackFrame* fb, const BacktraceType type, const size_t slot, const std::uint32_t num_frames, ThreadBucket* info, const BacktraceError error, bool default_ctx, bool unreadable_bt) {
     buffer[slot].trace.frames = fb;
     buffer[slot].trace.type = type;
     buffer[slot].trace.error = error;
@@ -81,6 +81,7 @@ void CircularQueue::update_trace_info(StackFrame* fb, const BacktraceType type, 
     buffer[slot].info = info;
     buffer[slot].ctx_len = (info == nullptr) ? 0 : info->ctx_tracker.current(buffer[slot].ctx);
     buffer[slot].default_ctx = default_ctx;
+    buffer[slot].unreadable_bt = unreadable_bt;
 }
 
 bool CircularQueue::pop() {
@@ -96,7 +97,7 @@ bool CircularQueue::pop() {
         usleep(1);
     }
 
-    listener_.record(buffer[current_output].trace, buffer[current_output].info, buffer[current_output].ctx_len, &buffer[current_output].ctx, buffer[current_output].default_ctx);
+    listener_.record(buffer[current_output].trace, buffer[current_output].info, buffer[current_output].ctx_len, &buffer[current_output].ctx, buffer[current_output].default_ctx, buffer[current_output].unreadable_bt);
     
     // ensure that the record is ready to be written to
     buffer[current_output].is_committed.store(UNCOMMITTED, std::memory_order_release);

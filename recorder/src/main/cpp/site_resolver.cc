@@ -397,8 +397,8 @@ void SiteResolver::SymInfo::update_mapped_ranges(std::function<void()> post_pars
 
             return true;
         });
-    auto pid = getpid();
-    std::fstream f_maps("/proc/" + std::to_string(pid) + "/maps", std::ios::in);
+    auto maps_file = MRegion::file();
+    std::fstream f_maps(maps_file, std::ios::in);
     parser.feed(f_maps);
     post_parse_cb();
     char executable_path[PATH_MAX];

@@ -6,7 +6,6 @@
 #include "fixtures.hh"
 #include "test.hh"
 #include <mapping_parser.hh>
-#include <site_resolver.hh>
 #include "test_helpers.hh"
 #include <set>
 #include <linux/limits.h>
@@ -14,16 +13,20 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-#include <fstream>
 #include <sys/mman.h>
+#include <fstream>
 
 #ifdef HAS_VALGRIND
 #include <valgrind/valgrind.h>
 #endif
 
+#include "mapping_helper.hh"
+
+static std::unique_ptr<Backtracer> b_tracer {nullptr};
+
 __attribute__ ((noinline)) int foo(NativeFrame* buff, std::uint32_t sz) {
-    return Stacktraces::fill_backtrace(buff, sz);
+    bool bt_unreadable;
+    return b_tracer->fill_in(buff, sz, bt_unreadable);
 }
 
 __attribute__ ((noinline)) int caller_of_foo(NativeFrame* buff, std::uint32_t sz) {
@@ -32,6 +35,8 @@ __attribute__ ((noinline)) int caller_of_foo(NativeFrame* buff, std::uint32_t sz
 
 TEST(SiteResolver__should_resolve_backtrace) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     const std::uint32_t buff_sz = 100;
     NativeFrame buff[buff_sz];
     std::uint32_t bt_len;
@@ -40,12 +45,7 @@ TEST(SiteResolver__should_resolve_backtrace) {
         });
     CHECK(bt_len > 4);
 
-    auto max_path_sz = 1024;
-    std::unique_ptr<char[]> link_path(new char[max_path_sz]);
-    auto path_len = readlink("/proc/self/exe", link_path.get(), max_path_sz);
-    CHECK((path_len > 0) && (path_len < max_path_sz));//ensure we read link correctly
-    link_path.get()[path_len] = '\0';
-    std::string path = link_path.get();
+    std::string path = my_executable();
 
     SiteResolver::SymInfo s_info;
     std::string fn_name;
@@ -67,165 +67,13 @@ TEST(SiteResolver__should_resolve_backtrace) {
     auto it = fn_files.find("some_lambda_caller(std::function<void ()>)");
     CHECK(it != std::end(fn_files));//this symbol comes from a shared-lib (aim is to ensure it works well with relocatable symbols)
 
-    auto dir = path.substr(0, path.rfind("/"));
-    CHECK_EQUAL(0, it->second.find(dir));
-    CHECK_EQUAL(my_test_helper_lib(), it->second);
-}
-
-typedef std::vector<std::pair<SiteResolver::Addr, SiteResolver::Addr>> CurrMappings;
-typedef std::map<SiteResolver::Addr, SiteResolver::Addr> MappableRanges;
-
-void find_mappable_ranges_between(const CurrMappings& curr_mappings, SiteResolver::Addr desired_start, SiteResolver::Addr desired_end, MappableRanges& mappable) {
-    mappable[desired_start] = desired_end;
-    for (auto& cm : curr_mappings) {
-        //std::cout << "C: [" << cm.first << ", " << cm.second  << "]\n";
-        auto it = mappable.lower_bound(cm.first);
-        if (it == std::begin(mappable)) {
-            if (mappable.lower_bound(cm.second) == it) continue;
-        }
-        it--;
-        while (it != std::end(mappable) &&
-               it->first < desired_end) {
-            auto start = it->first;
-            auto end = it->second;
-            //std::cout << "x [" << start << ", " << end << "]\n";
-            if (start <= cm.second &&
-                cm.first <= end) { //overlap
-                it = mappable.erase(it);
-                //std::cout << "- [" << start << ", " << end << "]\n";
-                if (start < cm.first) {
-                    mappable[start] = cm.first - 1;
-                    //std::cout << "+ [" << start << ", " << cm.first - 1 << "]\n";
-                }
-                if (end > cm.second) {
-                    mappable[cm.second + 1] = end;
-                    //std::cout << "+ [" << cm.second + 1 << ", " << end << "]\n";
-                }
-            } else {
-                it++;
-            }
-        }
-    }
-}
-
-TEST(SiteResolver__TestUtil__mappable_range_finder) {
-    CurrMappings cms;
-    cms.emplace_back(100, 200);
-    cms.emplace_back(300, 400);
-    cms.emplace_back(500, 600);
-    MappableRanges mappable;
-    find_mappable_ranges_between(cms, 150, 550, mappable);
-
-    CHECK_EQUAL(2, mappable.size());
-    CHECK_EQUAL(299, mappable[201]);
-    CHECK_EQUAL(499, mappable[401]);
-
-    mappable.clear();
-    find_mappable_ranges_between(cms, 100, 550, mappable);
-
-    CHECK_EQUAL(2, mappable.size());
-    CHECK_EQUAL(299, mappable[201]);
-    CHECK_EQUAL(499, mappable[401]);
-
-    mappable.clear();
-    find_mappable_ranges_between(cms, 150, 500, mappable);
-
-    CHECK_EQUAL(2, mappable.size());
-    CHECK_EQUAL(299, mappable[201]);
-    CHECK_EQUAL(499, mappable[401]);
-
-    mappable.clear();
-    find_mappable_ranges_between(cms, 150, 600, mappable);
-
-    CHECK_EQUAL(2, mappable.size());
-    CHECK_EQUAL(299, mappable[201]);
-    CHECK_EQUAL(499, mappable[401]);
-
-    mappable.clear();
-    find_mappable_ranges_between(cms, 100, 600, mappable);
-
-    CHECK_EQUAL(2, mappable.size());
-    CHECK_EQUAL(299, mappable[201]);
-    CHECK_EQUAL(499, mappable[401]);
-
-    mappable.clear();
-    find_mappable_ranges_between(cms, 99, 601, mappable);
-
-    CHECK_EQUAL(4, mappable.size());
-    CHECK_EQUAL(99, mappable[99]);
-    CHECK_EQUAL(299, mappable[201]);
-    CHECK_EQUAL(499, mappable[401]);
-    CHECK_EQUAL(601, mappable[601]);
-
-    mappable.clear();
-    cms.emplace_back(201, 299);
-    find_mappable_ranges_between(cms, 150, 550, mappable);
-
-    CHECK_EQUAL(1, mappable.size());
-    CHECK_EQUAL(499, mappable[401]);
-}
-
-void iterate_mapping(std::function<void(SiteResolver::Addr start, SiteResolver::Addr end, const MRegion::Event& e)> cb) {
-    MRegion::Parser parser([&](const MRegion::Event& e) {
-            std::size_t pos;
-            std::uint64_t start = std::stoull(e.range.start, &pos, 16);
-            assert(pos == e.range.start.length());
-            std::uint64_t end = std::stoull(e.range.end, &pos, 16);
-            assert(pos == e.range.end.length());
-
-            cb(start, end, e);
-
-            return true;
-        });
-    auto pid = getpid();
-    std::fstream f_maps("/proc/" + std::to_string(pid) + "/maps", std::ios::in);
-    parser.feed(f_maps);
-}
-
-void map_one_anon_executable_page_between_executable_and_testlib(void **mmap_region, long& pg_sz, std::string path) {
-    auto dir = path.substr(0, path.rfind("/"));
-    std::pair<SiteResolver::Addr, SiteResolver::Addr> test_bin, test_util_lib;
-    CurrMappings curr_mappings;
-    iterate_mapping([&](SiteResolver::Addr start, SiteResolver::Addr end, const MRegion::Event& e) {
-            curr_mappings.push_back({start, end});
-
-            if (e.perms.find('x') != std::string::npos) {
-                if (e.path == path) test_bin = {start, end};
-                if (e.path == my_test_helper_lib()) test_util_lib = {start, end};
-            }
-        });
-
-    SiteResolver::Addr desired_anon_exec_map_lowerb, desired_anon_exec_map_upperb;
-
-    if (test_bin.first < test_util_lib.first) {
-        desired_anon_exec_map_lowerb = test_bin.second + 1;
-        desired_anon_exec_map_upperb = test_util_lib.first - 1;
-    } else {
-        desired_anon_exec_map_lowerb = test_util_lib.second + 1;
-        desired_anon_exec_map_upperb = test_bin.first - 1;
-    }
-
-    MappableRanges mappable;
-    find_mappable_ranges_between(curr_mappings, desired_anon_exec_map_lowerb, desired_anon_exec_map_upperb, mappable);
-
-    pg_sz = sysconf(_SC_PAGESIZE);
-
-    CHECK(mappable.size() > 0); //otherwise this test can't proceed (unlucky shot, please try again)
-    auto buff_mapped = false;
-    *mmap_region = nullptr;
-    for (const auto& m : mappable) {
-        if ((m.second - m.first) >= (3 * pg_sz)) {
-            *mmap_region = reinterpret_cast<void*>(m.first - (m.first % pg_sz) + pg_sz);
-            *mmap_region = mmap(*mmap_region, pg_sz, PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, 0, 0);
-            buff_mapped = (*mmap_region != MAP_FAILED);
-            break;
-        }
-    }
-    CHECK(buff_mapped); //otherwise this test can't proceed (unlucky shot, please try again)
+    CHECK_EQUAL(my_test_helper_lib(), abs_path(it->second));
 }
 
 TEST(SiteResolver__should_call_out_unknown_mapping) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     const std::uint32_t buff_sz = 100;
     NativeFrame buff[buff_sz];
     std::uint32_t bt_len;
@@ -267,6 +115,8 @@ TEST(SiteResolver__should_call_out_unknown_mapping) {
 
 TEST(SiteResolver__should_handle_unknown_mapping_at__head__and__tail__gracefully) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
 
     SiteResolver::Addr lowest_exe = std::numeric_limits<SiteResolver::Addr>::max(), highest_exe = std::numeric_limits<SiteResolver::Addr>::min();
     iterate_mapping([&](SiteResolver::Addr start, SiteResolver::Addr end, const MRegion::Event& e) {
@@ -294,6 +144,8 @@ TEST(SiteResolver__should_handle_unknown_mapping_at__head__and__tail__gracefully
 
 TEST(SiteResolver__should_handle_vdso_and_vsyscall_addresses) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
 
     std::pair<SiteResolver::Addr, SiteResolver::Addr> vdso{0, 0}, vsyscall{0, 0};
 
@@ -339,6 +191,8 @@ TEST(SiteResolver__should_handle_vdso_and_vsyscall_addresses) {
 
 TEST(SiteResolver__should_handle_mapping_changes_between___mmap_parse___and___dl_iterate_phdr___gracefully) {
     TestEnv _;
+    auto map_file = MRegion::file();
+    b_tracer.reset(new Backtracer(map_file));
     //scenarios
     // - map [x,z] > parse > unmap [x,z] > dl_itr > test
     //   * test x => unknown sym but correct mapping
@@ -361,7 +215,7 @@ TEST(SiteResolver__should_handle_mapping_changes_between___mmap_parse___and___dl
             map_target_1 << '0';
         }
     }
-    auto mt1_path = std::string(dir.get()) + "/" + mt1;
+    auto mt1_path = abs_path(std::string(dir.get()) + "/" + mt1);
 
     auto mt1_fd = open(mt1_path.c_str(), O_RDONLY);
     CHECK(fchmod(mt1_fd, S_IRUSR | S_IXUSR) == 0);
@@ -451,4 +305,98 @@ TEST(SiteResolver__should_handle_mapping_changes_between___mmap_parse___and___dl
     s_info_2.site_for(mappable.begin()->second - 1, file_name, fn_name, pc_offset);
     CHECK(fn_name.find("[last symbol, end unknown]") != std::string::npos);
     CHECK_EQUAL(lib_path, file_name);
+}
+
+#define BT_SZ 64
+
+#define ASSERT_GOT_LIMITED_LENGTH_BACKTRACE(bt, bt_len)                 \
+    {                                                                   \
+        CHECK_EQUAL(4, bt_len);                                         \
+                                                                        \
+        SiteResolver::SymInfo s_info;                                   \
+        std::string fn_name;                                            \
+        std::string file_name;                                          \
+        SiteResolver::Addr pc_offset;                                   \
+        auto path = my_test_helper_lib();                               \
+                                                                        \
+        s_info.site_for(bt[0] , file_name, fn_name, pc_offset);         \
+        CHECK_EQUAL("capture_bt(Backtracer&, unsigned long*, unsigned long, bool&)", fn_name); \
+        CHECK_EQUAL(path, abs_path(file_name));                         \
+                                                                        \
+        s_info.site_for(bt[1] , file_name, fn_name, pc_offset);         \
+        CHECK_EQUAL("bt_test_foo(Backtracer&, unsigned long*, unsigned long, bool&)", fn_name); \
+        CHECK_EQUAL(path, abs_path(file_name));                         \
+                                                                        \
+        s_info.site_for(bt[2] , file_name, fn_name, pc_offset);         \
+        CHECK_EQUAL("bt_test_bar(Backtracer&, unsigned long*, unsigned long, bool&, unsigned long)", fn_name); \
+        CHECK_EQUAL(path, abs_path(file_name));                         \
+                                                                        \
+        s_info.site_for(bt[3] , file_name, fn_name, pc_offset);         \
+        CHECK_EQUAL("bt_test_baz(Backtracer&, unsigned long*, unsigned long, bool&, unsigned long)", fn_name); \
+        CHECK_EQUAL(path, abs_path(file_name));                         \
+    }
+//observe there is no bt_test_quux above, hence limited length.
+
+TEST(Backtracer__should_not_dereference__when_rbp_is_entirely_an_unmapped_quad_word) {
+    TestEnv _;
+    auto maps_file = MRegion::file();
+    b_tracer.reset(new Backtracer(maps_file));
+    std::uint32_t bt_len = 0;
+    NativeFrame bt[BT_SZ];
+    bool bt_unreadable;
+
+    std::uint64_t start, end;
+    find_atleast_16_bytes_wide_unmapped_range(start, end);
+
+    bt_len = bt_test_quux(*b_tracer, bt, BT_SZ, bt_unreadable, start);
+    
+    ASSERT_GOT_LIMITED_LENGTH_BACKTRACE(bt, bt_len);
+}
+
+TEST(Backtracer__should_not_dereference__when_return_address_is_entirely_not_mapped) {
+    TestEnv _;
+    auto maps_file = MRegion::file();
+    b_tracer.reset(new Backtracer(maps_file));
+    std::uint32_t bt_len = 0;
+    NativeFrame bt[BT_SZ];
+    bool bt_unreadable;
+    
+    std::uint64_t start, end;
+    find_atleast_16_bytes_wide_unmapped_range(start, end);
+
+    bt_len = bt_test_quux(*b_tracer, bt, BT_SZ, bt_unreadable, start - 8);
+    
+    ASSERT_GOT_LIMITED_LENGTH_BACKTRACE(bt, bt_len);
+}
+
+TEST(Backtracer__should_not_dereference__when_rbp_is_a_partly_unmapped_quad_word) {
+    TestEnv _;
+    auto maps_file = MRegion::file();
+    b_tracer.reset(new Backtracer(maps_file));
+    std::uint32_t bt_len = 0;
+    NativeFrame bt[BT_SZ];
+    bool bt_unreadable;
+    
+    std::uint64_t start, end;
+    find_atleast_16_bytes_wide_unmapped_range(start, end);
+
+    bt_len = bt_test_quux(*b_tracer, bt, BT_SZ, bt_unreadable, start - 7);
+    
+    ASSERT_GOT_LIMITED_LENGTH_BACKTRACE(bt, bt_len);
+}
+
+TEST(Backtracer__should_not_dereference__when_return_address_is_partly_unmapped) {
+    TestEnv _;
+    auto maps_file = MRegion::file();
+    b_tracer.reset(new Backtracer(maps_file));
+    std::uint32_t bt_len = 0;
+    NativeFrame bt[BT_SZ];
+    bool bt_unreadable;
+    
+    std::uint64_t start, end;
+    find_atleast_16_bytes_wide_unmapped_range(start, end);
+
+    bt_len = bt_test_quux(*b_tracer, bt, BT_SZ, bt_unreadable, start - 15);
+    
+    ASSERT_GOT_LIMITED_LENGTH_BACKTRACE(bt, bt_len);
 }

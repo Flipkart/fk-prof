@@ -68,8 +68,13 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
 
     STATIC_ARRAY(native_trace, NativeFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
 
-    auto bt_len = Stacktraces::fill_backtrace(native_trace, capture_stack_depth());
-    buffer->push(native_trace, bt_len, err, default_ctx, thread_info);
+    ReadsafePtr<Backtracer> b_tracer(GlobalCtx::recording.backtracer);
+    std::uint32_t bt_len = 0;
+    bool bt_unreadable = false;
+    if (b_tracer.available()) {
+        bt_len = b_tracer->fill_in(native_trace, capture_stack_depth(), bt_unreadable);
+    }
+    buffer->push(native_trace, bt_len, err, default_ctx, bt_unreadable, thread_info);
 }
 
 bool Profiler::start(JNIEnv *jniEnv) {

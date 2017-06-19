@@ -112,7 +112,7 @@ ProfileSerializingWriter::CtxId ProfileSerializingWriter::report_ctx(PerfCtx::Tr
     }
 }
 
-void ProfileSerializingWriter::record(const Backtrace &trace, ThreadBucket *info, std::uint8_t ctx_len, PerfCtx::ThreadTracker::EffectiveCtx* ctx, bool default_ctx) {
+void ProfileSerializingWriter::record(const Backtrace &trace, ThreadBucket *info, std::uint8_t ctx_len, PerfCtx::ThreadTracker::EffectiveCtx* ctx, bool default_ctx, bool unreadable_bt) {
     if (cpu_samples_flush_ctr >= sft.cpu_samples) flush();
     cpu_samples_flush_ctr++;
     
@@ -153,7 +153,7 @@ void ProfileSerializingWriter::record(const Backtrace &trace, ThreadBucket *info
         ss->add_trace_id(known_ctx);
     }
 
-    auto snipped = trace.num_frames > trunc_thresholds.cpu_samples_max_stack_sz;
+    auto snipped = unreadable_bt || (trace.num_frames > trunc_thresholds.cpu_samples_max_stack_sz);
     if (snipped) s_c_frame_snipped.inc();
     ss->set_snipped(snipped);
 

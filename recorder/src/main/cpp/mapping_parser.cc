@@ -44,3 +44,8 @@ bool MRegion::Parser::feed(std::istream& input) {
     }
     return input.eof();
 }
+
+std::string MRegion::file() {
+    auto pid = getpid();
+    return "/proc/" + std::to_string(pid) + "/maps";
+}

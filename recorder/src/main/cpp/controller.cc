@@ -3,6 +3,7 @@
 #include <curl/curl.h>
 #include "buff.hh"
 #include "blocking_ring_buffer.hh"
+#include "mapping_parser.hh"
 
 void controllerRunnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg) {
     auto control = static_cast<Controller*>(arg);
@@ -668,6 +669,8 @@ void Controller::issue(const recording::CpuSampleWork& csw, Processes& processes
     logger->info("Starting cpu-sampling at {} Hz and for upto {} frames", freq, tts.cpu_samples_max_stack_sz);
     
     GlobalCtx::recording.cpu_profiler.reset(new Profiler(jvm, jvmti, thread_map, *serializer.get(), tts.cpu_samples_max_stack_sz, freq, get_prob_pct(), cfg.noctx_cov_pct));
+    auto maps_file = MRegion::file();
+    GlobalCtx::recording.backtracer.reset(new Backtracer(maps_file, csw.capture_error_bt()));
     ReadsafePtr<Profiler> p(GlobalCtx::recording.cpu_profiler);
     p->start(env);
     processes.push_back(new CpuProfileProcess());
@@ -676,6 +679,7 @@ void Controller::issue(const recording::CpuSampleWork& csw, Processes& processes
 void Controller::retire(const recording::CpuSampleWork& csw) {
     logger->info("Stopping cpu-sampling");
     GlobalCtx::recording.cpu_profiler.reset();
+    GlobalCtx::recording.backtracer.reset();
 }
 
 namespace GlobalCtx {

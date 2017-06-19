@@ -26,4 +26,17 @@ std::string my_executable();
 
 std::string my_test_helper_lib();
 
+std::string abs_path(const std::string& path);
+
+__attribute__ ((noinline)) std::uint32_t capture_bt(Backtracer& b_tracer, NativeFrame* bt, std::size_t capacity, bool& bt_unreadable);
+
+__attribute__ ((noinline)) std::uint32_t bt_test_foo(Backtracer& b_tracer, NativeFrame* bt, std::size_t capacity, bool& bt_unreadable);
+
+__attribute__ ((noinline)) std::uint32_t bt_test_bar(Backtracer& b_tracer, NativeFrame* bt, std::size_t capacity, bool& bt_unreadable, std::uint64_t unmapped_address);
+
+__attribute__ ((noinline)) std::uint32_t bt_test_baz(Backtracer& b_tracer, NativeFrame* bt, std::size_t capacity, bool& bt_unreadable, std::uint64_t unmapped_address);
+
+__attribute__ ((noinline)) std::uint32_t bt_test_quux(Backtracer& b_tracer, NativeFrame* bt, std::size_t capacity, bool& bt_unreadable, std::uint64_t unmapped_address);
+
+
 #endif /* TEST_HELPERS_H */

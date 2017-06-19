@@ -42,10 +42,12 @@ namespace Time {
 extern LoggerP logger;//TODO: stick me in GlobalCtx???
 
 class Profiler;
+class Backtracer;
 
 namespace GlobalCtx {
     typedef struct {
         UniqueReadsafePtr<Profiler> cpu_profiler;
+        UniqueReadsafePtr<Backtracer> backtracer;
     } Rec;
 
     extern GlobalCtx::Rec recording;
