@@ -110,6 +110,8 @@ void ConfigurationOptions::load(const char* options) {
                 allow_bci = is_yes(value);
             } else if (strstr(key, "allow_ftrace") == key) {
                 allow_ftrace = is_yes(value);
+            } else if (strstr(key, "tracer_listener") == key) {
+                tracer_listener = safe_copy_string(value, next);
             } else {
                 logger->warn("Unknown configuration option: {}", key);
             }
@@ -139,6 +141,7 @@ bool ConfigurationOptions::valid() {
     ENSURE_GT(slow_tx_tolerance, 1.0);
     ENSURE_GT(tx_ring_sz, 0);
     ENSURE_NOT_NULL(stats_syslog_tag);
+    ENSURE_NOT_NULL(tracer_listener);
     return is_valid;
 }
 
@@ -156,4 +159,5 @@ ConfigurationOptions::~ConfigurationOptions()  {
     safe_free_string(inst_typ);
     safe_free_string(pctx_jar_path);
     safe_free_string(stats_syslog_tag);
+    safe_free_string(tracer_listener);
 }

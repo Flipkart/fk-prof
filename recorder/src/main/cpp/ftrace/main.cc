@@ -56,13 +56,13 @@ static void metrics_reporting_loop(std::atomic<bool>& run, medida::reporting::Ud
 }
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
+    if (argc > 2) {
         logger->error("Expected {} arguments, got {}", 1, argc - 1);
         throw std::runtime_error("Bad usage: fk-prof-ftracer <comma-separated-config-string>");
     }
     setup_term_action();
 
-    std::unique_ptr<ftrace::Config> cfg(new ftrace::Config(argv[1]));
+    std::unique_ptr<ftrace::Config> cfg(new ftrace::Config(argc == 1 ? "" : argv[1]));
     init_logging(cfg->log_level, "ftrace-server");
 
     MetricFormatter::SyslogTsdbFormatter metrics_formatter(metrics_tsdb_tag, cfg->stats_syslog_tag);

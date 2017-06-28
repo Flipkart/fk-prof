@@ -8,20 +8,6 @@
 #include "logging.hh"
 #include "util.hh"
 
-bool dir_exists(const char *path) {
-    struct stat info;
-    if(stat(path, &info) != 0)
-        return false;
-    return S_ISDIR(info.st_mode);
-}
-
-bool file_exists(const char *path) {
-    struct stat info;
-    if(stat(path, &info) != 0)
-        return false;
-    return S_ISREG(info.st_mode);
-}
-
 #define TRACING_ON "/tracing_on"
 #define TRACE_OPTIONS "/trace_options"
 #define INSTANCES_DIR "/instances"
@@ -39,7 +25,7 @@ void throw_file_not_found(const std::string& path, const std::string& type = "fi
 
 static int open_file(const std::string& instance_path, const std::string& subpath, int flags) {
     auto path = instance_path + subpath;
-    if (! file_exists(path.c_str())) {
+    if (! Util::file_exists(path.c_str())) {
         throw_file_not_found(path);
     }
     return open(path.c_str(), flags);
@@ -56,7 +42,7 @@ std::uint16_t cpus_present() {
 static void populate_data_links(const std::string& instance_path, std::list<ftrace::Tracer::DataLink>& dls, std::function<void(const ftrace::Tracer::DataLink&)>& data_link_listener) {
     std::uint16_t nr_cpu = cpus_present();
     for (std::uint16_t c = 0; c < nr_cpu; c++) {
-        auto cpu_dir = instance_path + CPU_DIR_PREFIX + std::to_string(c);
+        auto cpu_dir = CPU_DIR_PREFIX + std::to_string(c);
         auto ring_fd = open_file(instance_path, cpu_dir + PER_CPU_RAW_TRACE_PIPE, O_RDONLY);
         auto stats_fd = open_file(instance_path, cpu_dir + PER_CPU_STATS, O_RDONLY);
         dls.push_back({ring_fd, stats_fd, c});
@@ -78,11 +64,11 @@ ftrace::Tracer::Tracer(const std::string& tracing_dir, Listener& listener, std::
     s_m_read_bytes(get_metrics_registry().new_meter({METRICS_DOMAIN_TRACE, METRIC_TYPE, "pipe_read", "bytes"}, "rate")) {
 
     auto instances_dir = tracing_dir + INSTANCES_DIR;
-    if (! dir_exists(instances_dir.c_str())) {
+    if (! Util::dir_exists(instances_dir.c_str())) {
         throw_file_not_found(instances_dir, "dir");
     }
     instance_path = tracing_dir + INSTANCES_DIR + INSTANCE;
-    if (! dir_exists(instance_path.c_str())) {
+    if (! Util::dir_exists(instance_path.c_str())) {
         auto ret = mkdir(instance_path.c_str(), S_IRWXU | S_IXGRP | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
         assert(ret == 0);
     }
@@ -98,13 +84,26 @@ ftrace::Tracer::Tracer(const std::string& tracing_dir, Listener& listener, std::
     append(ctrl_fds.trace_options, "bin");
     append(ctrl_fds.trace_options, "nooverwrite");
 
-    const auto events_dir = instances_dir + EVENTS_DIR;
+    const auto events_dir = instance_path + EVENTS_DIR;
     evt_reader.reset(new EventReader(events_dir, evt_hdlr));
     pg_reader.reset(new PageReader(events_dir, *evt_reader.get(), pg_sz));
 }
 
 ftrace::Tracer::~Tracer() {
-    //TODO: impl me!
+    stop();
+    pg_reader.reset();
+    evt_reader.reset();
+    for (const auto& dl : dls) {
+        close(dl.pipe_fd);
+        close(dl.stats_fd);
+    }
+    //close(set_event_pid); //not enabled yet
+    close(ctrl_fds.syscall_exit_enable);
+    close(ctrl_fds.syscall_enter_enable);
+    close(ctrl_fds.sched_wakeup_enable);
+    close(ctrl_fds.sched_switch_enable);
+    close(ctrl_fds.trace_options);
+    close(ctrl_fds.tracing_on);
 }
 
 void ftrace::Tracer::trace_on(pid_t pid, void* ctx) {

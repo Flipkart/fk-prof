@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <sys/uio.h>
 #include <memory>
+#include <unistd.h>
 
 enum class FdType : std::uint8_t {
     listener = 0, client, tracer
@@ -45,8 +46,8 @@ static void make_non_blocking(int fd) {
 
 static const size_t io_buff_sz = 16 * 1024;
 
-ftrace::Server::Server(const std::string& tracing_dir, const std::string& socket_path) :
-    keep_running(true), tracer(nullptr), io_buff(new std::uint8_t[io_buff_sz]),
+ftrace::Server::Server(const std::string& tracing_dir, const std::string& _socket_path) :
+    socket_path(_socket_path), keep_running(true), tracer(nullptr), io_buff(new std::uint8_t[io_buff_sz]),
     
     s_t_processing_time(get_metrics_registry().new_timer({METRICS_DOMAIN_TRACE, METRIC_TYPE, "processing_time"})),
     s_t_wait_time(get_metrics_registry().new_timer({METRICS_DOMAIN_TRACE, METRIC_TYPE, "wait_time"})),
@@ -58,7 +59,7 @@ ftrace::Server::Server(const std::string& tracing_dir, const std::string& socket
     if (poll_fd < 0) {
         throw log_and_get_error("Couldn't create epoll-fd", errno);
     }
-    setup_listener(socket_path);
+    setup_listener();
     tracer.reset(new Tracer(tracing_dir, *this, [&](const ftrace::Tracer::DataLink& link) {
                 auto fd = link.pipe_fd;
                 make_non_blocking(fd);
@@ -116,6 +117,7 @@ void ftrace::Server::shutdown() {
     close(poll_fd);
     tracer.reset(nullptr);
     poll_fd = -1;
+    unlink(socket_path.c_str());
 }
 
 struct ftrace::ClientSession {
@@ -349,7 +351,7 @@ void ftrace::Server::stop() {
     keep_running.store(false, std::memory_order_relaxed);
 }
 
-void ftrace::Server::setup_listener(const std::string& socket_path) {
+void ftrace::Server::setup_listener() {
     listener_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
     if (listener_fd < 0) throw log_and_get_error("Couldn't create listener-socket", errno);
     

@@ -3,6 +3,7 @@
 
 #include <sstream>
 #include <regex>
+#include <sys/stat.h>
 
 namespace Util {
     namespace {
@@ -35,6 +36,11 @@ namespace Util {
     template <typename T> T stoun(const std::string& str);
 
     extern template std::uint16_t stoun<std::uint16_t>(const std::string& str);
+
+    bool dir_exists(const char *path);
+
+    bool file_exists(const char *path);
+
 }
 
 

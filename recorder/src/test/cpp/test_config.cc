@@ -35,7 +35,8 @@ TEST(Config_Should_ParsesAllOptions) {
                     "tx_ring_sz=102400,"
                     "stats_syslog_tag=foo,"
                     "allow_bci=y,"
-                    "allow_ftrace=y");
+                    "allow_ftrace=y,"
+                    "tracer_listener=/tmp/server.sock");
     
     ConfigurationOptions options(str.c_str());
     CHECK_EQUAL("http://10.20.30.40:9070", options.service_endpoint);
@@ -84,7 +85,8 @@ TEST(Config_Should_Understand_AllowSigprof) {
                     "inst_type=c0.medium,"
                     "allow_sigprof=y,"
                     "pctx_jar_path=/tmp/foo.jar,"
-                    "stats_syslog_tag=foo");
+                    "stats_syslog_tag=foo,"
+                    "tracer_listener=/tmp/server.sock");
 
     ConfigurationOptions options(str.c_str());
     CHECK_EQUAL(true, options.allow_sigprof);
@@ -103,7 +105,8 @@ TEST(Config_Should_Understand_AllowSigprof) {
     "zone=waldo_zone,"                                               \
     "inst_type=c0.medium,"                                           \
     "pctx_jar_path=/tmp/foo.jar,"                                    \
-    "stats_syslog_tag=bar,"
+    "stats_syslog_tag=bar,"                                          \
+    "tracer_listener=/tmp/server.sock"
 
 TEST(Config_Should_Understand_Match_allow_capability_field_values_case_insensitively) {
     TestEnv _;
@@ -137,7 +140,8 @@ TEST(Config_Should_DefaultAppropriately) {
                     "zone=waldo_zone,"
                     "inst_type=c0.medium,"
                     "pctx_jar_path=/tmp/quux.jar,"
-                    "stats_syslog_tag=bar");
+                    "stats_syslog_tag=bar,"
+                    "tracer_listener=/var/tmp/ftrace.sock");
     
     ConfigurationOptions options(str.c_str());
     CHECK_EQUAL("http://10.20.30.40:9070", options.service_endpoint);

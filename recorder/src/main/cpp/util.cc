@@ -41,3 +41,18 @@ template <typename T> T Util::stoun(const std::string& str) {
  }
 
 template std::uint16_t Util::stoun<std::uint16_t>(const std::string& str);
+
+bool Util::dir_exists(const char *path) {
+    struct stat info;
+    if(stat(path, &info) != 0)
+        return false;
+    return S_ISDIR(info.st_mode);
+}
+
+bool Util::file_exists(const char *path) {
+    struct stat info;
+    if(stat(path, &info) != 0)
+        return false;
+    return (S_IFMT & info.st_mode) != 0;
+}
+

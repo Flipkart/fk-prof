@@ -38,7 +38,7 @@ namespace ftrace {
     private:
         void shutdown();
 
-        void setup_listener(const std::string& socket_path);
+        void setup_listener();
 
         void io_evt(epoll_event& evt);
 
@@ -60,6 +60,8 @@ namespace ftrace {
         void do_add_tid(ClientFd fd, v_curr::payload::AddTid* add_tid);
 
         void do_del_tid(ClientFd fd, v_curr::payload::DelTid* add_tid);
+
+        const std::string socket_path;
 
         std::atomic<bool> keep_running;
 

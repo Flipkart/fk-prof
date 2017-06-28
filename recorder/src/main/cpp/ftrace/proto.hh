@@ -40,7 +40,7 @@ namespace ftrace {
 
         typedef std::uint8_t PayloadLen;
 
-        enum class PktType : std::uint8_t {
+        enum PktType  {
             toggle_features   = 0,
             add_tid           = 1,
             del_tid           = 2,

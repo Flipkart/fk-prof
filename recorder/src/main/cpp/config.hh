@@ -52,6 +52,8 @@ struct ConfigurationOptions {
     bool allow_bci;
     bool allow_ftrace;
 
+    char* tracer_listener;
+
     ConfigurationOptions(const char* options) :
         service_endpoint(nullptr),
         ip(nullptr),
@@ -75,7 +77,8 @@ struct ConfigurationOptions {
         tx_ring_sz(1024 * 1024),
         stats_syslog_tag(nullptr),
         allow_bci(false),
-        allow_ftrace(false) {
+        allow_ftrace(false),
+        tracer_listener(nullptr) {
 
         load(options);
     }
