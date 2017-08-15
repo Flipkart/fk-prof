@@ -98,7 +98,7 @@ public class CacheTest {
 
     private void setUpCache(TestContext context, LocalProfileCache localCache, AggregatedProfileLoader profileLoader, ProfileViewCreator viewCreator) {
         localProfileCache = localCache;
-        cache = new ClusterAwareCache(curator, executor, localProfileCache, profileLoader, viewCreator, config);
+        cache = new ClusterAwareCache(curator, executor, profileLoader, viewCreator, config, localProfileCache);
         Async async = context.async();
         cache.onClusterJoin().setHandler(ar -> {
             context.assertTrue(ar.succeeded());

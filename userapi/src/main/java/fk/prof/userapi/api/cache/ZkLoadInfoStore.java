@@ -25,6 +25,20 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 /**
+ * Shared storage based on zookeeper to store the mapping profile -> ip:port and maintain resource utilization counters
+ * for each node in cluster.
+ * It is used by {@link ClusterAwareCache}.
+ *
+ * zookeeper node structure:
+ * /fkprof-userapi                                                                    (session namespace)
+ * /fkprof-userapi/nodesInfo/{ip:port} -> {@link NodeLoadInfo}                                (ephemeral)
+ * /fkprof-userapi/profilesLoadStatus/{profileName} -> {@link ProfileResidencyInfo}           (ephemeral)
+ *
+ * For resource utilization counter, currently only cached profile count is stored
+ *
+ * @see NodeLoadInfo
+ * @see ProfileResidencyInfo
+ *
  * Created by gaurav.ashok on 01/08/17.
  */
 class ZkLoadInfoStore {
@@ -104,7 +118,7 @@ class ZkLoadInfoStore {
         }
     }
 
-    void updateProfile(AggregatedProfileNamingStrategy profileName, boolean profileNodeExists) throws Exception {
+    void updateProfileResidencyInfo(AggregatedProfileNamingStrategy profileName, boolean profileNodeExists) throws Exception {
         ensureConnected();
         NodeLoadInfo nodeLoadInfo = readFrom(zkNodesInfoPath, NodeLoadInfo.parser());
         int profileLoadedCount = nodeLoadInfo.getProfilesLoaded() + (profileNodeExists ? 0 : 1);
@@ -118,7 +132,7 @@ class ZkLoadInfoStore {
         transaction.commit();
     }
 
-    void removeProfile(AggregatedProfileNamingStrategy profileName, boolean deleteProfileNode) throws Exception {
+    void removeProfileResidencyInfo(AggregatedProfileNamingStrategy profileName, boolean deleteProfileNode) throws Exception {
         ensureConnected();
         NodeLoadInfo nodeLoadInfo = readFrom(zkNodesInfoPath, NodeLoadInfo.parser());
         byte[] newData = buildNodeLoadInfo(nodeLoadInfo.getProfilesLoaded() - 1).toByteArray();
@@ -235,6 +249,10 @@ class ZkLoadInfoStore {
         logger.info("zookeeper state changed to \"{}\"", newState.name());
     }
 
+    /**
+     * Reinitialization after recovering from lost zk connection. Updates all mapping in the zk.
+     * @throws Exception
+     */
     private void reInit() throws Exception {
         logger.info("ReInitializing zkStore");
         List<AggregatedProfileNamingStrategy> cachedProfiles = this.cachedProfiles.get();

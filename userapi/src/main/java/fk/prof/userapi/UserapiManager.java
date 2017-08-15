@@ -18,7 +18,6 @@ import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.api.ProfileViewCreator;
 import fk.prof.userapi.api.cache.ClusterAwareCache;
-import fk.prof.userapi.api.cache.LocalProfileCache;
 import fk.prof.userapi.deployer.VerticleDeployer;
 import fk.prof.userapi.deployer.impl.UserapiHttpVerticleDeployer;
 import fk.prof.userapi.http.UserapiApiPathConstants;
@@ -71,7 +70,6 @@ public class UserapiManager {
 
         this.cache = new ClusterAwareCache(curatorClient,
             vertx.createSharedWorkerExecutor(this.config.getBlockingWorkerPool().getName(), this.config.getBlockingWorkerPool().getSize()),
-            new LocalProfileCache(this.config),
             new AggregatedProfileLoader(this.storage),
             new ProfileViewCreator(),
             this.config);
@@ -80,6 +78,7 @@ public class UserapiManager {
     public Future<Void> close() {
         Future future = Future.future();
         vertx.close(closeResult -> {
+            curatorClient.close();
             if (closeResult.succeeded()) {
                 logger.info("Shutdown successful for vertx instance");
                 future.complete();
@@ -161,7 +160,9 @@ public class UserapiManager {
             .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.CLUSTER_GIVEN_APPID + ".*").setAlias(UserapiApiPathConstants.CLUSTER_GIVEN_APPID).setType(MatchType.REGEX))
             .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.PROC_GIVEN_APPID_CLUSTERID + ".*").setAlias(UserapiApiPathConstants.PROC_GIVEN_APPID_CLUSTERID).setType(MatchType.REGEX))
             .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.PROFILES_GIVEN_APPID_CLUSTERID_PROCID).setAlias(UserapiApiPathConstants.PROFILE_GIVEN_APPID_CLUSTERID_PROCID_WORKTYPE_TRACENAME).setType(MatchType.REGEX))
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.PROFILE_GIVEN_APPID_CLUSTERID_PROCID_WORKTYPE_TRACENAME).setAlias(UserapiApiPathConstants.PROFILE_GIVEN_APPID_CLUSTERID_PROCID_WORKTYPE_TRACENAME).setType(MatchType.REGEX));
+            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.PROFILE_GIVEN_APPID_CLUSTERID_PROCID_WORKTYPE_TRACENAME).setAlias(UserapiApiPathConstants.PROFILE_GIVEN_APPID_CLUSTERID_PROCID_WORKTYPE_TRACENAME).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.CALLEES_VIEW_FOR_CPU_SAMPLING).setAlias(UserapiApiPathConstants.CALLEES_VIEW_FOR_CPU_SAMPLING).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.CALLERS_VIEW_FOR_CPU_SAMPLING).setAlias(UserapiApiPathConstants.CALLERS_VIEW_FOR_CPU_SAMPLING).setType(MatchType.REGEX));
     }
 
     public static class AbortPolicy implements RejectedExecutionHandler {

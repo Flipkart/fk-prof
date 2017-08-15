@@ -90,7 +90,7 @@ public class ZkStoreTest {
         AggregatedProfileNamingStrategy profileName1 = pn("proc1", dt(0));
 
         try(AutoCloseable lock1 = zkStore.getLock()) {
-            zkStore.updateProfile(profileName1, false);
+            zkStore.updateProfileResidencyInfo(profileName1, false);
         }
 
         LoadInfoEntities.NodeLoadInfo loadInfo = zkStore.readNodeLoadInfo();
@@ -100,7 +100,7 @@ public class ZkStoreTest {
         Assert.assertEquals("127.0.0.1", residencyInfo.getIp());
         Assert.assertEquals(8080, residencyInfo.getPort());
 
-        zkStore.removeProfile(profileName1, true);
+        zkStore.removeProfileResidencyInfo(profileName1, true);
         Assert.assertEquals(0, zkStore.readNodeLoadInfo().getProfilesLoaded());
         Assert.assertNull(zkStore.readProfileResidencyInfo(profileName1));
     }
@@ -123,8 +123,8 @@ public class ZkStoreTest {
         AggregatedProfileNamingStrategy profileName1 = pn("proc1", dt(0)),
             profileName2 = pn("proc2", dt(0));
 
-        zkStore.updateProfile(profileName1, false);
-        zkStore.updateProfile(profileName2, false);
+        zkStore.updateProfileResidencyInfo(profileName1, false);
+        zkStore.updateProfileResidencyInfo(profileName2, false);
 
         doReturn(Arrays.asList(profileName1, profileName2)).when(loadedProfiles).get();
 
@@ -133,7 +133,7 @@ public class ZkStoreTest {
             Thread.sleep(500);
             Exception caughtEx = null;
             try {
-                zkStore.updateProfile(profileName1, false);
+                zkStore.updateProfileResidencyInfo(profileName1, false);
             }
             catch (Exception e) {
                 caughtEx = e;

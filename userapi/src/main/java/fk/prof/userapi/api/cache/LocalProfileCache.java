@@ -22,9 +22,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 /**
+ * A wrapper over {@link Cache} to cache aggregated profiles and created views.
+ * Provides usual get, put semantics.
+ * It is used by {@link ClusterAwareCache} as a local cache. {@code put} for a {@link AggregatedProfileNamingStrategy}
+ * will only be called 2 times, once the profile loading is initiated and the next when loading is finished.
+ *
  * Created by gaurav.ashok on 17/07/17.
  */
-public class LocalProfileCache {
+class LocalProfileCache {
     private static final Logger logger = LoggerFactory.getLogger(LocalProfileCache.class);
 
     private final AtomicInteger uidGenerator;
@@ -33,7 +38,7 @@ public class LocalProfileCache {
 
     private RemovalListener<AggregatedProfileNamingStrategy, Future<AggregatedProfileInfo>> removalListener;
 
-    public LocalProfileCache(Configuration config) {
+    LocalProfileCache(Configuration config) {
         this(config, Ticker.systemTicker());
     }
 
@@ -62,8 +67,8 @@ public class LocalProfileCache {
         this.removalListener = removalListener;
     }
 
-    Future<AggregatedProfileInfo> get(AggregatedProfileNamingStrategy key) {
-        CacheableProfile cacheableProfile = cache.getIfPresent(key);
+    Future<AggregatedProfileInfo> get(AggregatedProfileNamingStrategy profileName) {
+        CacheableProfile cacheableProfile = cache.getIfPresent(profileName);
         return cacheableProfile != null ? cacheableProfile.profile : null;
     }
 
@@ -112,6 +117,11 @@ public class LocalProfileCache {
         }
     }
 
+    /**
+     * A wrapper over cached profile object {@code Future<AggregatedProfileInfo>} to store list of keys for loaded views
+     * and provide thread-safe getOrCompute semantic for the view. The list of keys is also used to invalidate views when
+     * profile itself gets evicted.
+     */
     private class CacheableProfile implements Cacheable {
         int uid;
         AggregatedProfileNamingStrategy profileName;
