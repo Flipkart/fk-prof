@@ -20,6 +20,10 @@ const everythingOnTopHeight = 160;
 const filterBoxHeight = 87;
 const stackEntryHeight = 25;
 
+const KEY = 0;
+const DATA = 1;
+const LEVEL = 2;
+
 //Input is expected to be Array of (nodeIndex, callCount)   and
 //output returned is an array of objects of type HotMethodNode
 //This function aggregates nodes with same name+lineNo to be rendered and same name for first layer
@@ -70,6 +74,8 @@ class MethodTreeComponent extends Component {
       req: {url: '', status: 'PENDING', err: ''}
     };
     this.allNodes = {};
+    this.curAllNodes = {};
+    this.renderData = [];
     this.opened = {}; // keeps track of all opened/closed nodes
     this.highlighted = {}; //keeps track of all highlighted nodes
     this.flatten = this.flatten.bind(this);
@@ -100,7 +106,9 @@ class MethodTreeComponent extends Component {
     console.log("URL for Post is ", url);
     http.post(url, [])
       .then(resp => {
-        this.allNodes[url] = {renderList: this.flatten(resp, [], 0), methodLookup: resp['method_lookup']};
+        this.allNodes[url] = {allList: this.flatten(resp, [], 0), methodLookup: resp['method_lookup']};
+        this.curAllNodes = this.allNodes[url];
+        this.curAllNodes.allList.forEach((x,i)=> x[LEVEL]===0 && this.renderData.push(x));
         this.setState((prevState) => ({req: {...prevState.req, status: 'SUCCESS'}}));
       })
       .catch(err => {
@@ -117,7 +125,9 @@ class MethodTreeComponent extends Component {
       this.setState((prevState) => ({req: {...prevState.req, status: 'PENDING', url: url}}));
       http.post(url, [])
         .then(resp => {
-          this.allNodes[url] = {renderList: this.flatten(resp, [], 0), methodLookup: resp['method_lookup']};
+          this.allNodes[url] = {allList: this.flatten(resp, [], 0), methodLookup: resp['method_lookup']};
+          this.curAllNodes = this.allNodes[url];
+          this.curAllNodes.allList.forEach((x,i)=> x[LEVEL]===0 && this.renderData.push(x));
           this.setState((prevState) => ({req: {...prevState.req, status: 'SUCCESS'}}));
         })
         .catch(err => {
@@ -137,18 +147,18 @@ class MethodTreeComponent extends Component {
   // }
 
 
-  flatten(root, renderList, lvl) {
+  flatten(root, allList, lvl) {
     //sorting logic on Object.entries
     Object.entries(root).forEach(([k, v]) => {
       if (k !== 'method_lookup') {
-        const idx = renderList.push([k, v.data, lvl, 0, false]) - 1; //key, node data, render lvl, subtree node count, IsSubtreeOpened
+        const idx = allList.push([parseInt(k), v.data, lvl, 0, false]) - 1; //key, node data, render lvl, subtree node count, IsSubtreeOpened
         if(v.chld) {
-          this.flatten(v.chld, renderList, lvl + 1);
+          this.flatten(v.chld, allList, lvl + 1);
         }
-        renderList[idx][3] = renderList.length - 1 - idx; //subTree node count
+        allList[idx][3] = allList.length - 1 - idx; //subTree node count
       }
     });
-    return renderList;
+    return allList;
   }
 
   render () {
@@ -176,7 +186,7 @@ class MethodTreeComponent extends Component {
     const containerHeight = window.innerHeight - everythingOnTopHeight; //subtracting height of everything above the container
     const gridHeight = containerHeight - filterBoxHeight; //subtracting height of filter box
     // console.log("cH", containerHeight, " fbh",filterBoxHeight, " gh",gridHeight);
-    // console.log("this.allNodes : ",  this.allNodes);
+   // console.log("this.allNodes : ",  this.curAllNodes);
     return (
       <div>
         {/*<div style={{flex: "1 1 auto", height: containerHeight + "px"}}>*/}
@@ -207,7 +217,7 @@ class MethodTreeComponent extends Component {
                     columnWidth={width}
                     height={gridHeight}
                     width={width}
-                    rowCount={this.allNodes[this.state.req.url].renderList.length}
+                    rowCount={this.renderData.length}
                     rowHeight={stackEntryHeight}
                     cellRenderer={this.stackLineDetailCellRenderer}
                     className={styles.LeftGrid}
@@ -246,34 +256,105 @@ class MethodTreeComponent extends Component {
     );
   }
 
-  // toggle (listIdx) {
-  //   const rowdata = this.renderData[listIdx];
-  //   const uniqueId = rowdata[0];
-  //
-  //   let nodeIndexes;
-  //   if (this.props.nextNodesAccessorField === 'parent') {
-  //     nodeIndexes = rowdata[1].parentsWithSampledCallCount;
-  //   } else {
-  //     nodeIndexes = rowdata[1].children;
-  //   }
-  //
-  //   if(!this.opened[uniqueId]) {
-  //     //expand
-  //     const childRenderData = this.getRenderData(nodeIndexes, null, uniqueId, rowdata[3] > 1, rowdata[2]);
-  //     const postarr = this.renderData.splice(listIdx + 1);
-  //     this.renderData = this.renderData.concat(childRenderData, postarr);
-  //   } else {
-  //     //collapse
-  //     const descendants = this.getRenderedDescendantCountForListItem(listIdx);
-  //     if(descendants > 0) {
-  //       this.renderData.splice(listIdx + 1, descendants);
-  //     }
-  //   }
-  //   this.opened[uniqueId] = !this.opened[uniqueId];
-  //   this.setState({
-  //     itemCount: this.renderData.length
-  //   });
-  // }
+  toggle (renderIdx) {
+    // console.log('this.renderData inside toggle', this.renderData);
+    // console.log('toggle: renderIdx ', renderIdx);
+    const allNodesIdx = this.renderData[renderIdx];
+    // console.log('allNodesIdx', allNodesIdx);
+    let isRenderExpanded = false; //isSubtreeOpened //renderNodeHasItsSubtreeOpened
+    if (renderIdx+1 < this.renderData.length && this.renderData[renderIdx+1][LEVEL] > allNodesIdx[LEVEL]) {
+      isRenderExpanded = true;
+    }
+
+    let isAllNodesExpanded = false;
+    if (allNodesIdx+1 < this.curAllNodes.allList.length && this.curAllNodes.allList[allNodesIdx+1][LEVEL] > this.curAllNodes.allList[allNodesIdx][LEVEL]) {
+      isAllNodesExpanded = true;
+    }
+    // const uniqueId = rowData[0];
+
+    // let nodeIndexes;
+    // if (this.props.nextNodesAccessorField === 'parent') {
+    //   nodeIndexes = rowData[1].parentsWithSampledCallCount;
+    // } else {
+    //   nodeIndexes = rowData[1].children;
+    // }
+
+    // if(!this.opened[uniqueId]) {
+    //   //expand
+    //   const childRenderData = this.getRenderData(nodeIndexes, null, uniqueId, rowData[3] > 1, rowData[2]);
+    //   const postarr = this.renderData.splice(listIdx + 1);
+    //   this.renderData = this.renderData.concat(childRenderData, postarr);
+    // } else {
+    //   //collapse
+    //   const descendants = this.getRenderedDescendantCountForListItem(listIdx);
+    //   if(descendants > 0) {
+    //     this.renderData.splice(listIdx + 1, descendants);
+    //   }
+    // }
+    // this.opened[uniqueId] = !this.opened[uniqueId];
+    console.log('idx :', renderIdx);
+    console.log('idx :', this.renderData);
+    console.log('isRenderExpanded : ',isRenderExpanded);
+    if (isRenderExpanded) {
+      //collapse
+      let idx = renderIdx+1;
+      while (idx < this.renderData.length && this.curAllNodes.allList[this.renderData[idx]][LEVEL] > this.curAllNodes.allList[allNodesIdx][LEVEL]) {
+        idx++;
+      }
+      console.log('Collapse: renderData=', this.renderData);
+      console.log('idx', idx, 'renderIdx',renderIdx );
+      this.renderData.splice(renderIdx+1, idx-renderIdx-1);
+      console.log('Collapse: renderData2=', this.renderData);
+
+      this.setState({
+        itemCount: this.renderData.length
+      });
+    } else {
+      //expand
+      console.log('isAllNodesExpanded : ',isAllNodesExpanded);
+      if (isAllNodesExpanded) {
+        let idx = allNodesIdx+1;
+        while (idx < this.curAllNodes.allList.length && this.curAllNodes.allList[idx][LEVEL] > this.curAllNodes.allList[allNodesIdx][LEVEL]) {
+          idx++;
+        }
+        this.renderData.splice(renderIdx+1, 0, ...Array.from({length: idx-allNodesIdx-1}, (v, i) => i+allNodesIdx+1));
+        console.log('renderData after inserting subTree: ', this.renderData);
+        this.setState({
+          itemCount: this.renderData.length
+        });
+      } else {
+        //disable toggle button if response for network call returns empty json
+        console.log('post req with body: ', this.curAllNodes.allList[allNodesIdx][KEY]);
+        http.post(this.state.req.url, [this.curAllNodes.allList[allNodesIdx][KEY]])
+          .then(resp => {
+            this.curAllNodes.methodLookup = [...new Set([...this.curAllNodes.methodLookup, ...resp['method_lookup']])];
+            const subTreeList = this.flatten(resp, [], this.curAllNodes.allList[allNodesIdx][LEVEL]);
+            console.log('subTreeList: ', subTreeList);
+            console.log('renderData pre adding', this.curAllNodes.allList);
+            this.curAllNodes.allList.splice(allNodesIdx+1,0,subTreeList);
+            console.log('renderData post adding', this.curAllNodes.allList);
+
+            this.setState((prevState) => ({req: {...prevState.req, status: 'SUCCESS'}}));
+            console.log('Array inserted', ...Array.from({length: subTreeList.length}, (v, i) => i+allNodesIdx+1));
+            console.log('renderData pre adding', this.renderData);
+
+            this.renderData.splice(renderIdx+1, 0, ...Array.from({length: subTreeList.length}, (v, i) => i+allNodesIdx+1));
+            console.log('renderData post adding', this.renderData);
+            if(subTreeList.length === 0){
+              console.log('// TODO: DISABLE TOGGLE BUTTON');
+            }
+            this.setState({
+              itemCount: this.renderData.length
+            });
+          })
+          .catch(err => {
+            this.setState((prevState) => ({req: {...prevState.req, ...{err: err, status: 'ERROR'}}}));
+            console.log('Show a snackBar to retry toggling later');
+          });
+      }
+    }
+
+  }
   //
   // highlight (path) {
   //   if (path in this.highlighted) {
@@ -320,11 +401,17 @@ class MethodTreeComponent extends Component {
   //
   stackLineDetailCellRenderer (params) {
     // console.log('params = ', params);
-    const rowData = this.allNodes[this.state.req.url].renderList[params.rowIndex];
+
+    // console.log('renderData', this.renderData);
+    // console.log('renderData rowIndex', this.renderData[params.rowIndex]);
+    const rowData = this.curAllNodes.allList[this.renderData[params.rowIndex]];
+
+    console.log('renderData :', this.renderData);
     const [ methodId, lineNo, sampleCount ] = rowData[1];
-    const displayNameWithArgs = this.allNodes[this.state.req.url].methodLookup[methodId];
-    const splits = displayNameWithArgs.split(" ");
-    const displayName = splits.length === 2 ? splits[0]: displayNameWithArgs;
+    const displayNameWithArgs = this.curAllNodes.methodLookup[methodId];
+    // const splits = displayNameWithArgs.split(" ");
+    // const displayName = splits.length === 2 ? splits[0]: displayNameWithArgs;
+    const displayName = displayNameWithArgs;
 
     //This condition is equivalent to (n instanceOf HotMethodNode)
     //since nextNodesAccessorField is = parent in hot method view and
@@ -343,7 +430,6 @@ class MethodTreeComponent extends Component {
     // }
     // const isHighlighted = Object.keys(this.highlighted)
     //   .filter(highlight => highlight.startsWith(uniqueId));
-
     return (
       <StacklineDetail
         key={params.rowIndex}
@@ -351,12 +437,12 @@ class MethodTreeComponent extends Component {
         listIdx={params.rowIndex}
         nodename={displayNameWithArgs}
         stackline={displayName}
-        indent={0}
-        nodestate={true}
-        highlight={10}
+        indent={rowData[2]*10}
+        nodestate={rowData[4]}
+        highlight={false}
         subdued={false}
         onHighlight={()=>console.log('onHighlight')}
-        onClick={()=>console.log('onClick')}>
+        onClick={this.toggle.bind(this, params.rowIndex)}>
       </StacklineDetail>
 
     );
