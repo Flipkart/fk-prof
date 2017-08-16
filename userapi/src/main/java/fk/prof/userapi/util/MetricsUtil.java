@@ -25,7 +25,10 @@ public class MetricsUtil {
     }
 
     public static void gauage(String name, Gauge gauge) {
-        getMetricRegistry().register(name, gauge);
+        MetricRegistry registry = getMetricRegistry();
+        if(!registry.getGauges().containsKey(name)) {
+            registry.register(name, gauge);
+        }
     }
 
     public static MetricRegistry getMetricRegistry() {
