@@ -72,16 +72,18 @@ public interface ProfileStoreAPI {
     void loadSummary(Future<AggregationWindowSummary> future, AggregatedProfileNamingStrategy filename);
 
     /**
-     *
+     * Get/Create a callerTree view for the trace
      * @param profileName
      * @param traceName
+     * @return Future containing calltree view and the associated aggregated samples.
      */
     Future<Pair<AggregatedSamplesPerTraceCtx,CallTreeView>> getCpuSamplingCallersTreeView(AggregatedProfileNamingStrategy profileName, String traceName);
 
     /**
-     *
+     * Get/Create a calleeTree view for the trace
      * @param profileName
      * @param traceName
+     * @return Future containing calleetree view and the associated aggregated samples.
      */
     Future<Pair<AggregatedSamplesPerTraceCtx,CalleesTreeView>> getCpuSamplingCalleesTreeView(AggregatedProfileNamingStrategy profileName, String traceName);
 }

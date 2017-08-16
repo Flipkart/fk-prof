@@ -11,6 +11,7 @@ import fk.prof.userapi.Cacheable;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.Pair;
 import fk.prof.userapi.model.AggregatedProfileInfo;
+import fk.prof.userapi.util.MetricsUtil;
 import io.vertx.core.Future;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -61,6 +62,9 @@ class LocalProfileCache {
 
         this.removalListener = null;
         this.uidGenerator = new AtomicInteger(0);
+
+        MetricsUtil.gauage("localcache.profiles.count", () -> cache.size());
+        MetricsUtil.gauage("localcache.views.count", () -> viewCache.size());
     }
 
     void setRemovalListener(RemovalListener<AggregatedProfileNamingStrategy, Future<AggregatedProfileInfo>> removalListener) {

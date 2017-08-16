@@ -140,7 +140,7 @@ public class ZkStoreTest {
             }
 
             Assert.assertNotNull(caughtEx);
-            Assert.assertEquals(ZkStoreNotConnectedException.class, caughtEx.getClass());
+            Assert.assertEquals(ZkStoreUnavailableException.class, caughtEx.getClass());
 
             // wait for some time, to let the session expire
             // weird that i have to wait for 15 sec here even though session timeout is 4sec.

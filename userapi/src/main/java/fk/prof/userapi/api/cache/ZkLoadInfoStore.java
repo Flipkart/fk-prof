@@ -1,5 +1,6 @@
 package fk.prof.userapi.api.cache;
 
+import com.codahale.metrics.Counter;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.AbstractMessage;
@@ -7,6 +8,7 @@ import com.google.protobuf.Parser;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.userapi.proto.LoadInfoEntities.NodeLoadInfo;
 import fk.prof.userapi.proto.LoadInfoEntities.ProfileResidencyInfo;
+import fk.prof.userapi.util.MetricsUtil;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import org.apache.curator.framework.CuratorFramework;
@@ -55,6 +57,9 @@ class ZkLoadInfoStore {
 
     private final byte[] myResidencyInfo;
     private Supplier<List<AggregatedProfileNamingStrategy>> cachedProfiles;
+
+    private Counter lockAcquireTimeoutCounter = MetricsUtil.counter("zk.lock.timeouts");
+    private Counter onReconnectFailures = MetricsUtil.counter("zk.onreconnect.failures");
 
     ZkLoadInfoStore(CuratorFramework zookeeper, String myIp, int port, Supplier<List<AggregatedProfileNamingStrategy>> cachedProfiles) {
         this.zookeeper = zookeeper;
@@ -164,9 +169,9 @@ class ZkLoadInfoStore {
         Connected
     }
 
-    private void ensureConnected() throws ZkStoreNotConnectedException {
+    private void ensureConnected() throws ZkStoreUnavailableException {
         if(!ConnectionState.Connected.equals(connectionState.get())) {
-            throw new ZkStoreNotConnectedException("connection lost recently: " + recentlyZkConnectionLost.get() + ", lastTimeOfLostConnection: " + lastZkLostTime.get().toString());
+            throw new ZkStoreUnavailableException("connection lost recently: " + recentlyZkConnectionLost.get() + ", lastTimeOfLostConnection: " + lastZkLostTime.get().toString());
         }
     }
 
@@ -186,7 +191,10 @@ class ZkLoadInfoStore {
                 lockAlreadyAcquired = true;
             }
             else {
-                sharedMutex.acquire();
+                if(!sharedMutex.acquire(5, TimeUnit.SECONDS)) {
+                    lockAcquireTimeoutCounter.inc();
+                    throw new ZkStoreUnavailableException("Could not acquire lock in the given time.");
+                }
             }
         }
 
@@ -223,18 +231,17 @@ class ZkLoadInfoStore {
                 if(recentlyZkConnectionLost.get()) {
                     reInit();
                     recentlyZkConnectionLost.set(false);
-                    connectionState.set(ConnectionState.Connected);
                 }
                 else {
                     if(!pathExists(zkNodesInfoPath)) {
-                        // Assuming this should not happen. Putting a check so that we can be notified if this assumption breaks any time.
+                        // Assuming this should not happen. throwing an error here so that we can be notified if this assumption breaks any time.
                         throw new RuntimeException("After zookeeper reconnection, my node was not found");
                     }
-                    connectionState.set(ConnectionState.Connected);
                 }
+                connectionState.set(ConnectionState.Connected);
             }
             catch (Exception e) {
-                //TODO metric here
+                onReconnectFailures.inc();
                 logger.error("Error while reinitializing zookeeper after reconnection.", e);
             }
         }
@@ -280,7 +287,6 @@ class ZkLoadInfoStore {
             }
 
             if(nodeInfoNodeExists) {
-                //TODO metric me !!
                 throw new RuntimeException("even though connection was lost, the nodes weren't deleted");
             }
         }

@@ -306,7 +306,7 @@ public class ClusterAwareCache {
     }
 
     private Object buildView(AggregatedProfileInfo profile, String traceName, StacktraceTreeViewType viewType) {
-        if(StacktraceTreeViewType.CALLERS.equals(viewType)) {
+        if (StacktraceTreeViewType.CALLERS.equals(viewType)) {
             return viewCreator.buildCallTreeView(profile, traceName);
         }
         else {
