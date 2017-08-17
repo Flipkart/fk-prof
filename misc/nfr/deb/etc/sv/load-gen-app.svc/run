@@ -7,6 +7,7 @@ ulimit -c unlimited
 
 JAVA_HOME=/usr/lib/jvm/jdk-8-oracle-x64
 FK_PROF_PROG=load-gen-app
+FK_PROF_OVERRIDES=/etc/load-gen-app/rec-overrides
 source /etc/default/fk-prof-rec
 source /etc/load-gen-app/config
 
