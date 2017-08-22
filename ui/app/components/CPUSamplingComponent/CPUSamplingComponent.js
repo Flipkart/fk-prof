@@ -1,6 +1,6 @@
 import React, { Component, PropTypes } from 'react';
 
-import MethodTreeComponent from 'components/MethodTreeComponent';
+import MethodTree from 'components/MethodTreeComponent';
 import {  AutoSizer } from 'react-virtualized';
 import Tabs from 'components/Tabs';
 import styles from './CPUSamplingComponent.css';
@@ -24,6 +24,7 @@ export class CPUSamplingComponent extends Component {
             >
               <i
                 className="material-icons"
+                display
               >launch</i>
             </a>
           </div>
@@ -51,14 +52,36 @@ export class CPUSamplingComponent extends Component {
           </div>
         )}
         <Tabs>
-          <div>
+          <div style={{display: "flex"}}>
             <div>Hot Methods</div>
-            <MethodTreeComponent traceName={this.props.params.traceName} nextNodesAccessorField={"parent"} filterKey={null}/>
+            <div style={{display: "flex", flex: "1 1 auto"}}>
+              <AutoSizer disableHeight>
+                {({ width }) => (
+                  <MethodTree
+                    traceName={this.props.params.traceName}
+                    nextNodesAccessorField="parent"
+                    filterKey="cs_hm_filter"
+                    containerWidth={width}
+                  />
+                )}
+              </AutoSizer>
+            </div>
           </div>
-          {/*<div>*/}
-            {/*<div>Call Tree</div>*/}
-            {/*<MethodTreeComponent traceName={this.props.params.traceName}/>*/}
-          {/*</div>*/}
+          <div>
+            <div>Call Tree</div>
+            <div style={{display: "flex", flex: "1 1 auto"}}>
+              <AutoSizer disableHeight>
+                {({ width }) => (
+                  <MethodTree
+                    traceName={this.props.params.traceName}
+                    nextNodesAccessorField="children"
+                    filterKey="cs_ct_filter"
+                    containerWidth={width}
+                  />
+                )}
+              </AutoSizer>
+            </div>
+          </div>
         </Tabs>
       </div>
     );

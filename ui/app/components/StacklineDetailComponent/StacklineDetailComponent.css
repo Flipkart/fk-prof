@@ -1,5 +1,5 @@
 .detailContainer:hover .stackline {
-    background-color: #f0f0f0;
+    background-color: #f0f0f0;  
 }
 
 .nodeIcon {
@@ -16,7 +16,7 @@
 }
 
 .stackline {
-  border-bottom: 1px solid rgba(158, 158, 158, 0.28);
+  border-bottom: 1px solid rgba(158, 158, 158, 0.28);  
   height: 25px;
   display: flex;
   align-items: center;

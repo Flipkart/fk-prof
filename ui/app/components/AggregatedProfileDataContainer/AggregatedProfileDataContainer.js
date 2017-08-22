@@ -4,6 +4,7 @@ import { connect } from 'react-redux';
 
 import CPUSampling from 'components/CPUSamplingComponent';
 import safeTraverse from 'utils/safeTraverse';
+import styles from './AggregatedProfileDataContainer.css';
 
 const workTypeMap = {
   cpu_sample_work: {
@@ -48,8 +49,8 @@ class AggregatedProfileDataContainer extends React.Component {
     const Komponent = this.props.workTypes && selectedWorkType && workTypeMap[selectedWorkType] &&
       workTypeMap[selectedWorkType].component;
     return (
-      <div className="mdl-grid mdl-shadow--2dp mdl-grid--no-spacing">
-        <div className="mdl-cell mdl-cell--12-col mdl-grid">
+      <div className={styles['aggregated-container']}>
+        <div className={styles['header']}>
           {this.props.workTypes && this.props.workTypes.map(w => (
             <button
               key={w.workType}
@@ -57,12 +58,13 @@ class AggregatedProfileDataContainer extends React.Component {
               style={
                 selectedWorkType === w.workType
                   ? { background: 'rgb(63,81,181)', color: 'white', cursor: 'default' } : {}
-              }>
+              }
+            >
               {`${workTypeMap[w.workType].text} (${w.samples})`}
             </button>
           ))}
         </div>
-        <div style={{width: '100%', height: '100%', marginTop: '-20px'}}>
+        <div>
           {Komponent && (
             <Komponent
               location={this.props.location}

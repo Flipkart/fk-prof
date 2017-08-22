@@ -16,7 +16,7 @@ import Loader from 'components/LoaderComponent';
 const noop = () => {};
 
 const rightColumnWidth = 150;
-const everythingOnTopHeight = 255;
+const everythingOnTopHeight = 270;
 const filterBoxHeight = 87;
 const stackEntryHeight = 25;
 
@@ -124,7 +124,7 @@ class MethodTreeComponent extends Component {
     this.containerWidth = 0;
     this.opened = {}; // keeps track of all opened/closed nodes
     this.highlighted = {}; //keeps track of all highlighted nodes
-    this.allNodes = {};
+
     this.stacklineDetailCellRenderer = this.stacklineDetailCellRenderer.bind(this);
     this.stacklineStatCellRenderer = this.stacklineStatCellRenderer.bind(this);
 
@@ -212,9 +212,10 @@ class MethodTreeComponent extends Component {
     const { nextNodesAccessorField } = this.props;
     const containerHeight = window.innerHeight - everythingOnTopHeight; //subtracting height of everything above the container
     const gridHeight = containerHeight - filterBoxHeight; //subtracting height of filter box
+
     return (
-      <div>
-        <div>
+      <div style={{display: "flex", flexDirection: "column", width: this.containerWidth}}>
+        <div style={{flex: "1 1 auto", height: containerHeight + "px"}}>
           <ScrollSync>
             {({ clientHeight, clientWidth, onScroll, scrollHeight, scrollLeft, scrollTop, scrollWidth }) => (
               <div className={styles.GridRow}>
@@ -239,7 +240,7 @@ class MethodTreeComponent extends Component {
                       {({ width }) => (
                         <Grid
                           columnCount={1}
-                          columnWidth={Math.max(width, this.getMaxWidthOfRenderedStacklines())}
+                          columnWidth={this.getMaxWidthOfRenderedStacklines()}
                           height={gridHeight}
                           width={width}
                           rowCount={this.state.itemCount}
@@ -319,7 +320,7 @@ class MethodTreeComponent extends Component {
     } else {
       // identifying already highlighted children of path
       const highlightedChildren = Object.keys(this.highlighted)
-        .filter(highlight => highlight.startsWith(path));
+      .filter(highlight => highlight.startsWith(path));
       if (highlightedChildren.length) {
         // delete highlighted children
         highlightedChildren.forEach((p) => {
@@ -329,7 +330,7 @@ class MethodTreeComponent extends Component {
 
       // identifying already highlighted parents of path, this will always be 1 at max
       const highlightedParents = Object.keys(this.highlighted)
-        .filter(highlight => path.startsWith(highlight));
+      .filter(highlight => path.startsWith(highlight));
       if (highlightedParents.length) {
         // delete highlighted parents
         highlightedParents.forEach((p) => {
@@ -361,26 +362,11 @@ class MethodTreeComponent extends Component {
     let rowData = this.renderData[rowIndex];
     let uniqueId = rowData[0];
 
-    let newNodeIndexes;
+    const displayName = this.callTreeStore.getNameWithArgs(uniqueId);
 
-    //This condition is equivalent to (n instanceOf HotMethodNode)
-    //since nextNodesAccessorField is = parent in hot method view and
-    //Node type for dedupedNodes is HotMethodNode from above
-    // if (this.props.nextNodesAccessorField === 'parent') {
-    //   newNodeIndexes = n.parentsWithSampledCallCount;
-    //   const lineNoOrNot = (n.belongsToTopLayer)? '' : ':' + n.lineNo;
-    //   displayName = displayName + lineNoOrNot;
-    //   displayNameWithArgs = displayNameWithArgs + lineNoOrNot;
-    // } else {
-    //   // using the index i because in call tree the name of sibling nodes
-    //   // can be same, react will throw up, argh!
-    //   newNodeIndexes = n.children;
-    //   displayName = displayName + ':' + n.lineNo;
-    //   displayNameWithArgs = displayNameWithArgs + ':' + n.lineNo;
-    // }
     const isHighlighted = Object.keys(this.highlighted)
       .filter(highlight => highlight.startsWith(uniqueId));
-    const displayName = this.callTreeStore.getNameWithArgs(uniqueId);
+
     return (
       <StacklineDetail
         key={uniqueId}
@@ -452,116 +438,6 @@ class MethodTreeComponent extends Component {
       });
     });
   }
-
-  // getRenderData (nodeIndexes = [], filterText, parentHasSiblings, parentIndent) {
-  //   const renderStack = [];
-  //   renderStack.push({
-  //     gen: {
-  //       nis: nodeIndexes, //indexes of first-level nodes in the tree subject to de-duplication
-  //       p_ind: parentIndent, //indentation of parent node
-  //       p_sib: parentHasSiblings, //parentHasSiblings
-  //     }
-  //   });
-  //   const renderData = [];
-  //
-  //   const getOriginalKeys = function (nodes){
-  //     const keys = [];
-  //     if (this.props.nextNodesAccessorField === 'parent') {
-  //       return nodes.forEach(n => keys.concat(n.parts.map(part => part.uniqueId)));
-  //     } else {
-  //       return nodes.map(n => n.uniqueId);
-  //     }
-  //   }.bind(this);
-  //
-  //   while(renderStack.length > 0) {
-  //     let se = renderStack.pop();
-  //     if (se.gen) {
-  //       // only need to de-dupe for bottom-up not top-down,
-  //       // hence the ternary :/
-  //       // const dedupedNodes = this.props.nextNodesAccessorField === 'parent'
-  //       //   ? this.dedupeNodes(se.gen.nis)
-  //       //   : se.gen.nis.map((nodeIndex) => this.allNodes[nodeIndex]).slice().sort((a, b) => b.onStack - a.onStack);
-  //
-  //       const nodeData = this.props.nextNodesAccessorField === 'parent' ? this.hotMethodNodes : this.allNodes;
-  //       const processedNodes = nodeIndexes.map((nodeIndex) => nodeData[nodeIndex]).slice().sort((a, b) => b.onStack - a.onStack);
-  //       // this.fetchNodes(this.state.req.url, getOriginalKeys(processedNodes));
-  //       //Indent should always be zero if no parent
-  //       //Otherwise, if parent has siblings or if this node has siblings, do a major indent of the nodes, minor indent otherwise
-  //       const indent = se.p_ind === 0 ? 0 : ((se.gen.p_sib || processedNodes.length > 1 ) ? se.gen.p_ind + 10 : se.gen.p_ind + 3);
-  //       renderStack.push({
-  //        node: {
-  //           dn: processedNodes, //first-level nodes
-  //           ind: indent, //indentation to be applied to rendered node
-  //           idx: 0, //index in array "dn" to identify the node to render,
-  //         }
-  //       });
-  //     } else {
-  //       if(se.node.idx >= se.node.dn.length) {
-  //         continue;
-  //       }
-  //       const n = se.node.dn[se.node.idx];
-  //       //Node has been retrieved so it is safe to increment index and push stack entry back in render stack
-  //       //Fields from this entry will be read further in this iteration but not modified beyond this point, avoiding un-necessary object copy
-  //       se.node.idx++;
-  //       //After index increment, stack entry refers to next sibling, pushing it now itself on stack
-  //       //This ensures that stack entries of children of the current node are pushed later and hence processed earlier
-  //       renderStack.push(se);
-  //
-  //       let displayName = this.methodLookup[n.name][0];
-  //       //If this is a first-level node(p_pth will be empty) and filter is applied, skip rendering of node if display name does not match the filter
-  //       if(filterText && se.ind === 0 && !displayName.match(new RegExp(filterText, 'i'))) {
-  //         continue;
-  //       }
-  //
-  //       let uniqueId, newNodeIndexes;
-  //       //This condition is equivalent to (n instanceOf HotMethodNode)
-  //       //since nextNodesAccessorField is = parent in hot method view and
-  //       //Node type for dedupedNodes is HotMethodNode from above
-  //       if (this.props.nextNodesAccessorField === 'parent') {
-  //         uniqueId = n.index;
-  //         newNodeIndexes = n.parentsWithSampledCallCount;
-  //         const lineNoOrNot = (n.belongsToTopLayer)? '' : ':' + n.lineNo;
-  //         displayName = displayName + lineNoOrNot;
-  //       } else {
-  //         uniqueId = n.index;
-  //         newNodeIndexes = n.children;
-  //         displayName = displayName + ':' + n.lineNo;
-  //       }
-  //
-  //       // If only single node is being rendered, expand the node
-  //       // Or if the node has no children, then expand the node, so that expanded icon is rendered against this node
-  //       if(se.node.dn.length === 1 || newNodeIndexes.length === 0) {
-  //         this.opened[uniqueId] = true;
-  //       }
-  //
-  //       const stackEntryWidth = getTextWidth(displayName, "14px Arial") + 28 + se.node.ind; //28 is space taken up by icons
-  //       const nodeData = [uniqueId, n, se.node.ind, se.node.dn.length, stackEntryWidth];
-  //       renderData.push(nodeData);
-  //
-  //       if(this.opened[uniqueId] && newNodeIndexes) {
-  //         renderStack.push({
-  //           gen: {
-  //             nis: newNodeIndexes,
-  //             p_ind: se.node.ind,
-  //             p_sib: se.node.dn.length > 1
-  //           }
-  //         });
-  //       }
-  //     }
-  //   }
-  //   return renderData;
-  // }
-
-  // getInitialRenderData(filterText) {
-  //   const { nextNodesAccessorField } = this.props;
-  //   let nodeIndexes;
-  //   if (nextNodesAccessorField === 'parent') {
-  //     nodeIndexes = this.nodeIndexes.map((nodeIndex) => [nodeIndex, undefined]);
-  //   } else {
-  //     nodeIndexes = this.nodeIndexes;
-  //   }
-  //   return this.getRenderData(nodeIndexes, filterText, '', false, 0);
-  // }
 
   getRenderedDescendantCountForListItem(listIdx) {
     let currIdx = listIdx;
