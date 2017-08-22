@@ -1,16 +1,19 @@
 package fk.prof.userapi.api;
 
-
+import com.codahale.metrics.Meter;
+import com.codahale.metrics.Timer;
 import com.google.common.io.ByteStreams;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.model.AggregationWindowSerializer;
 import fk.prof.aggregation.model.AggregationWindowSummarySerializer;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.metrics.ProcessGroupTag;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.buffer.StorageBackedInputStream;
 import fk.prof.userapi.Deserializer;
 import fk.prof.userapi.model.*;
 import fk.prof.userapi.model.tree.CallTree;
+import fk.prof.userapi.util.MetricsUtil;
 import io.vertx.core.Future;
 
 import java.io.IOException;
@@ -29,6 +32,12 @@ import java.util.zip.GZIPInputStream;
  */
 public class AggregatedProfileLoader {
 
+    private static String profileLoadTimerPrefix = "profile.load.timer";
+    private static String profileSummaryLoadTimerPrefix = "profilesummary.load.timer";
+
+    private Meter profileLoadFailureCounter = MetricsUtil.meter("profile.load.failures.meter");
+    private Meter profileSummaryLoadFailureCounter = MetricsUtil.meter("profilesummary.load.failures.meter");
+
     private AsyncStorage asyncStorage;
 
     public AggregatedProfileLoader(AsyncStorage asyncStorage) {
@@ -43,14 +52,19 @@ public class AggregatedProfileLoader {
 
         InputStream in = new StorageBackedInputStream(asyncStorage, filename);
 
+        ProcessGroupTag pgTag = new ProcessGroupTag(filename.appId, filename.clusterId, filename.procId);
+        Timer.Context timerCtx = MetricsUtil.timer(profileLoadTimerPrefix, pgTag.toString()).time();
+
         try {
             in = new GZIPInputStream(in);
             loadFromInputStream(future, filename, in);
         }
         catch (IOException e) {
+            profileLoadFailureCounter.mark();
             future.fail(e);
         }
         finally {
+            timerCtx.stop();
             try {
                 in.close();
             }
@@ -73,14 +87,19 @@ public class AggregatedProfileLoader {
 
         InputStream in = new StorageBackedInputStream(asyncStorage, filename);
 
+        ProcessGroupTag pgTag = new ProcessGroupTag(filename.appId, filename.clusterId, filename.procId);
+        Timer.Context timerCtx = MetricsUtil.timer(profileSummaryLoadTimerPrefix, pgTag.toString()).time();
+
         try {
             in = new GZIPInputStream(in);
             loadSummaryFromInputStream(future, filename, in);
         }
         catch (IOException e) {
+            profileSummaryLoadFailureCounter.mark();
             future.fail(e);
         }
         finally {
+            timerCtx.stop();
             try {
                 in.close();
             }
@@ -145,6 +164,7 @@ public class AggregatedProfileLoader {
             future.complete(profileInfo);
         }
         catch (IOException e) {
+            profileLoadFailureCounter.mark();
             future.fail(e);
         }
     }
@@ -189,6 +209,7 @@ public class AggregatedProfileLoader {
             future.complete(summary);
         }
         catch (IOException e) {
+            profileSummaryLoadFailureCounter.mark();
             future.fail(e);
         }
     }

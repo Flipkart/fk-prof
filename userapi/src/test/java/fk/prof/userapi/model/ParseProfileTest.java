@@ -10,12 +10,12 @@ import fk.prof.storage.S3AsyncStorage;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.Deserializer;
 import fk.prof.userapi.UserapiConfigManager;
+import fk.prof.userapi.api.AggregatedProfileLoader;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.api.cache.ClusterAwareCache;
 import fk.prof.userapi.model.json.ProtoSerializers;
 import fk.prof.userapi.model.tree.CallTree;
-import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.Json;
@@ -84,7 +84,8 @@ public class ParseProfileTest {
         Async async = context.async();
 
         S3AsyncStorage storage = mock(S3AsyncStorage.class);
-        String fileName = AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader()).getFileName(0);
+        AggregatedProfileNamingStrategy profileName = AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader());
+        String fileName = profileName.getFileName(0);
         InputStream s3InputStream = buildDefaultS3DataStream();
 
         // for above filename return the inputStream
@@ -94,23 +95,26 @@ public class ParseProfileTest {
             throw new ObjectNotFoundException("not found");
         }));
 
-        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, mock(ClusterAwareCache.class), config);
+        AggregatedProfileLoader loader = new AggregatedProfileLoader(storage);
+        ClusterAwareCache cache = mock(ClusterAwareCache.class);
+        doAnswer(inv -> {
+            Future<AggregatedProfileInfo> result = Future.future();
+            loader.load(result, inv.getArgument(0));
+            return result;
+        }).when(cache).getAggregatedProfile(eq(profileName));
+
+        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, cache, config);
 
         Future<AggregatedProfileInfo> future1 = Future.future();
-        Future<AggregatedProfileInfo> future2 = Future.future();
 
-        CompositeFuture cfuture = CompositeFuture.all(future1, future2);
-        cfuture.setHandler(result -> {
+        future1.setHandler(result -> {
             try {
                 if (result.failed()) {
                     context.fail(result.cause());
                 } else {
                     // match the response
-                    AggregatedProfileInfo firstResult = result.result().resultAt(0);
-                    AggregatedProfileInfo secondResult = result.result().resultAt(1);
+                    AggregatedProfileInfo firstResult = result.result();
                     testEquality(context, buildDefaultProfileInfo(), firstResult);
-                    // both results are actually the same cached object
-                    context.assertTrue(firstResult == secondResult);
 
                     // gzip buffer size is 512 and our content size is ~470 bytes, so fetchAsync will be called 2 times.
                     verify(storage, times(2)).fetchAsync(any());
@@ -126,7 +130,6 @@ public class ParseProfileTest {
         });
 
         profileDiscoveryAPI.load(future1, AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader()));
-        profileDiscoveryAPI.load(future2, AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader()));
     }
 
     private void testEquality(TestContext context, AggregatedProfileInfo expected, AggregatedProfileInfo actual) {

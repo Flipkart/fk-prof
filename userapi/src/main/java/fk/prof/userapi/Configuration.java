@@ -75,6 +75,14 @@ public class Configuration {
     @JsonProperty("maxDepthExpansion")
     private Integer maxDepthExpansion = 8;
 
+    @NotNull
+    @JsonProperty("maxProfilesToCache")
+    private Integer maxProfilesToCache = 50;
+
+    @NotNull
+    @JsonProperty("maxProfileViewsToCache")
+    private Integer maxProfileViewsToCache = 100;
+
     public String getIpAddress() {
         return ipAddress;
     }
@@ -125,6 +133,14 @@ public class Configuration {
 
     public Integer getMaxDepthExpansion() {
         return maxDepthExpansion;
+    }
+
+    public Integer getMaxProfilesToCache() {
+        return maxProfilesToCache;
+    }
+
+    public Integer getMaxProfileViewsToCache() {
+        return maxProfileViewsToCache;
     }
 
     private void setIoWorkerPool(VertxWorkerPoolConfig ioWorkerPool) {

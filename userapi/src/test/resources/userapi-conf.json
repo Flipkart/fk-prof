@@ -4,25 +4,25 @@
     "config": {
       "verticle.count": 1,
       "http.port": 8082,
-      "req.timeout": 10000
+      "req.timeout": 1200
     }
   },
   "curatorOptions": {
     "connection.url": "",
     "namespace": "fkprof-userapi",
-    "connection.timeout.ms": 4000,
+    "connection.timeout.ms": 2000,
     "session.timeout.ms": 4000,
     "max.retries": 3
   },
   "profile.retention.duration.min": 30,
   "profileView.retention.duration.min": 10,
-  "profile.load.timeout": 10000,
+  "profile.load.timeout": 1000,
   "storage": {
     "s3": {
       "endpoint": "http://127.0.0.1:13031",
       "access.key": "",
       "secret.key": "",
-      "list.objects.timeout.ms": 5000
+      "list.objects.timeout.ms": 1000
     },
     "thread.pool": {
       "coresize": 10,

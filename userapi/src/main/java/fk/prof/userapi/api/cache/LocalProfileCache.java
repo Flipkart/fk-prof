@@ -11,6 +11,7 @@ import fk.prof.userapi.Cacheable;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.Pair;
 import fk.prof.userapi.model.AggregatedProfileInfo;
+import fk.prof.userapi.util.MetricsUtil;
 import io.vertx.core.Future;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -22,9 +23,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 /**
+ * A wrapper over {@link Cache} to cache aggregated profiles and created views.
+ * Provides usual get, put semantics.
+ * It is used by {@link ClusterAwareCache} as a local cache. {@code put} for a {@link AggregatedProfileNamingStrategy}
+ * will only be called 2 times, once the profile loading is initiated and the next when loading is finished.
+ *
  * Created by gaurav.ashok on 17/07/17.
  */
-public class LocalProfileCache {
+class LocalProfileCache {
     private static final Logger logger = LoggerFactory.getLogger(LocalProfileCache.class);
 
     private final AtomicInteger uidGenerator;
@@ -33,45 +39,48 @@ public class LocalProfileCache {
 
     private RemovalListener<AggregatedProfileNamingStrategy, Future<AggregatedProfileInfo>> removalListener;
 
-    public LocalProfileCache(Configuration config) {
+    LocalProfileCache(Configuration config) {
         this(config, Ticker.systemTicker());
     }
 
     @VisibleForTesting
-    protected LocalProfileCache(Configuration config, Ticker ticker) {
+    LocalProfileCache(Configuration config, Ticker ticker) {
         this.viewCache = CacheBuilder.newBuilder()
             .ticker(ticker)
             .weigher((k, v) -> 1)        // default weight of 1, effectively counting the cached objects.
-            .maximumWeight(200)
+            .maximumWeight(config.getMaxProfileViewsToCache())
             .expireAfterAccess(config.getProfileViewRetentionDurationMin(), TimeUnit.MINUTES)
             .build();
 
         this.cache = CacheBuilder.newBuilder()
             .ticker(ticker)
-            .expireAfterAccess(config.getProfileRetentionDurationMin(), TimeUnit.MINUTES)
             .weigher((k, v) -> 1)        // default weight of 1, effectively counting the cached objects.
-            .maximumWeight(100)
+            .maximumWeight(config.getMaxProfilesToCache())
+            .expireAfterAccess(config.getProfileRetentionDurationMin(), TimeUnit.MINUTES)
             .removalListener(this::doCleanupOnEviction)
             .build();
 
         this.removalListener = null;
         this.uidGenerator = new AtomicInteger(0);
+
+        MetricsUtil.gauage("localcache.profiles.count", () -> cache.size());
+        MetricsUtil.gauage("localcache.views.count", () -> viewCache.size());
     }
 
-    public void setRemovalListener(RemovalListener<AggregatedProfileNamingStrategy, Future<AggregatedProfileInfo>> removalListener) {
+    void setRemovalListener(RemovalListener<AggregatedProfileNamingStrategy, Future<AggregatedProfileInfo>> removalListener) {
         this.removalListener = removalListener;
     }
 
-    public Future<AggregatedProfileInfo> get(AggregatedProfileNamingStrategy key) {
-        CacheableProfile cacheableProfile = cache.getIfPresent(key);
+    Future<AggregatedProfileInfo> get(AggregatedProfileNamingStrategy profileName) {
+        CacheableProfile cacheableProfile = cache.getIfPresent(profileName);
         return cacheableProfile != null ? cacheableProfile.profile : null;
     }
 
-    public void put(AggregatedProfileNamingStrategy key, Future<AggregatedProfileInfo> profileFuture) {
+    void put(AggregatedProfileNamingStrategy key, Future<AggregatedProfileInfo> profileFuture) {
         cache.put(key, new CacheableProfile(key, uidGenerator.incrementAndGet(), profileFuture));
     }
 
-    public <T extends Cacheable> Pair<Future<AggregatedProfileInfo>, T> getView(AggregatedProfileNamingStrategy profileName, String viewName) {
+    <T extends Cacheable> Pair<Future<AggregatedProfileInfo>, T> getView(AggregatedProfileNamingStrategy profileName, String viewName) {
         CacheableProfile cacheableProfile = cache.getIfPresent(profileName);
         if(cacheableProfile != null) {
             String viewKey = toViewKey(profileName, viewName, cacheableProfile.uid);
@@ -80,7 +89,7 @@ public class LocalProfileCache {
         return Pair.of(null, null);
     }
 
-    public <T extends Cacheable> Pair<Future<AggregatedProfileInfo>, T> computeViewIfAbsent(AggregatedProfileNamingStrategy profileName, String viewName, Function<AggregatedProfileInfo, T> viewProvider) {
+    <T extends Cacheable> Pair<Future<AggregatedProfileInfo>, T> computeViewIfAbsent(AggregatedProfileNamingStrategy profileName, String viewName, Function<AggregatedProfileInfo, T> viewProvider) {
         // dont cache it if dependent profile is not there.
         CacheableProfile cacheableProfile = cache.getIfPresent(profileName);
         if(cacheableProfile == null) {
@@ -90,8 +99,13 @@ public class LocalProfileCache {
         return cachedView == null ? Pair.of(null, null) : Pair.of(cacheableProfile.profile, cachedView);
     }
 
-    public List<AggregatedProfileNamingStrategy> cachedProfiles() {
+    List<AggregatedProfileNamingStrategy> cachedProfiles() {
         return new ArrayList<>(cache.asMap().keySet());
+    }
+
+    void claenUp() {
+        cache.cleanUp();
+        viewCache.cleanUp();
     }
 
     private void doCleanupOnEviction(RemovalNotification<AggregatedProfileNamingStrategy, CacheableProfile> evt) {
@@ -107,6 +121,11 @@ public class LocalProfileCache {
         }
     }
 
+    /**
+     * A wrapper over cached profile object {@code Future<AggregatedProfileInfo>} to store list of keys for loaded views
+     * and provide thread-safe getOrCompute semantic for the view. The list of keys is also used to invalidate views when
+     * profile itself gets evicted.
+     */
     private class CacheableProfile implements Cacheable {
         int uid;
         AggregatedProfileNamingStrategy profileName;

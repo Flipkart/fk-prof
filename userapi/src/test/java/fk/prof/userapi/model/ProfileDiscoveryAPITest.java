@@ -172,37 +172,33 @@ public class ProfileDiscoveryAPITest {
         f.setHandler(res -> completeTest(res, context, async));
     }
 
-//    @Test
-//    public void TestGetProfilesInTimeWindow(TestContext context) throws Exception {
-//        Async async = context.async();
-//        FilteredProfiles profile1 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("monitor_contention_work"));
-//        FilteredProfiles profile2 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1800), Sets.newSet("monitor_wait_work"));
-//        FilteredProfiles profile3 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("thread_sample_work", "cpu_sample_work"));
-//
-//        Map<List<Object>, Collection<?>> appIdTestPairs = new HashMap<List<Object>, Collection<?>>() {
-//            {
-//                put(Arrays.asList("app1", "cluster1", "process1", ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), 1600),
-//                        Sets.newSet(filenames[4], filenames[6]));
-//                put(Arrays.asList("app1", "cluster1", "process1", ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), 1900),
-//                        Sets.newSet(filenames[4], filenames[6]));
-//                put(Arrays.asList("foo", "bar", "main", ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), 1900),
-//                        Sets.newSet(filenames[2]));
-//            }
-//        };
-//
-//        List<Future> futures = new ArrayList<>();
-//        for (Map.Entry<List<Object>, Collection<?>> entry : appIdTestPairs.entrySet()) {
-//            Future<List<AggregatedProfileNamingStrategy>> f = Future.future();
-//            futures.add(f);
-//
-//            f.setHandler(res -> context.assertEquals(entry.getValue(), Sets.newSet(res.result().toArray())));
-//            profileDiscoveryAPI.getProfilesInTimeWindow(f, BASE_DIR,
-//                    (String)entry.getKey().get(0), (String)entry.getKey().get(1), (String)entry.getKey().get(2), (ZonedDateTime)entry.getKey().get(3), (Integer)entry.getKey().get(4));
-//        }
-//
-//        CompositeFuture f = CompositeFuture.all(futures);
-//        f.setHandler(res -> completeTest(res, context, async));
-//    }
+    @Test
+    public void TestGetProfilesInTimeWindow(TestContext context) throws Exception {
+        Async async = context.async();
+        Map<List<Object>, Collection<?>> appIdTestPairs = new HashMap<List<Object>, Collection<?>>() {
+            {
+                put(Arrays.asList("app1", "cluster1", "process1", ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), 1600),
+                        Sets.newSet(filenames[4], filenames[6]));
+                put(Arrays.asList("app1", "cluster1", "process1", ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), 1900),
+                        Sets.newSet(filenames[4], filenames[6]));
+                put(Arrays.asList("foo", "bar", "main", ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), 1900),
+                        Sets.newSet(filenames[2]));
+            }
+        };
+
+        List<Future> futures = new ArrayList<>();
+        for (Map.Entry<List<Object>, Collection<?>> entry : appIdTestPairs.entrySet()) {
+            Future<List<AggregatedProfileNamingStrategy>> f = Future.future();
+            futures.add(f);
+
+            f.setHandler(res -> context.assertEquals(entry.getValue(), Sets.newSet(res.result().toArray())));
+            profileDiscoveryAPI.getProfilesInTimeWindow(f, BASE_DIR,
+                    (String)entry.getKey().get(0), (String)entry.getKey().get(1), (String)entry.getKey().get(2), (ZonedDateTime)entry.getKey().get(3), (Integer)entry.getKey().get(4));
+        }
+
+        CompositeFuture f = CompositeFuture.all(futures);
+        f.setHandler(res -> completeTest(res, context, async));
+    }
 
     private void completeTest(AsyncResult result, TestContext context, Async async) {
         if(result.failed()) {

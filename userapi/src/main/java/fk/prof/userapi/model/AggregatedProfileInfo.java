@@ -39,6 +39,18 @@ public class AggregatedProfileInfo implements Cacheable {
         return header.getWindowDuration();
     }
 
+    public String getAppId() {
+        return header.getAppId();
+    }
+
+    public String getClusterId() {
+        return header.getClusterId();
+    }
+
+    public String getProcId() {
+        return header.getProcId();
+    }
+
     public Iterable<String> getTraces() {
         return traceNames.getNameList();
     }

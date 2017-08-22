@@ -4,32 +4,23 @@ import com.google.common.base.MoreObjects;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
 import fk.prof.aggregation.proto.AggregatedProfileModel.WorkType;
-import fk.prof.storage.StreamTransformer;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.Pair;
-import fk.prof.userapi.ServiceUnavailableException;
 import fk.prof.userapi.api.ProfileStoreAPI;
-import fk.prof.userapi.api.cache.CachedProfileNotFoundException;
-import fk.prof.userapi.api.cache.ProfileLoadInProgressException;
 import fk.prof.userapi.http.UserapiApiPathConstants;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
 import fk.prof.userapi.model.AggregationWindowSummary;
-import fk.prof.userapi.model.tree.CalleesTreeView;
+import fk.prof.userapi.model.StacktraceTreeViewType;
 import fk.prof.userapi.model.tree.CallTreeView;
+import fk.prof.userapi.model.tree.CalleesTreeView;
 import fk.prof.userapi.model.tree.IndexedTreeNode;
 import fk.prof.userapi.model.tree.TreeViewResponse.CpuSampleCalleesTreeViewResponse;
 import fk.prof.userapi.model.tree.TreeViewResponse.CpuSampleCallersTreeViewResponse;
-import fk.prof.userapi.util.HttpResponseUtil;
 import io.vertx.core.AbstractVerticle;
-import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
-import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
-import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.impl.CompositeFutureImpl;
-import io.vertx.core.json.Json;
-import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.Router;
@@ -38,9 +29,6 @@ import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.LoggerHandler;
 import io.vertx.ext.web.handler.TimeoutHandler;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.nio.charset.Charset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -81,8 +69,11 @@ public class HttpVerticle extends AbstractVerticle {
         router.get(UserapiApiPathConstants.PROC_GIVEN_APPID_CLUSTERID).handler(this::getProcId);
         router.get(UserapiApiPathConstants.PROFILES_GIVEN_APPID_CLUSTERID_PROCID).handler(this::getProfiles);
 
-        router.post(UserapiApiPathConstants.VIEW_FOR_CPU_SAMPLING).handler(BodyHandler.create().setBodyLimit(1024 * 1024));
-        router.post(UserapiApiPathConstants.VIEW_FOR_CPU_SAMPLING).handler(this::getViewForCpuSampling);
+        router.post(UserapiApiPathConstants.CALLERS_VIEW_FOR_CPU_SAMPLING).handler(BodyHandler.create().setBodyLimit(1024 * 1024));
+        router.post(UserapiApiPathConstants.CALLERS_VIEW_FOR_CPU_SAMPLING).handler(this::getCallersViewForCpuSampling);
+
+        router.post(UserapiApiPathConstants.CALLEES_VIEW_FOR_CPU_SAMPLING).handler(BodyHandler.create().setBodyLimit(1024 * 1024));
+        router.post(UserapiApiPathConstants.CALLEES_VIEW_FOR_CPU_SAMPLING).handler(this::getCalleesViewForCpuSampling);
 
         router.get(UserapiApiPathConstants.HEALTHCHECK).handler(this::handleGetHealth);
 
@@ -216,22 +207,23 @@ public class HttpVerticle extends AbstractVerticle {
             baseDir, appId, clusterId, proc, startTime, duration);
     }
 
-    private void getViewForCpuSampling(RoutingContext routingContext) {
+    private void getCallersViewForCpuSampling(RoutingContext routingContext) {
+        getViewForCpuSampling(routingContext, StacktraceTreeViewType.CALLERS);
+    }
+
+    private void getCalleesViewForCpuSampling(RoutingContext routingContext) {
+        getViewForCpuSampling(routingContext, StacktraceTreeViewType.CALLEES);
+    }
+
+    private void getViewForCpuSampling(RoutingContext routingContext, StacktraceTreeViewType viewType) {
         HttpServerRequest req = routingContext.request();
 
         String appId, clusterId, procId, traceName;
         Boolean autoExpand;
         Integer maxDepth, duration;
         ZonedDateTime startTime;
-        String viewType;
         List<Integer> nodeIds;
         try {
-            viewType = getParam(req, "viewType");
-
-            if(!("callers".equals(viewType) || "callees".equals(viewType))) {
-                throw new IllegalArgumentException("viewType \"" + viewType + "\" not supported");
-            }
-
             appId = getParam(req, "appId");
             clusterId = getParam(req, "clusterId");
             procId = getParam(req, "procId");
@@ -253,7 +245,7 @@ public class HttpVerticle extends AbstractVerticle {
 
         AggregatedProfileNamingStrategy profileName = new AggregatedProfileNamingStrategy(baseDir, VERSION, appId, clusterId, procId, startTime, duration, WorkType.cpu_sample_work);
 
-        if("callers".equals(viewType)) {
+        if(StacktraceTreeViewType.CALLERS.equals(viewType)) {
             getCallersViewForCpuSampling(routingContext, profileName, traceName, nodeIds, autoExpand, maxDepth);
         }
         else {

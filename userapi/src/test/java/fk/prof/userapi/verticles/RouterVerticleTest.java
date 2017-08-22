@@ -38,6 +38,8 @@ import java.util.concurrent.TimeoutException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
 
 /**
  * Tests for {@link HttpVerticle} using mocked behaviour of ProfileStoreAPIImpl
@@ -81,6 +83,7 @@ public class RouterVerticleTest {
 
         UserapiConfigManager.setDefaultSystemProperties();
         Configuration config = UserapiConfigManager.loadConfig(ProfileStoreAPIImpl.class.getClassLoader().getResource("userapi-conf.json").getFile());
+
         vertx = Vertx.vertx();
         port = config.getHttpConfig().getHttpPort();
         client = vertx.createHttpClient();
