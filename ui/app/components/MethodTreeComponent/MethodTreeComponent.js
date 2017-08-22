@@ -16,7 +16,7 @@ import Loader from 'components/LoaderComponent';
 const noop = () => {};
 
 const rightColumnWidth = 150;
-const everythingOnTopHeight = 270;
+const everythingOnTopHeight = 255;
 const filterBoxHeight = 87;
 const stackEntryHeight = 25;
 
@@ -69,7 +69,7 @@ class CallTreeStore {
     //sorting logic on Object.entries if any
     Object.entries(root).forEach(([k, v]) => {
       if (k !== 'method_lookup') {
-        this.nodes[parseInt(k)] = [v.data, v.chld ? Object.keys(v.chld).map(c => parseInt(c)) : []];
+        this.nodes[parseInt(k)] = [v.data, v.chld ? Object.keys(v.chld).map(c => parseInt(c)) : undefined];
         if (v.chld) {
           this.flatten(v.chld, this.nodes);
         }
@@ -81,26 +81,35 @@ class CallTreeStore {
     return this.methodLookup[this.nodes[uniqueId][0][0]] + ' ' + this.nodes[uniqueId][0][1];
   }
 
-  getChildrenAsync(id) {
-    if(id >= this.nodes.length) { // never supposed to be true
+  getChildrenAsync(uniqueId) {
+    if (uniqueId >= this.nodes.length) { // never supposed to be true
       return [];
     }
-    if(this.nodes[id]){
-      return new Promise.resolve(this.nodes[id][2]);
+    if (this.nodes[uniqueId] && this.nodes[uniqueId][1]) {
+      return Promise.resolve(this.nodes[uniqueId][1]);
     }
-    const body = (id === -1)? []: [id];
+    const body = (uniqueId === -1) ? [] : [uniqueId];
     return http.post(this.url, body).then(
       resp => {
         this.flatten(resp);
         Object.assign(this.methodLookup, resp['method_lookup']);
-        return this.nodes[id][2];
+        if (uniqueId === -1) {
+          this.nodes[uniqueId] = [null, Object.keys(resp).filter((k) => k !== 'method_lookup').map(k => parseInt(k))];
+        }
+        return this.nodes[uniqueId][1];
       }
     );
 
   }
 
   getSampleCount(uniqueId) {
-    return this.methodLookup[this.nodes[uniqueId][0][2]];
+    return this.nodes[uniqueId][0][2];
+  }
+
+  getChildren(uniqueId) {
+    if (this.nodes[uniqueId]) {
+      return this.nodes[uniqueId][1];
+    }
   }
 }
 
@@ -141,8 +150,7 @@ class MethodTreeComponent extends Component {
     const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true});
     const url = `/api/callers/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
     this.callTreeStore = new CallTreeStore(url);
-    console.log("URL for Post is ", url);
-    this.getRenderData(this.callTreeStore.getChildrenAsync(-1), this.props.filterKey, 0, false).then(subTreeRenderData => {
+    this.getRenderData(this.callTreeStore.getChildrenAsync(-1), this.props.filterKey, -1, false).then(subTreeRenderData => {
       this.renderData = subTreeRenderData;
       this.setState({
         itemCount: this.renderData.length
@@ -155,9 +163,8 @@ class MethodTreeComponent extends Component {
     const {profileStart: prevProfileStart, profileDuration: prevProfileDuration} = prevProps.location.query;
     const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true});
     this.callTreeStore.url = `/api/callers/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
-    console.log("URL for Post is ", this.callTreeStore.url);
     if(prevProfileStart !== profileStart || prevProfileDuration !== profileDuration || prevProps.traceName !== this.props.traceName){
-      this.getRenderData(this.callTreeStore.getChildrenAsync(-1), this.props.filterKey, 0, false).then(subTreeRenderData => {
+      this.getRenderData(this.callTreeStore.getChildrenAsync(-1), this.props.filterKey, -1, false).then(subTreeRenderData => {
         this.renderData = subTreeRenderData;
         this.setState({
           itemCount: this.renderData.length
@@ -177,9 +184,10 @@ class MethodTreeComponent extends Component {
   }
 
   render () {
-    if(this.containerWidth === 0) {
-      return null;
-    }
+    // console.log('this.containerWidth: ', this.containerWidth);
+    // if(this.containerWidth === 0) {
+    //   return null;
+    // }
 
     // if (!this.state.req.status) return null;
     //
@@ -204,10 +212,9 @@ class MethodTreeComponent extends Component {
     const { nextNodesAccessorField } = this.props;
     const containerHeight = window.innerHeight - everythingOnTopHeight; //subtracting height of everything above the container
     const gridHeight = containerHeight - filterBoxHeight; //subtracting height of filter box
-
     return (
-      <div style={{display: "flex", flexDirection: "column", width: this.containerWidth}}>
-        <div style={{flex: "1 1 auto", height: containerHeight + "px"}}>
+      <div>
+        <div>
           <ScrollSync>
             {({ clientHeight, clientWidth, onScroll, scrollHeight, scrollLeft, scrollTop, scrollWidth }) => (
               <div className={styles.GridRow}>
@@ -232,7 +239,7 @@ class MethodTreeComponent extends Component {
                       {({ width }) => (
                         <Grid
                           columnCount={1}
-                          columnWidth={this.getMaxWidthOfRenderedStacklines()}
+                          columnWidth={Math.max(width, this.getMaxWidthOfRenderedStacklines())}
                           height={gridHeight}
                           width={width}
                           rowCount={this.state.itemCount}
@@ -286,7 +293,7 @@ class MethodTreeComponent extends Component {
     if (!this.opened[uniqueId]) {
       //expand
       this.getRenderData(this.callTreeStore.getChildrenAsync(uniqueId), null, rowData[2], rowData[3] > 1).then(subTreeRenderData => {
-        this.renderData.splice(listIdx + 1, 0, subTreeRenderData);
+        this.renderData.splice(listIdx + 1, 0, ...subTreeRenderData);
         this.opened[uniqueId] = !this.opened[uniqueId];
         this.setState({
           itemCount: this.renderData.length
@@ -342,7 +349,7 @@ class MethodTreeComponent extends Component {
   handleFilterChange (e) {
     const { pathname, query } = this.props.location;
     this.props.router.push({ pathname, query: { ...query, [this.props.filterKey]: e.target.value } });
-    this.getRenderData(this.callTreeStore.getChildrenAsync(-1), e.target.value, 0, false).then(subTreeRenderData => {
+    this.getRenderData(this.callTreeStore.getChildrenAsync(-1), e.target.value, -1, false).then(subTreeRenderData => {
       this.renderData = subTreeRenderData;
       this.setState({
         itemCount: this.renderData.length
@@ -350,8 +357,8 @@ class MethodTreeComponent extends Component {
     });
   }
 
-  stacklineDetailCellRenderer (params) {
-    let rowData = this.renderData[params.rowIndex];
+  stacklineDetailCellRenderer ({ rowIndex, style }) {
+    let rowData = this.renderData[rowIndex];
     let uniqueId = rowData[0];
 
     let newNodeIndexes;
@@ -373,40 +380,29 @@ class MethodTreeComponent extends Component {
     // }
     const isHighlighted = Object.keys(this.highlighted)
       .filter(highlight => highlight.startsWith(uniqueId));
-
+    const displayName = this.callTreeStore.getNameWithArgs(uniqueId);
     return (
       <StacklineDetail
         key={uniqueId}
-        style={{...params.style, height: stackEntryHeight, whiteSpace: 'nowrap'}}
-        listIdx={params.rowIndex}
-        nodename={this.callTreeStore.getNameWithArgs(uniqueId)}
+        style={{...style, height: stackEntryHeight, whiteSpace: 'nowrap'}}
+        listIdx={rowIndex}
+        nodename={displayName}
         stackline={displayName}
         indent={rowData[2]}
         nodestate={this.opened[uniqueId]}
         highlight={isHighlighted.length}
         subdued={rowData[3] === 1}
         onHighlight={this.highlight.bind(this, uniqueId)}
-        onClick={newNodeIndexes ? this.toggle.bind(this, params.rowIndex) : noop}>
+        onClick={this.toggle.bind(this, rowIndex)}>
       </StacklineDetail>
 
     );
   }
 
-  stacklineStatCellRenderer({ columnIndex, key, parent, rowIndex, style }) {
+  stacklineStatCellRenderer({ rowIndex, style }) {
     let rowData = this.renderData[rowIndex];
     let uniqueId = rowData[0];
-
-    //TODO: optimize, move below assignment to lifecycle method when properties are received by component
-    const percentageDenominator = (this.allNodes.length > 0) ? this.allNodes[0].onStack : 1;
-
-    //This condition is equivalent to (n instanceOf HotMethodNode)
-    //since nextNodesAccessorField is = parent in hot method view and
-    //Node type for dedupedNodes is HotMethodNode from above
-    // if (this.props.nextNodesAccessorField === 'parent') {
-    //   countToDisplay = n.sampledCallCount;
-    // } else {
-    //   countToDisplay = n.onStack;
-    // }
+    const percentageDenominator = this.callTreeStore.getChildren(-1).reduce((sum, id) => sum + this.callTreeStore.getSampleCount(id), 0);
     const countToDisplay = this.callTreeStore.getSampleCount(uniqueId);
     const onStackPercentage = Number((countToDisplay * 100) / percentageDenominator).toFixed(2);
     const isHighlighted = Object.keys(this.highlighted)
@@ -427,28 +423,32 @@ class MethodTreeComponent extends Component {
 
   getRenderData(asyncIds, filterText, parentIndent, parentHasSiblings) {
     return new Promise(resolve => {
-      asyncIds.then(ids => {
-        const asyncIdsRenderData = ids.map((id) => new Promise(resolve => {
-          const indent = parentIndent === 0 ? 0 : ((parentHasSiblings || ids.length > 1 ) ? parentIndent + 10 : parentIndent + 3);
-          const stackEntryWidth = getTextWidth(this.callTreeStore.getNameWithArgs(id), "14px Arial") + 28 + indent; //28 is space taken up by icons
-          let renderDataList = [[id, null, indent, ids, stackEntryWidth]];
-          if(filterText && indent === 0 && !this.callTreeStore.getNameWithArgs(id).match(new RegExp(filterText, 'i'))) {
-            renderDataList = [];
-          }
-          if(ids.length === 1 || this.opened[id]) {
-            this.getRenderData(this.callTreeStore.getChildrenAsync(id),filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
-              resolve(renderDataList.push(subTreeRenderDataList));
-            });
-          }else{
-            resolve(renderDataList);
-          }
-          if(ids.length === 1 || this.callTreeStore.getChildrenAsync(id) === 0) {
-            this.opened[id] = true;
-          }
-        }));
-        Promise.all(asyncIdsRenderData).then(idsRenderData => {
-          resolve(idsRenderData.reduce((accumRenderData, idRenderData) => accumRenderData.concat(idRenderData), []));
-        })
+        asyncIds.then(ids => {
+        if(ids) {
+          ids.sort((a, b) => this.callTreeStore.getSampleCount(b) - this.callTreeStore.getSampleCount(a));
+          const asyncIdsRenderData = ids.map((id) => new Promise(resolve => {
+            const indent = parentIndent === -1 ? 0 : ((parentHasSiblings || ids.length > 1 ) ? parentIndent + 10 : parentIndent + 6);
+            const stackEntryWidth = getTextWidth(this.callTreeStore.getNameWithArgs(id), "14px Arial") + 28 + indent; //28 is space taken up by icons
+            let renderDataList = [[id, null, indent, ids.length, stackEntryWidth]];
+            if (filterText && indent === 0 && !this.callTreeStore.getNameWithArgs(id).match(new RegExp(filterText, 'i'))) {
+              renderDataList = [];
+            }
+            if (ids.length === 1 || this.opened[id]) {
+              this.opened[id] = true;
+              this.getRenderData(this.callTreeStore.getChildrenAsync(id), filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
+                console.log('subTreeRenderDataList: ', subTreeRenderDataList, ' for id: ', id);
+                resolve(renderDataList.concat(subTreeRenderDataList));
+              });
+            } else {
+              resolve(renderDataList);
+            }
+          }));
+          Promise.all(asyncIdsRenderData).then(idsRenderData => {
+            resolve(idsRenderData.reduce((accumRenderData, idRenderData) => accumRenderData.concat(idRenderData), []));
+          })
+        }else{
+          resolve([]);
+        }
       });
     });
   }
@@ -625,6 +625,9 @@ class MethodTreeComponent extends Component {
     const minGridWidth = this.containerWidth - rightColumnWidth - 15;
     return maxWidthOfRenderedStacklines < minGridWidth ? minGridWidth : maxWidthOfRenderedStacklines;
   }
+  static workTypeMap = {
+    cpu_sample_work: 'cpu-sampling',
+  };
 }
 
 MethodTreeComponent.propTypes = {

@@ -53,7 +53,7 @@ export class CPUSamplingComponent extends Component {
         <Tabs>
           <div>
             <div>Hot Methods</div>
-            <MethodTreeComponent traceName={this.props.params.traceName}/>
+            <MethodTreeComponent traceName={this.props.params.traceName} nextNodesAccessorField={"parent"} filterKey={null}/>
           </div>
           {/*<div>*/}
             {/*<div>Call Tree</div>*/}
