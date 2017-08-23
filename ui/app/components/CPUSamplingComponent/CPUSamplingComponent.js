@@ -69,18 +69,18 @@ export class CPUSamplingComponent extends Component {
           </div>
           <div>
             <div>Call Tree</div>
-            <div style={{display: "flex", flex: "1 1 auto"}}>
-              <AutoSizer disableHeight>
-                {({ width }) => (
-                  <MethodTree
-                    traceName={this.props.params.traceName}
-                    nextNodesAccessorField="children"
-                    filterKey="cs_ct_filter"
-                    containerWidth={width}
-                  />
-                )}
-              </AutoSizer>
-            </div>
+            {/*<div style={{display: "flex", flex: "1 1 auto"}}>*/}
+              {/*<AutoSizer disableHeight>*/}
+                {/*{({ width }) => (*/}
+                  {/*<MethodTree*/}
+                    {/*traceName={this.props.params.traceName}*/}
+                    {/*nextNodesAccessorField="children"*/}
+                    {/*filterKey="cs_ct_filter"*/}
+                    {/*containerWidth={width}*/}
+                  {/*/>*/}
+                {/*)}*/}
+              {/*</AutoSizer>*/}
+            {/*</div>*/}
           </div>
         </Tabs>
       </div>

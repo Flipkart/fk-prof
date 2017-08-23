@@ -65,20 +65,20 @@ class CallTreeStore {
     this.url = url;
   }
 
-  flatten(root) {
+  flatten(root, bodyRoot) {
     //sorting logic on Object.entries if any
     Object.entries(root).forEach(([k, v]) => {
       if (k !== 'method_lookup') {
-        this.nodes[parseInt(k)] = [v.data, v.chld ? Object.keys(v.chld).map(c => parseInt(c)) : undefined];
-        if (v.chld) {
-          this.flatten(v.chld, this.nodes);
+        this.nodes[parseInt(k)] = [v['data'], v['chld'] ? Object.keys(v['chld']).map(c => parseInt(c)) : (bodyRoot ? []: undefined)];
+        if (v['chld']) {
+          this.flatten(v['chld'], false);
         }
       }
     });
   }
 
   getNameWithArgs(uniqueId) {
-    return this.methodLookup[this.nodes[uniqueId][0][0]] + ' ' + this.nodes[uniqueId][0][1];
+    return uniqueId + ' ' +  this.methodLookup[this.nodes[uniqueId][0][0]] + ' ' + this.nodes[uniqueId][0][1];
   }
 
   getChildrenAsync(uniqueId) {
@@ -91,7 +91,8 @@ class CallTreeStore {
     const body = (uniqueId === -1) ? [] : [uniqueId];
     return http.post(this.url, body).then(
       resp => {
-        this.flatten(resp);
+        console.log('body: ', body, 'response: ', resp);
+        this.flatten(resp, true);
         Object.assign(this.methodLookup, resp['method_lookup']);
         if (uniqueId === -1) {
           this.nodes[uniqueId] = [null, Object.keys(resp).filter((k) => k !== 'method_lookup').map(k => parseInt(k))];
@@ -109,6 +110,8 @@ class CallTreeStore {
   getChildren(uniqueId) {
     if (this.nodes[uniqueId]) {
       return this.nodes[uniqueId][1];
+    }else{
+      return [];
     }
   }
 }
@@ -290,12 +293,15 @@ class MethodTreeComponent extends Component {
     //TODO: Pick a lock for the listIdx, i.e. if any toggle is pending on same uniqueId show a snackBar
     const rowData = this.renderData[listIdx];
     const uniqueId = rowData[0];
-
+   // console.log('opened list', this.opened);
     if (!this.opened[uniqueId]) {
       //expand
       this.getRenderData(this.callTreeStore.getChildrenAsync(uniqueId), null, rowData[2], rowData[3] > 1).then(subTreeRenderData => {
         this.renderData.splice(listIdx + 1, 0, ...subTreeRenderData);
-        this.opened[uniqueId] = !this.opened[uniqueId];
+        this.opened[uniqueId] = true;
+        if(subTreeRenderData.length === 0){
+          this.stacklineDetailGrid.forceUpdate();
+        }
         this.setState({
           itemCount: this.renderData.length
         });
@@ -305,11 +311,11 @@ class MethodTreeComponent extends Component {
       const descendants = this.getRenderedDescendantCountForListItem(listIdx);
       if (descendants > 0) {
         this.renderData.splice(listIdx + 1, descendants);
+        this.opened[uniqueId] = false;
+        this.setState({
+          itemCount: this.renderData.length
+        });
       }
-      this.opened[uniqueId] = !this.opened[uniqueId];
-      this.setState({
-        itemCount: this.renderData.length
-      });
     }
   }
 
@@ -366,7 +372,6 @@ class MethodTreeComponent extends Component {
 
     const isHighlighted = Object.keys(this.highlighted)
       .filter(highlight => highlight.startsWith(uniqueId));
-
     return (
       <StacklineDetail
         key={uniqueId}
@@ -414,15 +419,15 @@ class MethodTreeComponent extends Component {
           ids.sort((a, b) => this.callTreeStore.getSampleCount(b) - this.callTreeStore.getSampleCount(a));
           const asyncIdsRenderData = ids.map((id) => new Promise(resolve => {
             const indent = parentIndent === -1 ? 0 : ((parentHasSiblings || ids.length > 1 ) ? parentIndent + 10 : parentIndent + 6);
-            const stackEntryWidth = getTextWidth(this.callTreeStore.getNameWithArgs(id), "14px Arial") + 28 + indent; //28 is space taken up by icons
+            const displayName = this.callTreeStore.getNameWithArgs(id);
+            const stackEntryWidth = getTextWidth(displayName, "14px Arial") + 28 + indent; //28 is space taken up by icons
             let renderDataList = [[id, null, indent, ids.length, stackEntryWidth]];
-            if (filterText && indent === 0 && !this.callTreeStore.getNameWithArgs(id).match(new RegExp(filterText, 'i'))) {
+            if (filterText && indent === -1 && !displayName.match(new RegExp(filterText, 'i'))) {
               renderDataList = [];
             }
             if (ids.length === 1 || this.opened[id]) {
               this.opened[id] = true;
               this.getRenderData(this.callTreeStore.getChildrenAsync(id), filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
-                console.log('subTreeRenderDataList: ', subTreeRenderDataList, ' for id: ', id);
                 resolve(renderDataList.concat(subTreeRenderDataList));
               });
             } else {
@@ -451,43 +456,42 @@ class MethodTreeComponent extends Component {
   }
 
   getRenderedChildrenCountForListItem(listIdx) {
-    let children = 0;
-    let rowdata = this.renderData[listIdx];
-    if(rowdata) {
-      const uniqueId = rowdata[0];
+    let rowData = this.renderData[listIdx];
+    if(rowData) {
+      const uniqueId = rowData[0];
       if(this.opened[uniqueId]) {
-        if(this.isNodeHavingChildren(rowdata[1])) {
+        if(this.isNodeHavingChildren(uniqueId)) {
           //At least one rendered child item is going to be present for this item
           //Cannot rely on childNodeIndexes(calculated in isNodeHavingChildren method) to get count of children because actual rendered children can be lesser after deduping of nodes for hot method tree
           let child_rowdata = this.renderData[listIdx + 1];
           if(child_rowdata) {
             return child_rowdata[3]; //this is siblings count of child node which implies children count for parent node
           } else {
-            console.error("This should never happen. If list item is expanded and its childNodeIndexes > 0, then at least one more item should be present in renderdata list")
+            console.error("This should never happen. If list item is expanded and its childNodeIndexes > 0, then at least one more item should be present in renderData list")
           }
         }
       }
     }
-    return children;
+    return 0;
   }
 
-  isNodeHavingChildren(node) {
-    if(this.props.nextNodesAccessorField === 'parent') {
-      let childNodeIndexes = node.parentsWithSampledCallCount;
-      if(childNodeIndexes && childNodeIndexes.length > 0) {
-        if(childNodeIndexes.length !== 1) {
-          return true;
-        } else {
-          //If this has only one childnodeindex and that is "0" node => corresponds to root node which is not rendered in UI
-          //"if(! node.hasParent()) break;" condition in dedupeNodes method ensure above node is not rendered
-          return childNodeIndexes[0][0] !== 0;
-        }
-      } else {
-        return false;
-      }
-    } else {
-      return (node.children && node.children.length > 0);
-    }
+  isNodeHavingChildren(uniqueId) {
+    // if(this.props.nextNodesAccessorField === 'parent') {
+    //   let childNodeIndexes = node.parentsWithSampledCallCount;
+    //   if(childNodeIndexes && childNodeIndexes.length > 0) {
+    //     if(childNodeIndexes.length !== 1) {
+    //       return true;
+    //     } else {
+    //       //If this has only one childnodeindex and that is "0" node => corresponds to root node which is not rendered in UI
+    //       //"if(! node.hasParent()) break;" condition in dedupeNodes method ensure above node is not rendered
+    //       return childNodeIndexes[0][0] !== 0;
+    //     }
+    //   } else {
+    //     return false;
+    //   }
+    // } else {
+      return (this.callTreeStore.getChildren(uniqueId).length > 0);
+    // }
   }
 
   getMaxWidthOfRenderedStacklines() {
