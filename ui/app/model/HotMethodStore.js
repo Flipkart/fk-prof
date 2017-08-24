@@ -2,7 +2,7 @@ import http from 'utils/http';
 
 export default class HotMethodStore {
   constructor(url) {
-    this.nodes = {};
+    this.nodes = [];
     this.methodLookup = {};
     this.url = url;
   }
@@ -19,7 +19,7 @@ export default class HotMethodStore {
           accumNodes[key] = [v['data'], undefined, accumNodes[key][2].push([k, v])];       //[data, chld, parts]
           accumNodes[key][0][2] = accumNodes[key][0][2] + v['data'][2];       //adding up the sample count
         } else {
-          accumNodes[key] = [v['data'], undefined, [k, v]];        //[data, chld, parts]
+          accumNodes[key] = [v['data'], undefined, [[k, v]]];        //[data, chld, parts]
         }
       }
       return accumNodes;
@@ -31,7 +31,7 @@ export default class HotMethodStore {
   flatten(nodes, topLevel, bodyRoot) {
     const deDupNodes = this.deDup(nodes, topLevel);
     const curLayerIds = [];
-    deDupNodes.forEach(([k, v]) => {
+    Object.entries(deDupNodes).forEach(([k, v]) => {
       this.nodes.push(v);
       const vIndex = this.nodes.length - 1;
       curLayerIds.push(vIndex);

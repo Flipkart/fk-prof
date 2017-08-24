@@ -10,6 +10,7 @@ import HotMethodNode from '../../pojos/HotMethodNode';
 import 'react-virtualized/styles.css';
 import {objectToQueryParams} from 'utils/UrlUtils';
 import CallTreeStore from '../../model/CallTreeStore';
+import HotMethodStore from '../../model/HotMethodStore';
 import Loader from 'components/LoaderComponent';
 
 
@@ -70,6 +71,8 @@ class MethodTreeComponent extends Component {
     this.opened = {}; // keeps track of all opened/closed nodes
     this.highlighted = {}; //keeps track of all highlighted nodes
 
+    this.initTreeStore = this.initTreeStore.bind(this);
+
     this.stacklineDetailCellRenderer = this.stacklineDetailCellRenderer.bind(this);
     this.stacklineStatCellRenderer = this.stacklineStatCellRenderer.bind(this);
 
@@ -90,12 +93,21 @@ class MethodTreeComponent extends Component {
     this.setup(props.containerWidth);
   }
 
-  componentDidMount() {
+  initTreeStore() {
     const {app, cluster, proc, workType, selectedWorkType, profileStart, profileDuration} = this.props.location.query;
     const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true});
-    const url = `/api/callers/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
-    this.callTreeStore = new CallTreeStore(url);
-    this.getRenderData(this.callTreeStore.getChildrenAsync(-1), this.props.filterKey, -1, false).then(subTreeRenderData => {
+    if (this.props.nextNodesAccessorField === 'parent') {
+      const url = `/api/callees/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
+      this.treeStore = new HotMethodStore(url);
+    } else {
+      const url = `/api/callers/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
+      this.treeStore = new CallTreeStore(url);
+    }
+  }
+
+  componentDidMount() {
+    this.initTreeStore();
+    this.getRenderData(this.treeStore.getChildrenAsync(-1), this.props.filterKey, -1, false).then(subTreeRenderData => {
       this.renderData = subTreeRenderData;
       this.setState({
         itemCount: this.renderData.length
@@ -107,9 +119,9 @@ class MethodTreeComponent extends Component {
     const {app, cluster, proc, workType, selectedWorkType, profileStart, profileDuration} = this.props.location.query;
     const {profileStart: prevProfileStart, profileDuration: prevProfileDuration} = prevProps.location.query;
     const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true});
-    this.callTreeStore.url = `/api/callers/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
+    this.treeStore.url = `/api/callers/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
     if(prevProfileStart !== profileStart || prevProfileDuration !== profileDuration || prevProps.traceName !== this.props.traceName){
-      this.getRenderData(this.callTreeStore.getChildrenAsync(-1), this.props.filterKey, -1, false).then(subTreeRenderData => {
+      this.getRenderData(this.treeStore.getChildrenAsync(-1), this.props.filterKey, -1, false).then(subTreeRenderData => {
         this.renderData = subTreeRenderData;
         this.setState({
           itemCount: this.renderData.length
@@ -231,17 +243,17 @@ class MethodTreeComponent extends Component {
     );
   }
 
-  toggle (listIdx) {
+  toggle(listIdx) {
     //TODO: Pick a lock for the listIdx, i.e. if any toggle is pending on same uniqueId show a snackBar
     const rowData = this.renderData[listIdx];
     const uniqueId = rowData[0];
-   // console.log('opened list', this.opened);
+    console.log('opened list', this.opened);
     if (!this.opened[uniqueId]) {
       //expand
-      this.getRenderData(this.callTreeStore.getChildrenAsync(uniqueId), null, rowData[2], rowData[3] > 1).then(subTreeRenderData => {
+      this.getRenderData(this.treeStore.getChildrenAsync(uniqueId), null, rowData[2], rowData[3] > 1).then(subTreeRenderData => {
         this.renderData.splice(listIdx + 1, 0, ...subTreeRenderData);
         this.opened[uniqueId] = true;
-        if(subTreeRenderData.length === 0){
+        if (subTreeRenderData.length === 0) {
           this.stacklineDetailGrid.forceUpdate();
         }
         this.setState({
@@ -298,7 +310,7 @@ class MethodTreeComponent extends Component {
   handleFilterChange (e) {
     const { pathname, query } = this.props.location;
     this.props.router.push({ pathname, query: { ...query, [this.props.filterKey]: e.target.value } });
-    this.getRenderData(this.callTreeStore.getChildrenAsync(-1), e.target.value, -1, false).then(subTreeRenderData => {
+    this.getRenderData(this.treeStore.getChildrenAsync(-1), e.target.value, -1, false).then(subTreeRenderData => {
       this.renderData = subTreeRenderData;
       this.setState({
         itemCount: this.renderData.length
@@ -310,7 +322,7 @@ class MethodTreeComponent extends Component {
     let rowData = this.renderData[rowIndex];
     let uniqueId = rowData[0];
 
-    const displayName = this.callTreeStore.getNameWithArgs(uniqueId);
+    const displayName = this.treeStore.getNameWithArgs(uniqueId);
 
     const isHighlighted = Object.keys(this.highlighted)
       .filter(highlight => highlight.startsWith(uniqueId));
@@ -335,8 +347,8 @@ class MethodTreeComponent extends Component {
   stacklineStatCellRenderer({ rowIndex, style }) {
     let rowData = this.renderData[rowIndex];
     let uniqueId = rowData[0];
-    const percentageDenominator = this.callTreeStore.getChildren(-1).reduce((sum, id) => sum + this.callTreeStore.getSampleCount(id), 0);
-    const countToDisplay = this.callTreeStore.getSampleCount(uniqueId);
+    const percentageDenominator = this.treeStore.getChildren(-1).reduce((sum, id) => sum + this.treeStore.getSampleCount(id), 0);
+    const countToDisplay = this.treeStore.getSampleCount(uniqueId);
     const onStackPercentage = Number((countToDisplay * 100) / percentageDenominator).toFixed(2);
     const isHighlighted = Object.keys(this.highlighted)
       .filter(highlight => highlight.startsWith(uniqueId));
@@ -356,12 +368,12 @@ class MethodTreeComponent extends Component {
 
   getRenderData(asyncIds, filterText, parentIndent, parentHasSiblings) {
     return new Promise(resolve => {
-        asyncIds.then(ids => {
-        if(ids) {
-          ids.sort((a, b) => this.callTreeStore.getSampleCount(b) - this.callTreeStore.getSampleCount(a));
+      asyncIds.then(ids => {
+        if (ids) {
+          ids.sort((a, b) => this.treeStore.getSampleCount(b) - this.treeStore.getSampleCount(a));
           const asyncIdsRenderData = ids.map((id) => new Promise(resolve => {
             const indent = parentIndent === -1 ? 0 : ((parentHasSiblings || ids.length > 1 ) ? parentIndent + 10 : parentIndent + 6);
-            const displayName = this.callTreeStore.getNameWithArgs(id);
+            const displayName = this.treeStore.getNameWithArgs(id);
             const stackEntryWidth = getTextWidth(displayName, "14px Arial") + 28 + indent; //28 is space taken up by icons
             let renderDataList = [[id, null, indent, ids.length, stackEntryWidth]];
             if (filterText && indent === -1 && !displayName.match(new RegExp(filterText, 'i'))) {
@@ -369,7 +381,7 @@ class MethodTreeComponent extends Component {
             }
             if (ids.length === 1 || this.opened[id]) {
               this.opened[id] = true;
-              this.getRenderData(this.callTreeStore.getChildrenAsync(id), filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
+              this.getRenderData(this.treeStore.getChildrenAsync(id), filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
                 resolve(renderDataList.concat(subTreeRenderDataList));
               });
             } else {
@@ -379,7 +391,7 @@ class MethodTreeComponent extends Component {
           Promise.all(asyncIdsRenderData).then(idsRenderData => {
             resolve(idsRenderData.reduce((accumRenderData, idRenderData) => accumRenderData.concat(idRenderData), []));
           })
-        }else{
+        } else {
           resolve([]);
         }
       });
@@ -432,7 +444,7 @@ class MethodTreeComponent extends Component {
     //     return false;
     //   }
     // } else {
-      return (this.callTreeStore.getChildren(uniqueId).length > 0);
+      return (this.treeStore.getChildren(uniqueId).length > 0);
     // }
   }
 
