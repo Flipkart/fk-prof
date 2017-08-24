@@ -18,9 +18,6 @@ export default class CallTreeStore {
     });
   }
 
-  getNameWithArgs(uniqueId) {
-    return uniqueId + ' ' +  this.methodLookup[this.nodes[uniqueId][0][0]] + ' ' + this.nodes[uniqueId][0][1];
-  }
 
   getChildrenAsync(uniqueId) {
     if (uniqueId >= this.nodes.length) { // never supposed to be true
@@ -42,6 +39,10 @@ export default class CallTreeStore {
       }
     );
 
+  }
+
+  getNameWithArgs(uniqueId) {
+    return uniqueId + ' ' +  this.methodLookup[this.nodes[uniqueId][0][0]] + ' ' + this.nodes[uniqueId][0][1];
   }
 
   getSampleCount(uniqueId) {
