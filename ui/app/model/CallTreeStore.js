@@ -10,7 +10,7 @@ export default class CallTreeStore {
     //sorting logic on Object.entries if any
     Object.entries(root).forEach(([k, v]) => {
       if (k !== 'method_lookup') {
-        this.nodes[parseInt(k)] = [v['data'], v['chld'] ? Object.keys(v['chld']).map(c => parseInt(c)) : (bodyRoot ? []: undefined)];
+        this.nodes[parseInt(k)] = [v['data'], v['chld'] ? Object.keys(v['chld']).map(c => parseInt(c)) : (bodyRoot ? []: undefined)];    //nodes at bodyRoot level are guaranteed to have their children in the response
         if (v['chld']) {
           this.flatten(v['chld'], false);
         }
