@@ -187,7 +187,7 @@ public class CacheTest {
         Async async = context.async(2);
 
         NameProfilePair npPair = npPair("proc1", dt(0));
-        ProfileViewCreator viewCreator = mockedViewCreator(CallTreeView.class, npPair);
+        ProfileViewCreator viewCreator = mockedViewCreator(npPair);
 
         setUpDefaultCache(context, null, viewCreator);
         localProfileCache.put(npPair.name, Future.succeededFuture(npPair.profileInfo));
@@ -216,7 +216,7 @@ public class CacheTest {
         Async async = context.async(2);
 
         NameProfilePair npPair = npPair("proc1", dt(0), 2);
-        ProfileViewCreator viewCreator = mockedViewCreator(CallTreeView.class, npPair);
+        ProfileViewCreator viewCreator = mockedViewCreator(npPair);
 
         setUpDefaultCache(context, null, viewCreator);
         localProfileCache.put(npPair.name, Future.succeededFuture(npPair.profileInfo));
@@ -240,6 +240,37 @@ public class CacheTest {
         verify(viewCreator, times(1)).buildCallTreeView(same(npPair.profileInfo), eq("t1"));
         verify(viewCreator, times(1)).buildCallTreeView(same(npPair.profileInfo), eq("t2"));
     }
+
+    @Test(timeout = 2500000)
+    public void testLoadCallersAndThenCalleesView(TestContext context) throws Exception {
+        Async async = context.async(2);
+
+        NameProfilePair npPair = npPair("proc1", dt(0), 1);
+        ProfileViewCreator viewCreator = mockedViewCreator(npPair);
+
+        setUpDefaultCache(context, null, viewCreator);
+        localProfileCache.put(npPair.name, Future.succeededFuture(npPair.profileInfo));
+
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getCallTreeView(npPair.name, "t1");
+        Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> view2 = cache.getCalleesTreeView(npPair.name, "t1");
+
+        view1.setHandler(ar -> {
+            context.assertTrue(ar.succeeded());
+            context.assertEquals(ar.result().second, npPair.getCallTreeView(1));
+            async.countDown();
+        });
+
+        view2.setHandler(ar -> {
+            context.assertTrue(ar.succeeded());
+            context.assertEquals(ar.result().second, npPair.getCalleesTreeView(1));
+            async.countDown();
+        });
+
+        async.awaitSuccess(2000000);
+        verify(viewCreator, times(1)).buildCalleesTreeView(same(npPair.profileInfo), eq("t1"));
+        verify(viewCreator, times(1)).buildCallTreeView(same(npPair.profileInfo), eq("t1"));
+    }
+
 
     @Test(timeout = 2500)
     public void testLoadProfileAndViewWhenRemotelyCached_shouldThrowExceptionWithRemoteIp(TestContext context) throws Exception {
@@ -283,7 +314,7 @@ public class CacheTest {
 
         NameProfilePair npPair = npPair("proc2", dt(0));
         AggregatedProfileLoader loader = mockedProfileLoader(npPair);
-        ProfileViewCreator viewCreator = mockedViewCreator(CallTreeView.class, npPair);
+        ProfileViewCreator viewCreator = mockedViewCreator(npPair);
 
         setUpCache(context, new LocalProfileCache(config, ticker), loader, viewCreator);
 
@@ -334,19 +365,15 @@ public class CacheTest {
         return loader;
     }
 
-    private <T> ProfileViewCreator mockedViewCreator(Class<T> clazz, NameProfilePair... npPairs) {
+    private ProfileViewCreator mockedViewCreator(NameProfilePair... npPairs) {
         ProfileViewCreator foo = mock(ProfileViewCreator.class);
         for(NameProfilePair npPair : npPairs) {
-            if(CallTreeView.class.equals(clazz)) {
-                IntStream.range(0, npPair.callTreeView.size()).forEach(i ->
-                    doReturn(npPair.callTreeView.get(i)).when(foo).buildCallTreeView(same(npPair.profileInfo), eq("t" + (i+1))));
-            }
-            else {
-                IntStream.range(0, npPair.calleesTreeView.size()).forEach(i ->
-                    doReturn(npPair.calleesTreeView.get(i)).when(foo).buildCalleesTreeView(same(npPair.profileInfo), eq("t" + (i+1))));
-            }
-        }
+            IntStream.range(0, npPair.callTreeView.size()).forEach(i ->
+                doReturn(npPair.callTreeView.get(i)).when(foo).buildCallTreeView(same(npPair.profileInfo), eq("t" + (i+1))));
+            IntStream.range(0, npPair.calleesTreeView.size()).forEach(i ->
+                doReturn(npPair.calleesTreeView.get(i)).when(foo).buildCalleesTreeView(same(npPair.profileInfo), eq("t" + (i+1))));
 
+        }
         return foo;
     }
 

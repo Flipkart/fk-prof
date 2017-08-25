@@ -287,7 +287,7 @@ public class ClusterAwareCache {
                 // no cached view, so create a new one
                 switch (profileName.workType) {
                     case cpu_sample_work:
-                        profileViewPair = cache.computeViewIfAbsent(profileName, traceName, p -> (ViewType) buildView(p, traceName, viewType));
+                        profileViewPair = cache.computeViewIfAbsent(profileName, getViewName(traceName, viewType), p -> (ViewType) buildView(p, traceName, viewType));
                         if(profileViewPair.second == null) {
                             f.fail(new CachedProfileNotFoundException());
                         }
