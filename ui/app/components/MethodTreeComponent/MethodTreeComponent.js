@@ -95,7 +95,7 @@ class MethodTreeComponent extends Component {
 
   initTreeStore() {
     const {app, cluster, proc, workType, selectedWorkType, profileStart, profileDuration} = this.props.location.query;
-    const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true});
+    const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true, maxDepth: 6});
     if (this.props.nextNodesAccessorField === 'parent') {
       const url = `/api/callees/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
       this.treeStore = new HotMethodStore(url);
@@ -119,7 +119,6 @@ class MethodTreeComponent extends Component {
     const {app, cluster, proc, workType, selectedWorkType, profileStart, profileDuration} = this.props.location.query;
     const {profileStart: prevProfileStart, profileDuration: prevProfileDuration} = prevProps.location.query;
     const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true});
-    this.treeStore.url = `/api/callers/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
     if(prevProfileStart !== profileStart || prevProfileDuration !== profileDuration || prevProps.traceName !== this.props.traceName){
       this.getRenderData(this.treeStore.getChildrenAsync(-1), this.props.filterKey, -1, false).then(subTreeRenderData => {
         this.renderData = subTreeRenderData;
