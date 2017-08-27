@@ -50,7 +50,7 @@ export default class CallTreeStore {
   }
 
   getChildren(uniqueId) {
-    if (this.nodes[uniqueId]) {
+    if (this.nodes[uniqueId] && this.nodes[uniqueId][1]) {
       return this.nodes[uniqueId][1];
     }else{
       return [];

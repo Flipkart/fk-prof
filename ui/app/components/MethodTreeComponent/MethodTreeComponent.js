@@ -95,7 +95,7 @@ class MethodTreeComponent extends Component {
 
   initTreeStore() {
     const {app, cluster, proc, workType, selectedWorkType, profileStart, profileDuration} = this.props.location.query;
-    const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true, maxDepth: 6});
+    const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true});
     if (this.props.nextNodesAccessorField === 'parent') {
       const url = `/api/callees/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
       this.treeStore = new HotMethodStore(url);
@@ -246,7 +246,6 @@ class MethodTreeComponent extends Component {
     //TODO: Pick a lock for the listIdx, i.e. if any toggle is pending on same uniqueId show a snackBar
     const rowData = this.renderData[listIdx];
     const uniqueId = rowData[0];
-    console.log('opened list', this.opened);
     if (!this.opened[uniqueId]) {
       //expand
       this.getRenderData(this.treeStore.getChildrenAsync(uniqueId), null, rowData[2], rowData[3] > 1).then(subTreeRenderData => {
