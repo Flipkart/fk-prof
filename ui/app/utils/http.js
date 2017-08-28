@@ -15,7 +15,7 @@ function fireRequest (url, config) {
     .then((response) => {
       if (response.ok) {
         return Promise.resolve(response.json());
-      }else if(response.status >= 400){
+      } else if(response.status >= 400){
         const error = new Error();
         error.status = response.status;
         error.response = response.statusText;

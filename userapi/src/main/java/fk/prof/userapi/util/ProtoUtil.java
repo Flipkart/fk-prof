@@ -9,6 +9,7 @@ import recording.Recorder;
 
 import java.io.IOException;
 
+//TODO : Duplicate from backend, extract out in a common module
 public class ProtoUtil {
   public static AggregatedProfileModel.WorkType mapRecorderToAggregatorWorkType(Recorder.WorkType recorderWorkType) {
     return AggregatedProfileModel.WorkType.forNumber(recorderWorkType.getNumber());

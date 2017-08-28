@@ -52,7 +52,8 @@ public class Configuration {
     private StorageConfig storageConfig;
 
     @NotNull
-    @Valid@JsonProperty("backend")
+    @Valid
+    @JsonProperty("backend")
     private BackendConfig backendConfig;
 
     @NotNull
@@ -208,6 +209,7 @@ public class Configuration {
         }
     }
 
+    //TODO : Duplicate from backend, extract out in a common module
     public static class HttpClientConfig {
         @JsonProperty("connect.timeout.ms")
         private Integer connectTimeoutMs = 5000;

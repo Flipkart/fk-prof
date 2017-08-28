@@ -3,6 +3,7 @@ package fk.prof.userapi.exception;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 
+//TODO : Duplicate from backend, extract out in a common module
 public class UserapiHttpFailure extends RuntimeException {
   private int statusCode = 500;
 
