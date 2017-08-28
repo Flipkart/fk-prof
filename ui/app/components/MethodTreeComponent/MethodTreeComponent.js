@@ -13,42 +13,10 @@ import CallTreeStore from '../../model/CallTreeStore';
 import HotMethodStore from '../../model/HotMethodStore';
 import Loader from 'components/LoaderComponent';
 
-
-const noop = () => {};
-
 const rightColumnWidth = 150;
 const everythingOnTopHeight = 270;
 const filterBoxHeight = 87;
 const stackEntryHeight = 25;
-
-//Input is expected to be Array of (nodeIndex, callCount)   and
-//output returned is an array of objects of type HotMethodNode
-//This function aggregates nodes with same name+lineNo to be rendered and same name for first layer
-//in hotmethodView. As part of aggregation their sampledCallCounts are added and respective parents added in a list
-//with sampledCallCounts caused by them
-const dedupeNodes = (allNodes) => (nodesWithCallCount) => {
-  let dedupedNodes = {};
-  for(let i=0; i<nodesWithCallCount.length; i++){
-    let nodeWithCallCount = nodesWithCallCount[i];
-    const nodeIndex = nodeWithCallCount[0];
-    const node = allNodes[nodeIndex];
-    const sampledCallCount = nodeWithCallCount[1];
-    if(! node.hasParent()) break;
-    let renderNode;
-    if(sampledCallCount === undefined)
-      renderNode = new HotMethodNode(true, node.lineNo, node.name, node.onCPU, [[nodeIndex, node.onCPU]]);
-    else
-      renderNode = new HotMethodNode(false, node.lineNo, node.name, sampledCallCount, [[node.parent, sampledCallCount]]);
-    const key = renderNode.identifier();
-    if (!dedupedNodes[key]) {
-      dedupedNodes[key] = renderNode;
-    } else {
-      dedupedNodes[key].sampledCallCount += renderNode.sampledCallCount;
-      dedupedNodes[key].parentsWithSampledCallCount = [...dedupedNodes[key].parentsWithSampledCallCount, ...renderNode.parentsWithSampledCallCount];
-    }
-  }
-  return Object.keys(dedupedNodes).map(k => dedupedNodes[k]).sort((a, b) => b.sampledCallCount - a.sampledCallCount);
-};
 
 const getTextWidth = function(text, font) {
   // re-use canvas object for better performance
@@ -86,7 +54,6 @@ class MethodTreeComponent extends Component {
     this.getRenderedChildrenCountForListItem = this.getRenderedChildrenCountForListItem.bind(this);
     this.isNodeHavingChildren = this.isNodeHavingChildren.bind(this);
 
-    this.dedupeNodes = dedupeNodes(props.allNodes);
     this.renderData = [];
     this.state.itemCount = this.renderData.length;
 
@@ -428,22 +395,7 @@ class MethodTreeComponent extends Component {
   }
 
   isNodeHavingChildren(uniqueId) {
-    // if(this.props.nextNodesAccessorField === 'parent') {
-    //   let childNodeIndexes = node.parentsWithSampledCallCount;
-    //   if(childNodeIndexes && childNodeIndexes.length > 0) {
-    //     if(childNodeIndexes.length !== 1) {
-    //       return true;
-    //     } else {
-    //       //If this has only one childnodeindex and that is "0" node => corresponds to root node which is not rendered in UI
-    //       //"if(! node.hasParent()) break;" condition in dedupeNodes method ensure above node is not rendered
-    //       return childNodeIndexes[0][0] !== 0;
-    //     }
-    //   } else {
-    //     return false;
-    //   }
-    // } else {
-      return (this.treeStore.getChildren(uniqueId).length > 0);
-    // }
+    return (this.treeStore.getChildren(uniqueId).length > 0);
   }
 
   getMaxWidthOfRenderedStacklines() {
