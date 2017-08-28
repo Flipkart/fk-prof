@@ -30,14 +30,13 @@ import proto.PolicyDTO;
 
 import java.io.IOException;
 
-import static fk.prof.userapi.http.UserapiApiPathConstants.DELIMITER;
-
 /**
  * Tests for Policy APIs of HttpVerticle
  * Created by rohitpatiyal on 20/6/17.
  */
 @RunWith(VertxUnitRunner.class)
 public class UserapiPolicyAPITest {
+    private static final String DELIMITER = "/";
 
     private HttpServer backendServer;
     private HttpClient client;
@@ -93,7 +92,7 @@ public class UserapiPolicyAPITest {
         backendServer.requestHandler(router::accept);
         backendServer.listen(backendPort, result -> {
             if(result.succeeded()){
-                String userapiPolicyPath = UserapiApiPathConstants.POLICY_API_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
+                String userapiPolicyPath = UserapiApiPathConstants.POLICY_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
                 client.getNow(userapiPort, "localhost", userapiPolicyPath, res -> {
                     res.bodyHandler(buffer -> {
                         try {
@@ -136,7 +135,7 @@ public class UserapiPolicyAPITest {
         backendServer.requestHandler(router::accept);
         backendServer.listen(backendPort, result -> {
             if (result.succeeded()) {
-                String userapiPolicyPath = UserapiApiPathConstants.POLICY_API_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
+                String userapiPolicyPath = UserapiApiPathConstants.POLICY_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
 
                 client.put(userapiPort, "localhost", userapiPolicyPath, res -> {
                     res.bodyHandler(buffer -> {
@@ -180,7 +179,7 @@ public class UserapiPolicyAPITest {
         backendServer.requestHandler(router::accept);
         backendServer.listen(backendPort, result -> {
             if (result.succeeded()) {
-                String userapiPolicyPath = UserapiApiPathConstants.POLICY_API_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
+                String userapiPolicyPath = UserapiApiPathConstants.POLICY_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
                 client.post(userapiPort, "localhost", userapiPolicyPath, res -> {
                     res.bodyHandler(buffer -> {
                         try {

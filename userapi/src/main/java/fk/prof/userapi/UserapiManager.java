@@ -130,10 +130,10 @@ public class UserapiManager {
             .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.PROFILES_PREFIX + ".*").setAlias(UserapiApiPathConstants.PROFILES_PREFIX ).setType(MatchType.REGEX))
             .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.PROFILE_PREFIX + ".*").setAlias(UserapiApiPathConstants.PROFILE_PREFIX).setType(MatchType.REGEX))
 
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.LIST_POLICY_API_PREFIX + UserapiApiPathConstants.APPS_PREFIX + ".*").setAlias(UserapiApiPathConstants.LIST_POLICY_API_PREFIX + UserapiApiPathConstants.APPS_PREFIX).setType(MatchType.REGEX))
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.LIST_POLICY_API_PREFIX + UserapiApiPathConstants.CLUSTERS_PREFIX + ".*").setAlias(UserapiApiPathConstants.LIST_POLICY_API_PREFIX + UserapiApiPathConstants.CLUSTERS_PREFIX).setType(MatchType.REGEX))
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.LIST_POLICY_API_PREFIX + UserapiApiPathConstants.PROCS_FOR_APP_CLUSTER + ".*").setAlias(UserapiApiPathConstants.LIST_POLICY_API_PREFIX + UserapiApiPathConstants.PROCS_PREFIX).setType(MatchType.REGEX))
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.POLICY_API_PREFIX + ".*").setAlias(UserapiApiPathConstants.POLICY_API_PREFIX).setType(MatchType.REGEX));
+            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.POLICIES_PREFIX + UserapiApiPathConstants.APPS_PREFIX + ".*").setAlias(UserapiApiPathConstants.POLICIES_PREFIX + UserapiApiPathConstants.APPS_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.POLICIES_PREFIX + UserapiApiPathConstants.CLUSTERS_PREFIX + ".*").setAlias(UserapiApiPathConstants.POLICIES_PREFIX + UserapiApiPathConstants.CLUSTERS_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.POLICIES_PREFIX + UserapiApiPathConstants.PROCS_FOR_APP_CLUSTER + ".*").setAlias(UserapiApiPathConstants.POLICIES_PREFIX + UserapiApiPathConstants.PROCS_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.POLICY_PREFIX + ".*").setAlias(UserapiApiPathConstants.POLICY_PREFIX).setType(MatchType.REGEX));
     }
 
     public static class AbortPolicy implements RejectedExecutionHandler {

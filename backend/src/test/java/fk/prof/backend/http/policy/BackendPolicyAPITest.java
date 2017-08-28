@@ -102,7 +102,7 @@ public class BackendPolicyAPITest {
         leaderServer.listen(leaderPort, result -> {
             if (result.succeeded()) {
                 when(inMemoryLeaderStore.getLeader()).thenReturn(BackendDTO.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
-                String backendPolicyPath = ApiPathConstants.POLICY_API_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
+                String backendPolicyPath = ApiPathConstants.POLICY_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
 
                 client.getNow(backendPort, "localhost", backendPolicyPath, res -> {
                     res.bodyHandler(buffer -> {
@@ -147,7 +147,7 @@ public class BackendPolicyAPITest {
         leaderServer.listen(leaderPort, result -> {
             if (result.succeeded()) {
                 when(inMemoryLeaderStore.getLeader()).thenReturn(BackendDTO.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
-                String backendPolicyPath = ApiPathConstants.POLICY_API_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
+                String backendPolicyPath = ApiPathConstants.POLICY_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
 
                 client.put(backendPort, "localhost", backendPolicyPath, res -> {
                     res.bodyHandler(buffer -> {
@@ -192,7 +192,7 @@ public class BackendPolicyAPITest {
         leaderServer.listen(leaderPort, result -> {
             if (result.succeeded()) {
                 when(inMemoryLeaderStore.getLeader()).thenReturn(BackendDTO.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
-                String backendPolicyPath = ApiPathConstants.POLICY_API_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
+                String backendPolicyPath = ApiPathConstants.POLICY_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
 
                 client.post(backendPort, "localhost", backendPolicyPath, res -> {
                     res.bodyHandler(buffer -> {

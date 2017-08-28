@@ -268,7 +268,7 @@ public class HttpVerticle extends AbstractVerticle {
     }
 
     private void proxyListAPIToBackend(RoutingContext routingContext) {
-        final String path = routingContext.normalisedPath().substring(UserapiApiPathConstants.LIST_POLICY_API_PREFIX.length()) + ((routingContext.request().query() != null)? "?" + routingContext.request().query(): "");
+        final String path = routingContext.normalisedPath().substring(UserapiApiPathConstants.POLICIES_PREFIX.length()) + ((routingContext.request().query() != null)? "?" + routingContext.request().query(): "");
         try {
             makeRequestToBackend(routingContext.request().method(), path, routingContext.getBody(), false)
                     .setHandler(ar -> proxyResponseFromBackend(routingContext, ar));
