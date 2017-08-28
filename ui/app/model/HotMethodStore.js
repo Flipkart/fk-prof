@@ -31,7 +31,6 @@ export default class HotMethodStore {
   //handle new request prepare the data  use parent if needed
   flatten(nodes, topLevel, bodyRoot) {
     const deDupNodes = this.deDup(nodes, topLevel);
-    console.log('deDupNodes', deDupNodes);
     let curLayerIds = undefined;
     Object.entries(deDupNodes).forEach(([k, v]) => {
       this.nodes.push(v);
@@ -42,7 +41,7 @@ export default class HotMethodStore {
       curLayerIds.push(vIndex);
       //Try next layer for this aggregated/deDuped node
         const nextLayerNodes = {};
-        // if(!topLevel) {
+        if(!topLevel) {
           v[2].filter(([k, v, d]) => v['chld']).forEach(([k, v, d]) => {
             if (Object.keys(v['chld']).length === 1) {
               Object.values(v['chld'])[0]['data'][2] = d;
@@ -51,13 +50,15 @@ export default class HotMethodStore {
               console.log('hotMethod node should never happen more than one child/hotMethod parent, this has : ', v['chld']);
             }
           });
-        // } else {
-        //   v[2].forEach(([k, v]) => {
-        //       Object.assign(nextLayerNodes, {k:v});
-        //   });
-        // }
-        this.nodes[vIndex][1] = this.flatten(nextLayerNodes, false, false);
-        if (!this.nodes[vIndex][1] && bodyRoot) {        //if no part has a child field and if this is the body's root then it is a leaf node. Also nodes at bodyRoot level are guaranteed to have their children in the response
+          bodyRoot = false;
+        } else {
+          v[2].forEach(([k, v]) => {
+              Object.assign(nextLayerNodes, {[k]:v});
+          });
+          bodyRoot = true;
+        }
+      this.nodes[vIndex][1] = this.flatten(nextLayerNodes, false, bodyRoot);
+      if (!this.nodes[vIndex][1] && bodyRoot) {        //if no part has a child field and if this is the body's root then it is a leaf node. Also nodes at bodyRoot level are guaranteed to have their children in the response
           this.nodes[vIndex][1] = [];
         }
         if (this.nodes[vIndex][1] && this.nodes[vIndex].length === 3) {

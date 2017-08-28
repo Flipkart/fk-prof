@@ -370,7 +370,7 @@ class MethodTreeComponent extends Component {
         if (ids) {
           ids.sort((a, b) => this.treeStore.getSampleCount(b) - this.treeStore.getSampleCount(a));
           const asyncIdsRenderData = ids.map((id) => new Promise(resolve => {
-            const indent = parentIndent === -1 ? 0 : ((parentHasSiblings || ids.length > 1 ) ? parentIndent + 10 : parentIndent + 6);
+            const indent = parentIndent === -1 ? 0 : ((parentHasSiblings || ids.length > 1 ) ? parentIndent + 10 : parentIndent + 4);
             const displayName = this.treeStore.getNameWithArgs(id);
             const stackEntryWidth = getTextWidth(displayName, "14px Arial") + 28 + indent; //28 is space taken up by icons
             let renderDataList = [[id, null, indent, ids.length, stackEntryWidth]];
