@@ -100,7 +100,7 @@ public class RouterVerticleTest {
     }
 
     @Test(timeout = 10000)
-    public void TestRequestTimeout(TestContext testContext) throws Exception {
+    public void testRequestTimeout(TestContext testContext) throws Exception {
         final Async async = testContext.async();
         String pPrefixSet = "(^$|a|ap|app|app1)";
         doAnswer(invocation -> {
@@ -126,7 +126,7 @@ public class RouterVerticleTest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetAppsRoute(TestContext testContext) throws Exception {
+    public void testGetAppsRoute(TestContext testContext) throws Exception {
         final Async async = testContext.async();
         String pPrefixSet = "(^$|a|ap|app|app1)";
         String npPrefixSet = "(f|fo|foo)";
@@ -175,7 +175,7 @@ public class RouterVerticleTest {
     }
 
     @Test(timeout = 10000)
-    public void TestHealthcheckRoute(TestContext testContext) throws Exception {
+    public void testHealthcheckRoute(TestContext testContext) throws Exception {
         final Async async = testContext.async();
         client.getNow(port, "localhost", "/health", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), 200);
@@ -184,7 +184,7 @@ public class RouterVerticleTest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetClustersRoute(TestContext testContext) throws Exception {
+    public void testGetClustersRoute(TestContext testContext) throws Exception {
         final Async async = testContext.async();
         String pPrefixSet = "(^$|c|cl|clu|clus|clust|cluste|cluster|cluster1)";
         String npPrefixSet = "(b|ba|bar)";
@@ -267,7 +267,7 @@ public class RouterVerticleTest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetProcRoute(TestContext testContext) throws Exception {
+    public void testGetProcRoute(TestContext testContext) throws Exception {
         final Async async = testContext.async();
         String pPrefixSet = "(^$|p|pr|pro|proc|proce|proces|process|process1)";
         String npPrefixSet = "(m|ma|mai|main)";
@@ -357,7 +357,7 @@ public class RouterVerticleTest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetProfilesRoute(TestContext testContext) throws Exception {
+    public void testGetProfilesRoute(TestContext testContext) throws Exception {
         final Async async = testContext.async();
 
         AggregatedProfileNamingStrategy pProfile = new AggregatedProfileNamingStrategy("profiles", 1, P_APP_ID, P_CLUSTER_ID, P_PROC, P_TIME_STAMP, 1800);
@@ -410,7 +410,7 @@ public class RouterVerticleTest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetProfilesRoute_shouldReturnFailedProfilesIfThereIsExceptionWhenLoadingFiles(TestContext testContext) throws Exception {
+    public void testGetProfilesRoute_shouldReturnFailedProfilesIfThereIsExceptionWhenLoadingFiles(TestContext testContext) throws Exception {
         final Async async = testContext.async();
 
         String errorMsg = "took too long";

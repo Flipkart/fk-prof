@@ -78,7 +78,7 @@ public class UserapiPolicyAPITest {
     }
 
     @Test
-    public void TestGetPolicyProxiedToBackend(TestContext context) throws Exception {
+    public void testGetPolicyProxiedToBackend(TestContext context) throws Exception {
         final Async async = context.async();
         Router router = Router.router(vertx);
         UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET,
@@ -111,7 +111,7 @@ public class UserapiPolicyAPITest {
     }
 
     @Test
-    public void TestPutPolicyProxiedToLeader(TestContext context) {
+    public void testPutPolicyProxiedToLeader(TestContext context) {
         final Async async = context.async();
         Router router = Router.router(vertx);
         String jsonPayload = null;
@@ -155,7 +155,7 @@ public class UserapiPolicyAPITest {
     }
 
     @Test
-    public void TestPostPolicyProxiedToLeader(TestContext context) {
+    public void testPostPolicyProxiedToLeader(TestContext context) {
         final Async async = context.async();
         Router router = Router.router(vertx);
         String jsonPayload = null;

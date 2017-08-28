@@ -1,6 +1,6 @@
 import React, { Component, PropTypes } from 'react';
 import { connect } from 'react-redux';
-import Select from 'react-select';
+import Select, {Creatable} from 'react-select';
 
 import fetchClustersAction from 'actions/ClusterActions';
 import safeTraverse from 'utils/safeTraverse';

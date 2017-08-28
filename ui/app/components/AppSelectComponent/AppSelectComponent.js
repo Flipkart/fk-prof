@@ -1,6 +1,6 @@
 import React from 'react';
 import { connect } from 'react-redux';
-import Select from 'react-select';
+import Select, {Creatable} from 'react-select';
 
 import fetchAppsAction from 'actions/AppActions';
 import debounce from 'utils/debounce';

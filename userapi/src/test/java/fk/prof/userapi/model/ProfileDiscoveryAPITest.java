@@ -95,7 +95,7 @@ public class ProfileDiscoveryAPITest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetAppIdsWithPrefix(TestContext context) throws Exception {
+    public void testGetAppIdsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<String, Collection<Object>> appIdTestPairs = new HashMap<String, Collection<Object>>() {
             {
@@ -119,7 +119,7 @@ public class ProfileDiscoveryAPITest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetClusterIdsWithPrefix(TestContext context) throws Exception {
+    public void testGetClusterIdsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<List<String>, Collection<?>> appIdTestPairs = new HashMap<List<String>, Collection<?>>() {
             {
@@ -147,7 +147,7 @@ public class ProfileDiscoveryAPITest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetProcsWithPrefix(TestContext context) throws Exception {
+    public void testGetProcsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<List<String>, Collection<?>> appIdTestPairs = new HashMap<List<String>, Collection<?>>() {
             {
@@ -175,7 +175,7 @@ public class ProfileDiscoveryAPITest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetProfilesInTimeWindow(TestContext context) throws Exception {
+    public void testGetProfilesInTimeWindow(TestContext context) throws Exception {
         Async async = context.async();
         FilteredProfiles profile1 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("monitor_contention_work"));
         FilteredProfiles profile2 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1800), Sets.newSet("monitor_wait_work"));

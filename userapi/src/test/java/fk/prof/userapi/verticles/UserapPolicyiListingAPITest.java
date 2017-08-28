@@ -78,7 +78,7 @@ public class UserapPolicyiListingAPITest {
     }
 
     @Test
-    public void TestGetAppIdsRoute(TestContext context) throws Exception {
+    public void testGetAppIdsRoute(TestContext context) throws Exception {
         final Async async = context.async();
         String userapiGetAppIdsURI = UserapiApiPathConstants.POLICY_APPS + "?prefix=" + APP_ID.substring(0, 1 + new Random().nextInt(APP_ID.length() - 1));
         Router router = Router.router(vertx);
@@ -105,7 +105,7 @@ public class UserapPolicyiListingAPITest {
     }
 
     @Test
-    public void TestGetClusterIdsRoute(TestContext context) throws Exception {
+    public void testGetClusterIdsRoute(TestContext context) throws Exception {
         final Async async = context.async();
         String userapiGetClusterIdsURI = UserapiApiPathConstants.LIST_POLICY_API_PREFIX + "/clusters/" + APP_ID + "?prefix=" + CLUSTER_ID.substring(0, 1 + new Random().nextInt(CLUSTER_ID.length() - 1));
         Router router = Router.router(vertx);
@@ -133,7 +133,7 @@ public class UserapPolicyiListingAPITest {
 
 
     @Test
-    public void TestGetProcNamesRoute(TestContext context) throws Exception {
+    public void testGetProcNamesRoute(TestContext context) throws Exception {
         final Async async = context.async();
         String userapiGetProcNamesURI = UserapiApiPathConstants.LIST_POLICY_API_PREFIX + "/procs/" + APP_ID + DELIMITER + CLUSTER_ID + "?prefix=" + PROC.substring(0, 1 + new Random().nextInt(PROC.length() - 1));
         Router router = Router.router(vertx);
