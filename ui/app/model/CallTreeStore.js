@@ -33,6 +33,10 @@ export default class CallTreeStore {
         this.flatten(resp, true);
         Object.assign(this.methodLookup, resp['method_lookup']);
         if (uniqueId === -1) {
+          const rootKey = Object.keys(resp).filter(k => k !== 'method_lookup')[0]; // array should be of size 1
+          const rootChld = resp[rootKey]['chld'];
+          delete resp[rootKey];
+          Object.assign(resp, rootChld);
           this.nodes[uniqueId] = [null, Object.keys(resp).filter((k) => k !== 'method_lookup').map(k => parseInt(k))];
         }
         return this.nodes[uniqueId][1];
