@@ -6,7 +6,6 @@ import { ScrollSync, AutoSizer, Grid } from 'react-virtualized';
 import debounce from 'utils/debounce';
 
 import styles from './MethodTreeComponent.css';
-import HotMethodNode from '../../pojos/HotMethodNode';
 import 'react-virtualized/styles.css';
 import {objectToQueryParams} from 'utils/UrlUtils';
 import CallTreeStore from '../../model/CallTreeStore';
