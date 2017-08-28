@@ -1,11 +1,11 @@
 package fk.prof.userapi.model.tree;
 
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import fk.prof.userapi.model.Tree;
 
 import java.util.List;
 
 /**
+ * Represents a indexable node in the tree. This node has an index, accompanying data and the list of children nodes.
  * Created by gaurav.ashok on 01/06/17.
  */
 public class IndexedTreeNode<T> {
@@ -46,7 +46,6 @@ public class IndexedTreeNode<T> {
         }
     }
 
-    @JsonSerialize()
     public IndexedTreeNode<T> setChildren(List<IndexedTreeNode<T>> children) {
         this.children = children;
         return this;

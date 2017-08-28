@@ -12,6 +12,7 @@ import fk.prof.userapi.Cacheable;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.Pair;
 import fk.prof.userapi.model.AggregatedProfileInfo;
+import fk.prof.userapi.model.tree.CacheableView;
 import io.vertx.core.Future;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -35,7 +36,7 @@ class LocalProfileCache {
 
     private final AtomicInteger uidGenerator;
     private final Cache<AggregatedProfileNamingStrategy, CacheableProfile> cache;
-    private final Cache<String, Cacheable> viewCache;
+    private final Cache<String, CacheableView> viewCache;
 
     private RemovalListener<AggregatedProfileNamingStrategy, Future<AggregatedProfileInfo>> removalListener;
 
@@ -80,7 +81,7 @@ class LocalProfileCache {
         cache.put(key, new CacheableProfile(key, uidGenerator.incrementAndGet(), profileFuture));
     }
 
-    <T extends Cacheable> Pair<Future<AggregatedProfileInfo>, T> getView(AggregatedProfileNamingStrategy profileName, String viewName) {
+    <T extends CacheableView> Pair<Future<AggregatedProfileInfo>, T> getView(AggregatedProfileNamingStrategy profileName, String viewName) {
         CacheableProfile cacheableProfile = cache.getIfPresent(profileName);
         if(cacheableProfile != null) {
             String viewKey = toViewKey(profileName, viewName, cacheableProfile.uid);
@@ -89,7 +90,7 @@ class LocalProfileCache {
         return Pair.of(null, null);
     }
 
-    <T extends Cacheable> Pair<Future<AggregatedProfileInfo>, T> computeViewIfAbsent(AggregatedProfileNamingStrategy profileName, String viewName, Function<AggregatedProfileInfo, T> viewProvider) {
+    <T extends CacheableView> Pair<Future<AggregatedProfileInfo>, T> computeViewIfAbsent(AggregatedProfileNamingStrategy profileName, String viewName, Function<AggregatedProfileInfo, T> viewProvider) {
         // dont cache it if dependent profile is not there.
         CacheableProfile cacheableProfile = cache.getIfPresent(profileName);
         if(cacheableProfile == null) {
@@ -147,7 +148,7 @@ class LocalProfileCache {
             }
         }
 
-        <T extends Cacheable> T computeAndAddViewIfAbsent(String viewName, Function<AggregatedProfileInfo, T> viewProvider) {
+        <T extends CacheableView> T computeAndAddViewIfAbsent(String viewName, Function<AggregatedProfileInfo, T> viewProvider) {
             String viewKey = toViewKey(profileName, viewName, uid);
             synchronized (this) {
                 if(!evicted) {

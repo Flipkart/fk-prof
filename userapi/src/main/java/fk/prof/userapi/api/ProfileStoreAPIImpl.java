@@ -28,7 +28,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
- * Interacts with the {@link AsyncStorage} based on invocations from controller
+ * Interacts with the {@link AsyncStorage} and the {@link ClusterAwareCache} based on invocations from controller.
  * Created by rohit.patiyal on 19/01/17.
  */
 public class ProfileStoreAPIImpl implements ProfileStoreAPI {
@@ -181,6 +181,13 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
         }
     }
 
+    /**
+     * GetOrCreate a callTree view for the loaded profile. In case the profile is not loaded, it will be loaded locally
+     * first and then the view will be created.
+     * @param profileName
+     * @param traceName
+     * @return Future containing calltree view and the associated aggregated samples
+     */
     @Override
     public Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> getCpuSamplingCallersTreeView(AggregatedProfileNamingStrategy profileName, String traceName) {
         Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> result = Future.future();
@@ -201,6 +208,13 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
         return result;
     }
 
+    /**
+     * GetOrCreate a calleeTree view for the loaded profile. In case the profile is not loaded, it will be loaded locally
+     * first and then the view will be created.
+     * @param profileName
+     * @param traceName
+     * @return Future containing calleetree view and the associated aggregated samples
+     */
     @Override
     public Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> getCpuSamplingCalleesTreeView(AggregatedProfileNamingStrategy profileName, String traceName) {
         Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> result = Future.future();

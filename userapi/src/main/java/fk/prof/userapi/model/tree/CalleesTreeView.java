@@ -1,7 +1,6 @@
 package fk.prof.userapi.model.tree;
 
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
-import fk.prof.userapi.Cacheable;
 import fk.prof.userapi.model.Tree;
 
 import java.util.*;
@@ -11,7 +10,7 @@ import java.util.stream.Collectors;
 /**
  * Created by gaurav.ashok on 01/06/17.
  */
-public class CalleesTreeView implements Cacheable {
+public class CalleesTreeView implements CacheableView {
 
     private Tree<FrameNode> callTree;
     private List<IndexedTreeNode<FrameNode>> hotMethods;

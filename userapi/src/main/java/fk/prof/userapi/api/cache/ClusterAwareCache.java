@@ -4,7 +4,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.RemovalCause;
 import com.google.common.cache.RemovalNotification;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
-import fk.prof.userapi.Cacheable;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.Pair;
 import fk.prof.userapi.api.AggregatedProfileLoader;
@@ -12,6 +11,7 @@ import fk.prof.userapi.api.ProfileViewCreator;
 import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
 import fk.prof.userapi.model.StacktraceTreeViewType;
+import fk.prof.userapi.model.tree.CacheableView;
 import fk.prof.userapi.model.tree.CallTreeView;
 import fk.prof.userapi.model.tree.CalleesTreeView;
 import fk.prof.userapi.proto.LoadInfoEntities.ProfileResidencyInfo;
@@ -214,7 +214,7 @@ public class ClusterAwareCache {
      * @param <ViewType>
      * @return Future containing a pair of trace specific aggregated samples and its view.
      */
-    private <ViewType extends Cacheable> Future<Pair<AggregatedSamplesPerTraceCtx, ViewType>> getView(AggregatedProfileNamingStrategy profileName, String traceName, StacktraceTreeViewType viewType) {
+    private <ViewType extends CacheableView> Future<Pair<AggregatedSamplesPerTraceCtx, ViewType>> getView(AggregatedProfileNamingStrategy profileName, String traceName, StacktraceTreeViewType viewType) {
         Future<Pair<AggregatedSamplesPerTraceCtx, ViewType>> viewFuture = Future.future();
 
         Pair<Future<AggregatedProfileInfo>, ViewType> profileViewPair = cache.getView(profileName, getViewName(traceName, viewType));
@@ -262,7 +262,7 @@ public class ClusterAwareCache {
      * @param viewType
      * @param <ViewType>
      */
-    private <ViewType extends Cacheable> void getOrCreateView(AggregatedProfileNamingStrategy profileName, String traceName, Future<Pair<AggregatedSamplesPerTraceCtx, ViewType>> f, StacktraceTreeViewType viewType) {
+    private <ViewType extends CacheableView> void getOrCreateView(AggregatedProfileNamingStrategy profileName, String traceName, Future<Pair<AggregatedSamplesPerTraceCtx, ViewType>> f, StacktraceTreeViewType viewType) {
         Pair<Future<AggregatedProfileInfo>, ViewType> profileViewPair = cache.getView(profileName, getViewName(traceName, viewType));
         Future<AggregatedProfileInfo> cachedProfileInfo = profileViewPair.first;
         ViewType ctView = profileViewPair.second;

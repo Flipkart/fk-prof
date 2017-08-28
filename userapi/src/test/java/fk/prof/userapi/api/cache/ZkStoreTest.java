@@ -105,19 +105,6 @@ public class ZkStoreTest {
         Assert.assertNull(zkStore.readProfileResidencyInfo(profileName1));
     }
 
-    @Test
-    public void testTransact() throws Exception {
-        Assert.assertNull(curator.checkExists().forPath("/hello"));
-        Collection<CuratorTransactionResult> res = null;
-        try {
-              res = curator.inTransaction().check().forPath("/nodesInfo").and().check().forPath("/nodesInfo2").and().commit();
-        }
-        catch (Exception e) {
-            System.out.println(e.getMessage());
-        }
-        System.out.println(res);
-    }
-
     @Test(timeout = 10000)
     public void testConnectionStateTransition() throws Exception {
         AggregatedProfileNamingStrategy profileName1 = pn("proc1", dt(0)),
@@ -143,7 +130,7 @@ public class ZkStoreTest {
             Assert.assertEquals(ZkStoreUnavailableException.class, caughtEx.getClass());
 
             // wait for some time, to let the session expire
-            // weird that i have to wait for 15 sec here even though session timeout is 4sec.
+            // weird that i have to wait for > 4sec here even though session timeout is 4sec.
             Thread.sleep(7000);
         }
         finally {
@@ -153,6 +140,7 @@ public class ZkStoreTest {
         // after connection lost we still expect the data to be there as part of reinitialization
         int retry = 2 * curator.getZookeeperClient().getZooKeeper().getSessionTimeout() / 1000;
         while(retry > 0 && zkStore.getState() == ZkLoadInfoStore.ConnectionState.Disconnected) {
+            Thread.sleep(1000);
             retry--;
         }
 

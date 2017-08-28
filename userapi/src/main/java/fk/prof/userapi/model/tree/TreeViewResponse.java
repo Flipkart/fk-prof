@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ * Response class as the response for getTreeView http api.
+ * @see fk.prof.userapi.model.json.CustomSerializers.TreeViewResponseSerializer A custom serializer for this class.
+ *
  * Created by gaurav.ashok on 07/08/17.
  */
 public class TreeViewResponse<T> {

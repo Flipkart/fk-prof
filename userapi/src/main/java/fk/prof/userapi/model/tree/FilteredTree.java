@@ -6,6 +6,16 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
+ * FilteredTree applies a visibility mask on the tree.
+ * For example:
+ * After applying the visibility mask of [3] on the tree below,
+ * 0
+ * |__1
+ * |  |__2
+ * |__3
+ *
+ * getChildrenSize(0) will return 1, and getChildren(0) will return [3].
+ *
  * Created by gaurav.ashok on 05/06/17.
  */
 public class FilteredTree<T> implements Tree<T> {

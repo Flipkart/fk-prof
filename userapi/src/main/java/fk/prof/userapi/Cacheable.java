@@ -1,6 +1,7 @@
 package fk.prof.userapi;
 
 /**
+ * Base interface for the objects that can be cached.
  * Created by gaurav.ashok on 21/06/17.
  */
 public interface Cacheable {
