@@ -2,6 +2,7 @@ package fk.prof.userapi;
 
 import com.google.common.base.Preconditions;
 import com.google.common.io.Files;
+import fk.prof.metrics.Util;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.LoggerFactory;
 
@@ -43,6 +44,7 @@ public class UserapiConfigManager {
         Properties properties = System.getProperties();
         properties.putIfAbsent(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, UserapiConfigManager.LOGFACTORY_SYSTEM_PROPERTY_DEFAULT_VALUE);
         properties.putIfAbsent("vertx.metrics.options.enabled", true);
+        properties.putIfAbsent(Util.METRIC_REGISTRY_PROPERTY, METRIC_REGISTRY);
     }
 
     public static <T> void validateConfig(T config) {

@@ -6,9 +6,9 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Parser;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
+import fk.prof.metrics.Util;
 import fk.prof.userapi.proto.LoadInfoEntities.NodeLoadInfo;
 import fk.prof.userapi.proto.LoadInfoEntities.ProfileResidencyInfo;
-import fk.prof.userapi.util.MetricsUtil;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import org.apache.curator.framework.CuratorFramework;
@@ -58,8 +58,8 @@ class ZkLoadInfoStore {
     private final byte[] myResidencyInfo;
     private Supplier<List<AggregatedProfileNamingStrategy>> cachedProfiles;
 
-    private Counter lockAcquireTimeoutCounter = MetricsUtil.counter("zk.lock.timeouts");
-    private Counter onReconnectFailures = MetricsUtil.counter("zk.onreconnect.failures");
+    private Counter lockAcquireTimeoutCounter = Util.counter("zk.lock.timeouts");
+    private Counter onReconnectFailures = Util.counter("zk.onreconnect.failures");
 
     ZkLoadInfoStore(CuratorFramework zookeeper, String myIp, int port, Supplier<List<AggregatedProfileNamingStrategy>> cachedProfiles) {
         this.zookeeper = zookeeper;

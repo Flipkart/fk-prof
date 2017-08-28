@@ -1,6 +1,12 @@
 package fk.prof.metrics;
 
+import com.codahale.metrics.*;
+
 public class Util {
+
+  public static final String METRIC_REGISTRY_PROPERTY = "app_metric_registry";
+  private static String metricRegistryName = null;
+
   public static String encodeTags(String... tags) {
     StringBuilder result = new StringBuilder();
     boolean first = true;
@@ -35,5 +41,40 @@ public class Util {
       }
     }
     return result.toString();
+  }
+
+  public static Meter meter(String name, String... names) {
+    return getMetricRegistry().meter(MetricRegistry.name(name, names));
+  }
+
+  public static Timer timer(String name, String... names) {
+    return getMetricRegistry().timer(MetricRegistry.name(name, names));
+  }
+
+  public static Histogram histogram(String name, String... names) {
+    return getMetricRegistry().histogram(MetricRegistry.name(name, names));
+  }
+
+  public static Counter counter(String name, String... names) {
+    return getMetricRegistry().counter(MetricRegistry.name(name, names));
+  }
+
+  public static void gauge(String name, Gauge gauge) {
+    MetricRegistry registry = getMetricRegistry();
+    if(!registry.getGauges().containsKey(name)) {
+      registry.register(name, gauge);
+    }
+  }
+
+  public static MetricRegistry getMetricRegistry() {
+    // get registry name from system properties
+    if(metricRegistryName == null || metricRegistryName.isEmpty()) {
+      metricRegistryName = System.getProperty(METRIC_REGISTRY_PROPERTY);
+      if(metricRegistryName == null || metricRegistryName.isEmpty()) {
+        metricRegistryName = "metric-registry";
+      }
+    }
+
+    return SharedMetricRegistries.getOrCreate(metricRegistryName);
   }
 }
