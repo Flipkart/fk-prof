@@ -74,7 +74,7 @@ public class HttpVerticle extends AbstractVerticle {
         router.get(UserapiApiPathConstants.CLUSTERS_FOR_APP).handler(this::getClusterIds);
         router.get(UserapiApiPathConstants.PROCS_FOR_APP_CLUSTER).handler(this::getProcName);
         router.get(UserapiApiPathConstants.PROFILES_FOR_APP_CLUSTER_PROC).handler(this::getProfiles);
-        router.get(UserapiApiPathConstants.PROFILE_FOR_APP_CLUSTER_PROC_WORK_TRACE).handler(this::getCpuSamplingTraces);
+        router.get(UserapiApiPathConstants.CPU_SAMPLING_PROFILE_FOR_APP_CLUSTER_PROC_TRACE).handler(this::getCpuSamplingTraces);
         router.get(UserapiApiPathConstants.HEALTH_CHECK).handler(this::handleGetHealth);
 
         UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, UserapiApiPathConstants.POLICY_APPS, this::proxyListAPIToBackend);
