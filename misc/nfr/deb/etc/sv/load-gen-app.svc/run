@@ -12,6 +12,7 @@ source /etc/default/fk-prof-rec
 source /etc/load-gen-app/config
 
 JMX_OPTS=" -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.port=11011"
-GC_OPTS=" -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:/var/log/load-gen-app/gc.out"
+#GC_OPTS=" -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:/var/log/load-gen-app/gc.out"
+GC_OPTS=" -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+DisableExplicitGC -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps -XX:+PrintTenuringDistribution"
 
 exec setuidgid fk-prof-nfr $JAVA_HOME/bin/java -server $GC_OPTS $JMX_OPTS $FK_PROF_REC_OPTS -jar /usr/share/load-gen-app/load-gen-app.jar $load_gen_app_params 2>&1
