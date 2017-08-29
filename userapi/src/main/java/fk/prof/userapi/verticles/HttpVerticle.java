@@ -9,7 +9,6 @@ import fk.prof.userapi.Configuration;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.exception.UserapiHttpFailure;
 import fk.prof.userapi.http.ProfHttpClient;
-import fk.prof.userapi.http.UserapiApiPathConstants;
 import fk.prof.userapi.http.UserapiHttpHelper;
 import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.AggregationWindowSummary;
@@ -41,6 +40,8 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import static fk.prof.userapi.http.UserapiApiPathConstants.*;
+
 /**
  * Routes requests to their respective handlers
  * Created by rohit.patiyal on 18/01/17.
@@ -70,21 +71,21 @@ public class HttpVerticle extends AbstractVerticle {
         router.route().handler(TimeoutHandler.create(httpConfig.getRequestTimeout()));
         router.route().handler(LoggerHandler.create());
 
-        router.get(UserapiApiPathConstants.APPS).handler(this::getAppIds);
-        router.get(UserapiApiPathConstants.CLUSTERS_FOR_APP).handler(this::getClusterIds);
-        router.get(UserapiApiPathConstants.PROCS_FOR_APP_CLUSTER).handler(this::getProcName);
-        router.get(UserapiApiPathConstants.PROFILES_FOR_APP_CLUSTER_PROC).handler(this::getProfiles);
-        router.get(UserapiApiPathConstants.CPU_SAMPLING_PROFILE_FOR_APP_CLUSTER_PROC_TRACE).handler(this::getCpuSamplingTraces);
-        router.get(UserapiApiPathConstants.HEALTH_CHECK).handler(this::handleGetHealth);
+        router.get(PROFILES_APPS).handler(this::getAppIds);
+        router.get(PROFILES_CLUSTERS_FOR_APP).handler(this::getClusterIds);
+        router.get(PROFILES_PROCS_FOR_APP_CLUSTER).handler(this::getProcName);
+        router.get(PROFILES_FOR_APP_CLUSTER_PROC).handler(this::getProfiles);
+        router.get(CPU_SAMPLING_PROFILE_FOR_APP_CLUSTER_PROC_TRACE).handler(this::getCpuSamplingTraces);
+        router.get(HEALTH_CHECK).handler(this::handleGetHealth);
 
-        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, UserapiApiPathConstants.POLICY_APPS, this::proxyListAPIToBackend);
-        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, UserapiApiPathConstants.POLICY_CLUSTERS_FOR_APP, this::proxyListAPIToBackend);
-        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, UserapiApiPathConstants.POLICY_PROCS_FOR_APP_CLUSTER, this::proxyListAPIToBackend);
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, POLICIES_APPS, this::proxyListAPIToBackend);
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, POLICIES_CLUSTERS_FOR_APP, this::proxyListAPIToBackend);
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, POLICIES_PROCS_FOR_APP_CLUSTER, this::proxyListAPIToBackend);
 
-        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, UserapiApiPathConstants.GET_POLICY_FOR_APP_CLUSTER_PROC, this::proxyGetPolicyToBackend);
-        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.PUT, UserapiApiPathConstants.PUT_POLICY_FOR_APP_CLUSTER_PROC,
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, GET_POLICY_FOR_APP_CLUSTER_PROC, this::proxyGetPolicyToBackend);
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.PUT, PUT_POLICY_FOR_APP_CLUSTER_PROC,
                 BodyHandler.create().setBodyLimit(1024 * 10), this::proxyPutPostPolicyToBackend);
-        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.POST, UserapiApiPathConstants.POST_POLICY_FOR_APP_CLUSTER_PROC,
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.POST, POST_POLICY_FOR_APP_CLUSTER_PROC,
                 BodyHandler.create().setBodyLimit(1024 * 10), this::proxyPutPostPolicyToBackend);
 
         return router;
@@ -248,7 +249,7 @@ public class HttpVerticle extends AbstractVerticle {
             PolicyDTO.VersionedPolicyDetails.Builder payloadVersionedPolicyDetails = PolicyDTO.VersionedPolicyDetails.newBuilder();
             JsonFormat.parser().merge(payloadVersionedPolicyDetailsJsonString, payloadVersionedPolicyDetails);
             PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = payloadVersionedPolicyDetails.build();
-            LOGGER.info("Making request for policy change: {} to backend", PolicyDTOProtoUtil.versionedPolicyDetailsCompactRepr(versionedPolicyDetails));
+            LOGGER.debug("Making request for policy change: {} to backend", PolicyDTOProtoUtil.versionedPolicyDetailsCompactRepr(versionedPolicyDetails));
             makeRequestToBackend(routingContext.request().method(), routingContext.normalisedPath(), ProtoUtil.buildBufferFromProto(versionedPolicyDetails), false)
                     .setHandler(ar -> proxyBufferedPolicyResponseFromBackend(routingContext, ar));
         } catch (Exception ex) {
@@ -268,7 +269,7 @@ public class HttpVerticle extends AbstractVerticle {
     }
 
     private void proxyListAPIToBackend(RoutingContext routingContext) {
-        final String path = routingContext.normalisedPath().substring(UserapiApiPathConstants.POLICIES_PREFIX.length()) + ((routingContext.request().query() != null)? "?" + routingContext.request().query(): "");
+        final String path = routingContext.normalisedPath().substring((META_PREFIX + POLICIES_PREFIX).length()) + ((routingContext.request().query() != null)? "?" + routingContext.request().query(): "");
         try {
             makeRequestToBackend(routingContext.request().method(), path, routingContext.getBody(), false)
                     .setHandler(ar -> proxyResponseFromBackend(routingContext, ar));
@@ -292,8 +293,8 @@ public class HttpVerticle extends AbstractVerticle {
             if (ar.result().getStatusCode() == 200 || ar.result().getStatusCode() == 201) {
                 try {
                     PolicyDTO.VersionedPolicyDetails responseVersionedPolicyDetails = ProtoUtil.buildProtoFromBuffer(PolicyDTO.VersionedPolicyDetails.parser(), ar.result().getResponse());
-                    String jsonS = JsonFormat.printer().print(responseVersionedPolicyDetails);
-                    context.response().end(jsonS);
+                    String jsonStr = JsonFormat.printer().print(responseVersionedPolicyDetails);
+                    context.response().end(jsonStr);
                 } catch (InvalidProtocolBufferException e) {
                     UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(e);
                     UserapiHttpHelper.handleFailure(context, httpFailure);

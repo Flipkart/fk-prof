@@ -5,6 +5,7 @@ import {
   Router,
   IndexRedirect,
   browserHistory,
+  Redirect,
 } from 'react-router';
 import { Provider } from 'react-redux';
 
@@ -19,17 +20,17 @@ import Root from 'components/RootComponent';
 import App from 'components/AppComponent';
 import CPUSampling from 'components/CPUSamplingComponent';
 import AggregatedProfileDataContainer from 'components/AggregatedProfileDataContainer';
-import Policy from "components/PolicyComponent";
 
 import './assets/styles/global.css';
 
 const routes = (
   <Route path="/" component={Root}>
-    <IndexRedirect to="/profiler" />
-    <Route path="/profiler" component={App}>
-      <Route path="/profiler/profile-data/:traceName" component={AggregatedProfileDataContainer} />
-      <Route path="/profiler/policy" component={Policy}/>
+    <IndexRedirect to="/profiles" />
+    <Redirect from="profiler" to="/profiles"/>
+    <Route path="/profiles" component={App}>
+      <Route path="/profile/profile-data/:traceName" component={AggregatedProfileDataContainer} />
     </Route>
+    <Route path="/policies" component={App}/>
     <Route path="/work-type/cpu_sample_work/:traceName" component={CPUSampling} />
   </Route>
 );

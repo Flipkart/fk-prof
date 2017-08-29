@@ -32,7 +32,7 @@ export default class PolicyComponent extends React.Component {
     if (prevProps.proc !== this.props.proc) {
       this.getPolicy();
     }
-    componentHandler.upgradeDom(); // eslint-disable-line
+    componentHandler.upgradeDom(); // eslint-disable-line  //To apply mdl JS behaviours on components loaded later https://github.com/google/material-design-lite/issues/5081
     if (prevState.query.state === 'PENDING' && this.state.query.state !== 'PENDING' && prevState.query.type === this.state.query.type) {
       let data = {};
       if (this.state.query.state === 'FAILURE' && this.state.query.type === 'GET') {
@@ -63,7 +63,7 @@ export default class PolicyComponent extends React.Component {
         state: "PENDING"
       }
     });
-    const url = '../api/policy/' + this.props.app + '/' + this.props.cluster + '/' + this.props.proc;
+    const url = '/api/policy/' + this.props.app + '/' + this.props.cluster + '/' + this.props.proc;
     http.get(url).then(json => {
       this.setState({
         msg: "Update policy",
@@ -126,7 +126,7 @@ export default class PolicyComponent extends React.Component {
         state: "PENDING"
       }
     });
-    const url = '../api/policy/' + this.props.app + '/' + this.props.cluster + '/' + this.props.proc;
+    const url = '/api/policy/' + this.props.app + '/' + this.props.cluster + '/' + this.props.proc;
     http.put(url, this.state.json).then(json => {
       this.setState({
         query: {
@@ -156,7 +156,7 @@ export default class PolicyComponent extends React.Component {
         state: "PENDING"
       }
     });
-    const url = '../api/policy/' + this.props.app + '/' + this.props.cluster + '/' + this.props.proc;
+    const url = '/api/policy/' + this.props.app + '/' + this.props.cluster + '/' + this.props.proc;
     http.post(url, this.state.json).then(json => {
       this.setState({
         query: {
@@ -262,7 +262,6 @@ export default class PolicyComponent extends React.Component {
   }
 
   handleSubmitClick(e) {
-    'use strict';
     if ((this.state.query.type === 'POST' || this.state.query.type === 'PUT') && this.state.query.state === 'PENDING') {
       this.setState({
         msg: "Please wait, your previous policy change is still pending"

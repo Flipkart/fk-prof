@@ -2,61 +2,61 @@ import React from 'react';
 import { connect } from 'react-redux';
 import Select, {Creatable} from 'react-select';
 
-import fetchAppsAction from 'actions/AppActions';
+import fetchProfilesAppsAction from 'actions/ProfilesAppActions';
 import debounce from 'utils/debounce';
 import styles from './AppSelectComponent.css';
-import fetchPolicyAppsAction from 'actions/PolicyAppActions';
+import fetchPolicyAppsAction from 'actions/PoliciesAppActions';
 
 const noop = () => {};
 
 class AppSelectComponent extends React.Component {
   componentDidMount() {
-    this.props.isPolicyPage ? this.props.getPolicyApps() : this.props.getApps();
+    this.props.isPoliciesPage ? this.props.getPoliciesApps() : this.props.getProfilesApps();
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.isPolicyPage !== this.props.isPolicyPage) {
-      nextProps.isPolicyPage ? this.props.getPolicyApps() : this.props.getApps();
+    if (nextProps.isPoliciesPage !== this.props.isPoliciesPage) {
+      nextProps.isPoliciesPage ? this.props.getPoliciesApps() : this.props.getProfilesApps();
     }
   }
 
   render() {
-    const finalApps = this.props.isPolicyPage ? this.props.policyApps : this.props.apps;
-    const options = finalApps.asyncStatus === 'SUCCESS'
-      ? finalApps.data.map(a => ({name: a})) : [];
+    const appsResponse = this.props.isPoliciesPage ? this.props.policiesApps : this.props.profilesApps;
+    const apps = appsResponse.asyncStatus === 'SUCCESS'
+      ? appsResponse.data.map(a => ({name: a})) : [];
 
-    const noResultsText = finalApps.asyncStatus === 'SUCCESS'
-    && finalApps.data.length === 0 ? 'No results found!' : 'Searching...';
+    const noResultsText = appsResponse.asyncStatus === 'SUCCESS'
+    && appsResponse.data.length === 0 ? 'No results found!' : 'Searching...';
     const valueOption = this.props.value && {name: this.props.value};
     return (
       <div>
         <label className={styles.label} htmlFor="appid">App</label>
-        {this.props.isPolicyPage &&
+        {this.props.isPoliciesPage &&
         <Creatable
           clearable={false}
           id="appid"
-          options={options}
+          options={apps}
           value={valueOption}
           onChange={this.props.onChange || noop}
           labelKey="name"
           valueKey="name"
-          onInputChange={debounce(this.props.getPolicyApps, 500)}
-          isLoading={finalApps.asyncStatus === 'PENDING'}
+          onInputChange={debounce(this.props.getPoliciesApps, 500)}
+          isLoading={appsResponse.asyncStatus === 'PENDING'}
           noResultsText={noResultsText}
           placeholder="Type to search..."
           promptTextCreator={(label) => "Add app: " + label}
         />}
-        {!this.props.isPolicyPage &&
+        {!this.props.isPoliciesPage &&
         <Select
           clearable={false}
           id="appid"
-          options={options}
+          options={apps}
           value={valueOption}
           onChange={this.props.onChange || noop}
           labelKey="name"
           valueKey="name"
-          onInputChange={debounce(this.props.getApps, 500)}
-          isLoading={finalApps.asyncStatus === 'PENDING'}
+          onInputChange={debounce(this.props.getProfilesApps, 500)}
+          isLoading={appsResponse.asyncStatus === 'PENDING'}
           noResultsText={noResultsText}
           placeholder="Type to search..."
         />}
@@ -65,10 +65,10 @@ class AppSelectComponent extends React.Component {
   }
 }
 
-const mapStateToProps = state => ({ apps: state.apps, policyApps: state.policyApps });
+const mapStateToProps = state => ({ profilesApps: state.profilesApps, policiesApps: state.policiesApps });
 const mapDispatchToProps = dispatch => ({
-  getApps: prefix => dispatch(fetchAppsAction(prefix)),
-  getPolicyApps: prefix => dispatch(fetchPolicyAppsAction(prefix))
+  getProfilesApps: prefix => dispatch(fetchProfilesAppsAction(prefix)),
+  getPoliciesApps: prefix => dispatch(fetchPolicyAppsAction(prefix))
 });
 
 export default connect(mapStateToProps, mapDispatchToProps)(AppSelectComponent);

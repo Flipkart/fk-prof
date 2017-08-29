@@ -10,7 +10,7 @@ export default class Header extends React.Component {
   render() {
     let profileActive = "";
     let policyActive = "";
-    if (this.props.isPolicyPage) {
+    if (this.props.isPoliciesPage) {
       policyActive = " is-active";
     } else {
       profileActive = " is-active";
@@ -20,9 +20,9 @@ export default class Header extends React.Component {
     Object.keys(queryObject).filter(k => !reqKeys.includes(k)).forEach(k => delete queryObject[k]);
     return (
       <div className="mdl-layout__header mdl-layout__header--transparent">
-        <div className="mdl-layout__tab-bar mdl-js-ripple-effect">
-          <div className="mdl-layout--large-screen-only" style={{ height: '50%'}}>
-            <Link to={loc => ({pathname: '/profiler/', query: ''})}
+        <div className="mdl-layout__tab-bar mdl-js-ripple-effect" style={{height: '48px', width: '100%'}}>
+          <div className="mdl-layout--large-screen-only" style={{height: '90%'}}>
+            <Link to={loc => ({pathname: '/profiles', query: ''})}
                   style={{textDecoration: "none"}}>
               <img src={fk_logo} className="mdl-shadow--4dp "
                    style={{marginTop: '5px', height: '80%', borderRadius: '2px'}}/>
@@ -30,12 +30,12 @@ export default class Header extends React.Component {
             </Link>
           </div>
           <Link className={"mdl-layout__tab" + profileActive}
-                to={loc => ({pathname: '/profiler/', query: queryObject})}
+                to={loc => ({pathname: '/profiles', query: queryObject})}
                 style={{textDecoration: "none", textTransform: 'capitalize'}}>
             Profiles
           </Link>
           <Link className={"mdl-layout__tab" + policyActive}
-                to={loc => ({pathname: '/profiler/policy', query: queryObject})}
+                to={loc => ({pathname: '/policies', query: queryObject})}
                 style={{textDecoration: "none", textTransform: 'capitalize'}}>
             Policies
           </Link>

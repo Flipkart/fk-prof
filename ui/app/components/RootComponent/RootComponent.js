@@ -4,7 +4,7 @@ import Header from 'components/HeaderComponent';
 
 const BaseComponent = Komponent => class extends Component {
   componentDidUpdate () {
-      componentHandler.upgradeDom(); // eslint-disable-line
+    componentHandler.upgradeDom(); // eslint-disable-line
   }
 
   render () {
@@ -14,7 +14,7 @@ const BaseComponent = Komponent => class extends Component {
 
 const RootComponent = props => (
   <div className="mdl-layout mdl-js-layout mdl-layout--fixed-header">
-    <Header queryParams={props.location.query} isPolicyPage={props.location.pathname.includes('policy')}/>
+    <Header queryParams={props.location.query} isPoliciesPage={props.location.pathname.startsWith('/policies')}/>
     <main className="mdl-layout__content" style={{ marginTop:'-20px' }}>
       <div className="page-content">
         { props.children }

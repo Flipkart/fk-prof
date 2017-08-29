@@ -1,21 +1,21 @@
 import { combineReducers } from 'redux';
 
-import apps from 'reducers/AppReducer';
-import clusters from 'reducers/ClusterReducer';
-import procs from 'reducers/ProcReducer';
+import profilesApps from 'reducers/ProfilesAppReducer';
+import profilesClusters from 'reducers/ProfilesClusterReducer';
+import profilesProcs from 'reducers/ProfilesProcReducer';
 import profiles from 'reducers/ProfilesReducer';
 import aggregatedProfileData from 'reducers/AggregatedProfileDataReducer';
-import policyApps from 'reducers/PolicyAppReducer';
-import policyClusters from 'reducers/PolicyClusterReducer';
-import policyProcs from 'reducers/PolicyProcReducer';
+import policiesApps from 'reducers/PoliciesAppReducer';
+import policiesClusters from 'reducers/PoliciesClusterReducer';
+import policiesProcs from 'reducers/PoliciesProcReducer';
 
 export default combineReducers({
-  apps,
-  clusters,
-  procs,
+  profilesApps,
+  profilesClusters,
+  profilesProcs,
   profiles,
   aggregatedProfileData,
-  policyApps,
-  policyClusters,
-  policyProcs,
+  policiesApps,
+  policiesClusters,
+  policiesProcs,
 });

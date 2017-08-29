@@ -35,6 +35,8 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
+import static fk.prof.userapi.http.UserapiApiPathConstants.META_PREFIX;
+import static fk.prof.userapi.http.UserapiApiPathConstants.PROFILES_PREFIX;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -116,7 +118,7 @@ public class RouterVerticleTest {
             return null;
         }).when(profileDiscoveryAPI).getAppIdsWithPrefix(any(), any(), ArgumentMatchers.matches(pPrefixSet));
 
-        client.getNow(port, "localhost", "/apps?prefix=a", httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/apps?prefix=a", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.SERVICE_UNAVAILABLE.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains("Service Unavailable"));
@@ -145,7 +147,7 @@ public class RouterVerticleTest {
         Future<Void> pIncorrectPrefix = Future.future();
         Future<Void> pNoPrefix = Future.future();
 
-        client.getNow(port, "localhost", "/apps?prefix=" + P_APP_ID.substring(0, 1 + new Random().nextInt(P_APP_ID.length() - 1)), httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/apps?prefix=" + P_APP_ID.substring(0, 1 + new Random().nextInt(P_APP_ID.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_APP_ID));
@@ -153,7 +155,7 @@ public class RouterVerticleTest {
                 pCorrectPrefix.complete();
             });
         });
-        client.getNow(port, "localhost", "/apps?prefix=", httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/apps?prefix=", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_APP_ID));
@@ -161,7 +163,7 @@ public class RouterVerticleTest {
                 pIncorrectPrefix.complete();
             });
         });
-        client.getNow(port, "localhost", "/apps?prefix=" + NP_APP_ID.substring(0, 1 + new Random().nextInt(NP_APP_ID.length() - 1)), httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/apps?prefix=" + NP_APP_ID.substring(0, 1 + new Random().nextInt(NP_APP_ID.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_APP_ID));
@@ -213,7 +215,7 @@ public class RouterVerticleTest {
         Future<Void> npAndNpPrefix = Future.future();
         Future<Void> npAndNoPrefix = Future.future();
 
-        client.getNow(port, "localhost", "/clusters/" + P_APP_ID + "?prefix=" + P_CLUSTER_ID.substring(0, 1 + new Random().nextInt(P_CLUSTER_ID.length() - 1)), httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/clusters/" + P_APP_ID + "?prefix=" + P_CLUSTER_ID.substring(0, 1 + new Random().nextInt(P_CLUSTER_ID.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_CLUSTER_ID));
@@ -221,7 +223,7 @@ public class RouterVerticleTest {
                 pAndCorrectPrefix.complete();
             });
         });
-        client.getNow(port, "localhost", "/clusters/" + P_APP_ID + "?prefix=", httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/clusters/" + P_APP_ID + "?prefix=", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_CLUSTER_ID));
@@ -229,7 +231,7 @@ public class RouterVerticleTest {
                 pAndNoPrefix.complete();
             });
         });
-        client.getNow(port, "localhost", "/clusters/" + P_APP_ID + "?prefix=" + NP_CLUSTER_ID.substring(0, 1 + new Random().nextInt(NP_CLUSTER_ID.length() - 1)), httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/clusters/" + P_APP_ID + "?prefix=" + NP_CLUSTER_ID.substring(0, 1 + new Random().nextInt(NP_CLUSTER_ID.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_CLUSTER_ID));
@@ -238,7 +240,7 @@ public class RouterVerticleTest {
             });
         });
 
-        client.getNow(port, "localhost", "/clusters/" + NP_APP_ID + "?prefix=" + P_CLUSTER_ID.substring(0, 1 + new Random().nextInt(P_CLUSTER_ID.length() - 1)), httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/clusters/" + NP_APP_ID + "?prefix=" + P_CLUSTER_ID.substring(0, 1 + new Random().nextInt(P_CLUSTER_ID.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_CLUSTER_ID));
@@ -246,7 +248,7 @@ public class RouterVerticleTest {
                 npAndPPrefix.complete();
             });
         });
-        client.getNow(port, "localhost", "/clusters/" + NP_APP_ID + "?prefix=" + NP_CLUSTER_ID.substring(0, 1 + new Random().nextInt(NP_CLUSTER_ID.length() - 1)), httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/clusters/" + NP_APP_ID + "?prefix=" + NP_CLUSTER_ID.substring(0, 1 + new Random().nextInt(NP_CLUSTER_ID.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_CLUSTER_ID));
@@ -254,7 +256,7 @@ public class RouterVerticleTest {
                 npAndNpPrefix.complete();
             });
         });
-        client.getNow(port, "localhost", "/clusters/" + NP_APP_ID + "?prefix=", httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/clusters/" + NP_APP_ID + "?prefix=", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_CLUSTER_ID));
@@ -297,7 +299,7 @@ public class RouterVerticleTest {
         Future<Void> npAndNpPrefix = Future.future();
         Future<Void> npAndNoPrefix = Future.future();
 
-        client.getNow(port, "localhost", "/procs/" + P_APP_ID + URL_SEPARATOR + P_CLUSTER_ID + "?prefix=" + P_PROC.substring(0, 1 + new Random().nextInt(P_PROC.length() - 1)), httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/procs/" + P_APP_ID + URL_SEPARATOR + P_CLUSTER_ID + "?prefix=" + P_PROC.substring(0, 1 + new Random().nextInt(P_PROC.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_PROC));
@@ -306,7 +308,7 @@ public class RouterVerticleTest {
             });
 
         });
-        client.getNow(port, "localhost", "/procs/" + P_APP_ID + URL_SEPARATOR + P_CLUSTER_ID + "?prefix=" + NP_PROC.substring(0, 1 + new Random().nextInt(NP_PROC.length() - 1)), httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/procs/" + P_APP_ID + URL_SEPARATOR + P_CLUSTER_ID + "?prefix=" + NP_PROC.substring(0, 1 + new Random().nextInt(NP_PROC.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_PROC));
@@ -315,7 +317,7 @@ public class RouterVerticleTest {
             });
 
         });
-        client.getNow(port, "localhost", "/procs/" + P_APP_ID + URL_SEPARATOR + P_CLUSTER_ID + "?prefix=", httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/procs/" + P_APP_ID + URL_SEPARATOR + P_CLUSTER_ID + "?prefix=", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_PROC));
@@ -324,7 +326,7 @@ public class RouterVerticleTest {
             });
 
         });
-        client.getNow(port, "localhost", "/procs/" + NP_APP_ID + URL_SEPARATOR + NP_CLUSTER_ID + "?prefix=" + P_PROC.substring(0, 1 + new Random().nextInt(P_PROC.length() - 1)), httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/procs/" + NP_APP_ID + URL_SEPARATOR + NP_CLUSTER_ID + "?prefix=" + P_PROC.substring(0, 1 + new Random().nextInt(P_PROC.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_PROC));
@@ -333,7 +335,7 @@ public class RouterVerticleTest {
             });
 
         });
-        client.getNow(port, "localhost", "/procs/" + NP_APP_ID + URL_SEPARATOR + NP_CLUSTER_ID + "?prefix=" + NP_PROC.substring(0, 1 + new Random().nextInt(NP_PROC.length() - 1)), httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/procs/" + NP_APP_ID + URL_SEPARATOR + NP_CLUSTER_ID + "?prefix=" + NP_PROC.substring(0, 1 + new Random().nextInt(NP_PROC.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_PROC));
@@ -342,7 +344,7 @@ public class RouterVerticleTest {
             });
 
         });
-        client.getNow(port, "localhost", "/procs/" + NP_APP_ID + URL_SEPARATOR + NP_CLUSTER_ID + "?prefix=", httpClientResponse -> {
+        client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/procs/" + NP_APP_ID + URL_SEPARATOR + NP_CLUSTER_ID + "?prefix=", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_PROC));

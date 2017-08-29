@@ -2,12 +2,12 @@ import React, { Component, PropTypes } from 'react';
 import { connect } from 'react-redux';
 import Select, {Creatable} from 'react-select';
 
-import fetchClustersAction from 'actions/ClusterActions';
+import fetchProfilesClusterAction from 'actions/ProfilesClusterActions';
 import safeTraverse from 'utils/safeTraverse';
 
 import styles from './ClusterSelectComponent.css';
 
-import fetchPolicyClustersAction from 'actions/PolicyClusterActions';
+import fetchPoliciesClusterAction from 'actions/PoliciesClusterActions';
 import debounce from 'utils/debounce';
 
 const noop = () => {};
@@ -16,52 +16,52 @@ class ClusterSelectComponent extends Component {
   componentDidMount () {
     const { app } = this.props;
     if (app) {
-      this.props.isPolicyPage ? this.props.getPolicyClusters(app)() : this.props.getClusters(app)();
+      this.props.isPoliciesPage ? this.props.getPolicyClusters(app)() : this.props.getProfilesClusters(app)();
     }
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.app !== this.props.app || nextProps.isPolicyPage !== this.props.isPolicyPage) {
-      nextProps.isPolicyPage ? this.props.getPolicyClusters(nextProps.app)() : this.props.getClusters(nextProps.app)();
+    if (nextProps.app !== this.props.app || nextProps.isPoliciesPage !== this.props.isPoliciesPage) {
+      nextProps.isPoliciesPage ? this.props.getPolicyClusters(nextProps.app)() : this.props.getProfilesClusters(nextProps.app)();
     }
   }
 
   render() {
-    const {onChange, clusters, policyClusters} = this.props;
-    const finalClusters = this.props.isPolicyPage ? policyClusters : clusters;
-    const clusterList = finalClusters.asyncStatus === 'SUCCESS'
-      ? finalClusters.data.map(c => ({name: c})) : [];
+    const {onChange, profilesClusters, policiesClusters} = this.props;
+    const clustersResponse = this.props.isPoliciesPage ? policiesClusters : profilesClusters;
+    const clusters = clustersResponse.asyncStatus === 'SUCCESS'
+      ? clustersResponse.data.map(c => ({name: c})) : [];
     const valueOption = this.props.value && {name: this.props.value};
     return (
       <div>
         <label className={styles.label} htmlFor="cluster">Cluster</label>
-        {this.props.isPolicyPage &&
+        {this.props.isPoliciesPage &&
         <Creatable
           id="cluster"
           clearable={false}
-          options={clusterList}
+          options={clusters}
           onChange={onChange || noop}
           labelKey="name"
           valueKey="name"
           onInputChange={debounce(this.props.getPolicyClusters(this.props.app), 500)}
-          isLoading={finalClusters.asyncStatus === 'PENDING'}
+          isLoading={clustersResponse.asyncStatus === 'PENDING'}
           value={valueOption}
-          noResultsText={finalClusters.asyncStatus !== 'PENDING' ? 'No results found!' : 'Searching...'}
+          noResultsText={clustersResponse.asyncStatus !== 'PENDING' ? 'No results found!' : 'Searching...'}
           placeholder="Type to search..."
           promptTextCreator={(label) => "Add cluster: " + label}
         />}
-        {!this.props.isPolicyPage &&
+        {!this.props.isPoliciesPage &&
         < Select
           id="cluster"
           clearable={false}
-          options={clusterList}
+          options={clusters}
           onChange={onChange || noop}
           labelKey="name"
           valueKey="name"
-          onInputChange={debounce(this.props.getClusters(this.props.app), 500)}
-          isLoading={finalClusters.asyncStatus === 'PENDING'}
+          onInputChange={debounce(this.props.getProfilesClusters(this.props.app), 500)}
+          isLoading={clustersResponse.asyncStatus === 'PENDING'}
           value={valueOption}
-          noResultsText={finalClusters.asyncStatus !== 'PENDING' ? 'No results found!' : 'Searching...'}
+          noResultsText={clustersResponse.asyncStatus !== 'PENDING' ? 'No results found!' : 'Searching...'}
           placeholder="Type to search..."
         />
         }
@@ -71,23 +71,23 @@ class ClusterSelectComponent extends Component {
 }
 
 const mapStateToProps = (state, ownProps) => ({
-  clusters: safeTraverse(state, ['clusters', ownProps.app]) || {},
-  policyClusters: safeTraverse(state, ['policyClusters', ownProps.app]) || {}
+  profilesClusters: safeTraverse(state, ['profilesClusters', ownProps.app]) || {},
+  policiesClusters: safeTraverse(state, ['policiesClusters', ownProps.app]) || {}
 });
 
 const mapDispatchToProps = dispatch => ({
-  getClusters: app => event => {dispatch(fetchClustersAction(app, event));},
-  getPolicyClusters: app => event => dispatch(fetchPolicyClustersAction(app, event)),
+  getProfilesClusters: app => event => {dispatch(fetchProfilesClusterAction(app, event));},
+  getPolicyClusters: app => event => dispatch(fetchPoliciesClusterAction(app, event)),
 });
 
 ClusterSelectComponent.propTypes = {
   app: PropTypes.string,
-  clusters: PropTypes.object.isRequired,
-  policyClusters: PropTypes.object.isRequired,
-  getClusters: PropTypes.func.isRequired,
+  profilesClusters: PropTypes.object.isRequired,
+  policiesClusters: PropTypes.object.isRequired,
+  getProfilesClusters: PropTypes.func.isRequired,
   getPolicyClusters: PropTypes.func.isRequired,
   onChange: PropTypes.func,
-  isPolicyPage: PropTypes.bool.isRequired,
+  isPoliciesPage: PropTypes.bool.isRequired,
 };
 
 export default connect(mapStateToProps, mapDispatchToProps)(ClusterSelectComponent);

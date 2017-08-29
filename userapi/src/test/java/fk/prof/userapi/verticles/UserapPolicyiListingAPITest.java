@@ -27,6 +27,7 @@ import org.mockito.internal.util.collections.Sets;
 
 import java.util.Random;
 
+import static fk.prof.userapi.http.UserapiApiPathConstants.*;
 /**
  * Tests for ProcessGroupListingAPIs in LeaderHttpVerticle which
  * are getAppIds, getClusterIds, getProcNames
@@ -80,11 +81,11 @@ public class UserapPolicyiListingAPITest {
     @Test
     public void testGetAppIdsRoute(TestContext context) throws Exception {
         final Async async = context.async();
-        String userapiGetAppIdsURI = UserapiApiPathConstants.POLICY_APPS + "?prefix=" + APP_ID.substring(0, 1 + new Random().nextInt(APP_ID.length() - 1));
+        String userapiGetAppIdsURI = UserapiApiPathConstants.POLICIES_APPS + "?prefix=" + APP_ID.substring(0, 1 + new Random().nextInt(APP_ID.length() - 1));
         Router router = Router.router(vertx);
         UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET,
-                UserapiApiPathConstants.POLICY_APPS.substring(UserapiApiPathConstants.POLICIES_PREFIX.length()), routingContext -> {
-                    context.assertEquals(userapiGetAppIdsURI.substring(UserapiApiPathConstants.POLICIES_PREFIX.length()), routingContext.normalisedPath()+"?"+routingContext.request().query());
+                UserapiApiPathConstants.POLICIES_APPS.substring((META_PREFIX + POLICIES_PREFIX).length()), routingContext -> {
+                    context.assertEquals(userapiGetAppIdsURI.substring((META_PREFIX + POLICIES_PREFIX).length()), routingContext.normalisedPath()+"?"+routingContext.request().query());
                     routingContext.response().end(Json.encode(Sets.newSet(APP_ID)));
                 });
         backendServer.requestHandler(router::accept);
@@ -107,11 +108,11 @@ public class UserapPolicyiListingAPITest {
     @Test
     public void testGetClusterIdsRoute(TestContext context) throws Exception {
         final Async async = context.async();
-        String userapiGetClusterIdsURI = UserapiApiPathConstants.POLICIES_PREFIX + "/clusters/" + APP_ID + "?prefix=" + CLUSTER_ID.substring(0, 1 + new Random().nextInt(CLUSTER_ID.length() - 1));
+        String userapiGetClusterIdsURI = (META_PREFIX + POLICIES_PREFIX) + "/clusters/" + APP_ID + "?prefix=" + CLUSTER_ID.substring(0, 1 + new Random().nextInt(CLUSTER_ID.length() - 1));
         Router router = Router.router(vertx);
         UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET,
-                UserapiApiPathConstants.POLICY_CLUSTERS_FOR_APP.substring(UserapiApiPathConstants.POLICIES_PREFIX.length()), routingContext -> {
-                    context.assertEquals(userapiGetClusterIdsURI.substring(UserapiApiPathConstants.POLICIES_PREFIX.length()), routingContext.normalisedPath()+"?"+routingContext.request().query());
+                UserapiApiPathConstants.POLICIES_CLUSTERS_FOR_APP.substring((META_PREFIX + POLICIES_PREFIX).length()), routingContext -> {
+                    context.assertEquals(userapiGetClusterIdsURI.substring((META_PREFIX + POLICIES_PREFIX).length()), routingContext.normalisedPath()+"?"+routingContext.request().query());
                     routingContext.response().end(Json.encode(Sets.newSet(CLUSTER_ID)));
                 });
         backendServer.requestHandler(router::accept);
@@ -135,10 +136,10 @@ public class UserapPolicyiListingAPITest {
     @Test
     public void testGetProcNamesRoute(TestContext context) throws Exception {
         final Async async = context.async();
-        String userapiGetProcNamesURI = UserapiApiPathConstants.POLICIES_PREFIX + "/procs/" + APP_ID + DELIMITER + CLUSTER_ID + "?prefix=" + PROC.substring(0, 1 + new Random().nextInt(PROC.length() - 1));
+        String userapiGetProcNamesURI = (META_PREFIX + POLICIES_PREFIX) + "/procs/" + APP_ID + DELIMITER + CLUSTER_ID + "?prefix=" + PROC.substring(0, 1 + new Random().nextInt(PROC.length() - 1));
         Router router = Router.router(vertx);
         UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET,
-                UserapiApiPathConstants.POLICY_PROCS_FOR_APP_CLUSTER.substring(UserapiApiPathConstants.POLICIES_PREFIX.length()), req -> req.response().end(Json.encode(Sets.newSet(PROC))));
+                UserapiApiPathConstants.POLICIES_PROCS_FOR_APP_CLUSTER.substring((META_PREFIX + POLICIES_PREFIX).length()), req -> req.response().end(Json.encode(Sets.newSet(PROC))));
         backendServer.requestHandler(router::accept);
         backendServer.listen(backendPort, result -> {
             if (result.succeeded()) {
