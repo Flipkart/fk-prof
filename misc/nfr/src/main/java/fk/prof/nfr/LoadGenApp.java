@@ -70,7 +70,7 @@ public class LoadGenApp {
 
         int[] iterationCounts = new int[loadTypes];
         for(int i = 0; i < loadTypes; ++i) {
-            iterationCounts[i] = (int)(2000 * (factor * loadShare[i] / (traceDuplicatesFactor) / (totalTimings[i] / 1000.0f)));
+            iterationCounts[i] = (int)(1000 * (factor * loadShare[i] / (traceDuplicatesFactor) / (totalTimings[i] / 1000.0f)));
         }
 
         System.out.println("iterations for each load: " + iterationCounts[0] + "\t" + iterationCounts[1] + "\t" + iterationCounts[2]);
@@ -88,6 +88,16 @@ public class LoadGenApp {
                     inception.doWorkOnSomeLevel();
                     long end = System.currentTimeMillis();
                     System.out.println("thread\t" + tid + "\t" + (end - start));
+
+                    long totalTimeShare = (long)(factor * 1000);
+                    if(end - start < totalTimeShare) {
+                        try {
+                            Thread.sleep(totalTimeShare - (end - start));
+                        } catch(InterruptedException e) {
+                            Thread.interrupted();
+                        }
+                    }
+
                     if (Thread.currentThread().isInterrupted()) {
                         return;
                     }
