@@ -6,6 +6,7 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import fk.prof.PerfCtx;
 
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +38,9 @@ public class LoadGenApp {
         int codeCvrgForPerfCtx = Integer.parseInt(args[6]);
         int maxFanOut = Integer.parseInt(args[7]);
         int stackLevelDepth = Integer.parseInt(args[8]);
+        int threadSpawnerCount = Integer.parseInt(args[9]);
+
+        boolean isDebug = args.length > 10 ? "1".equals(args[10]) : false;
 
         // generate trace names and corresponding perf ctx
         PerfCtx[][] perfctxs = new PerfCtx[loadTypes][traceDuplicatesFactor];
@@ -87,7 +91,10 @@ public class LoadGenApp {
                     long start = System.currentTimeMillis();
                     inception.doWorkOnSomeLevel();
                     long end = System.currentTimeMillis();
-                    System.out.println("thread\t" + tid + "\t" + (end - start));
+
+                    if(isDebug) {
+                        System.out.println("thread\t" + tid + "\t" + (end - start));
+                    }
 
                     long totalTimeShare = (long)(factor * 1000);
                     if(end - start < totalTimeShare) {
@@ -104,6 +111,8 @@ public class LoadGenApp {
                 }
             });
         }
+
+        execSvc.submit(() -> new ThreadSpawner(threadSpawnerCount, isDebug).doWork());
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
@@ -146,5 +155,59 @@ public class LoadGenApp {
         long end = System.currentTimeMillis();
 
         return end - start;
+    }
+
+    private static class ThreadSpawner {
+
+        int n;
+        boolean isDebug;
+
+        public ThreadSpawner(int n, boolean isDebug) {
+            this.n = n;
+            this.isDebug = isDebug;
+        }
+
+        public void doWork() {
+
+            Thread[] threads = new Thread[n];
+
+            while(true) {
+                for (int i = 0; i < n; ++i) {
+
+                    if(threads[i] != null) {
+                        while(true) {
+                            boolean joined = false;
+                            try {
+                                threads[i].join();
+                                joined = true;
+                            } catch (Exception e) {}
+
+                            if(joined) break;
+                        }
+                    }
+
+                    final int th_id = i;
+                    threads[i] = new Thread(() -> {
+                        try {
+                            if(isDebug) {
+                                System.out.println("Threadspawner: thd " + th_id + " started");
+                            }
+                            Thread.sleep(1000 * (new Random().nextInt() % 10));
+                            if(isDebug) {
+                                System.out.println("Threadspawner: thd " + th_id + " will now end");
+                            }
+                        }
+                        catch (Exception e) {
+                        }
+                    });
+
+                    threads[i].start();
+                }
+
+                if(Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+            }
+        }
     }
 }
