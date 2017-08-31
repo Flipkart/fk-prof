@@ -226,7 +226,8 @@ public class LeaderHttpVerticle extends AbstractVerticle {
       Recorder.ProcessGroup pg = parseProcessGroup(context);
       PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = policyStore.getVersionedPolicy(pg);
       if (versionedPolicyDetails == null) {
-        context.response().setStatusCode(404).end("Policy not found for process group " + RecorderProtoUtil.processGroupCompactRepr(pg));
+        HttpFailure httpFailure = new HttpFailure("Policy not found for process group " + RecorderProtoUtil.processGroupCompactRepr(pg), 404);
+        HttpHelper.handleFailure(context, httpFailure);
       } else {
         context.response().end(ProtoUtil.buildBufferFromProto(versionedPolicyDetails));
       }

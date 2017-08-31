@@ -18,18 +18,23 @@ function fireRequest (url, config) {
   const conf = Object.assign({ ...defaultConfig }, config);
   return fetch(url, conf)
     .then((response) => {
-      if (response.ok) {
-        return Promise.resolve(response.json());
-      } else if(response.status >= 400){
-        const error = new Error();
-        error.status = response.status;
-        error.response = response.statusText;
-        throw error;
-      }
-      return response.json().then(error =>{
-        return Promise.reject({ status: response.status, response: error });});
-    },
-  ).catch(error => Promise.reject(error));
+        if (response.ok) {
+          return Promise.resolve(response.json());
+        }
+        if (response.status === 503) {   //Handle server time out separately
+          const err = new Error();
+          err.response = {message: 'Request timed out'};
+          throw err;
+        }
+        return response.json().then(response => {       //Handling a non ok json response
+          console.log('Fetch received a non ok response : ', response);
+          return Promise.reject({status: response.status, response: response});
+        });
+      },
+    ).catch(error => {
+      console.log('Error while parsing fetch response : ', JSON.stringify(error));    //Handling json parsing exceptions
+      return Promise.reject(error);
+    });
 }
 
 export default {

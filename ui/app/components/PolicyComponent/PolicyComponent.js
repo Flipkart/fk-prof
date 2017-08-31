@@ -20,17 +20,28 @@ class PolicyComponent extends Component {
     this.handleSubmitClick = this.handleSubmitClick.bind(this);
     this.handleWorkChange = this.handleWorkChange.bind(this);
     this.isCreateView = this.isCreateView.bind(this);
+    this.isUpdateView = this.isUpdateView.bind(this);
+    this.showPromptMsg = this.showPromptMsg.bind(this);
+    this.makeRequest = this.makeRequest.bind(this);
+  }
+
+  showPromptMsg = (msg) => {
+    componentHandler.upgradeDom(); // eslint-disable-line  //To apply mdl JS behaviours on components loaded later https://github.com/google/material-design-lite/issues/5081
+    document.querySelector('#policy-submit').MaterialSnackbar.showSnackbar({message: msg});
+  };
+
+  makeRequest(reqType) {
+    this.props.policyAction(reqType, this.props.app, this.props.cluster, this.props.proc, this.props.versionedPolicyDetails.data).then(this.showPromptMsg, this.showPromptMsg);
   }
 
   componentDidMount() {
-    this.props.policyAction(GET, this.props.app, this.props.cluster, this.props.proc, null);
+    this.makeRequest(GET);
   }
 
   componentDidUpdate(prevProps) {
     if (prevProps.proc !== this.props.proc) {
-      this.props.policyAction(GET, this.props.app, this.props.cluster, this.props.proc, null);
+      this.makeRequest(GET);
     }
-    componentHandler.upgradeDom(); // eslint-disable-line  //To apply mdl JS behaviours on components loaded later https://github.com/google/material-design-lite/issues/5081
   }
 
   handleScheduleChange(e) {
@@ -89,9 +100,9 @@ class PolicyComponent extends Component {
         document.querySelector('#policy-submit').MaterialSnackbar.showSnackbar({message: 'Please provide appropriate values to the fields marked in red'});
       } else {
         if (this.isCreateView()) {
-          this.props.policyAction(POST, this.props.app, this.props.cluster, this.props.proc, this.props.versionedPolicyDetails.data);
-        } else {
-          this.props.policyAction(PUT, this.props.app, this.props.cluster, this.props.proc, this.props.versionedPolicyDetails.data);
+          this.makeRequest(POST);
+        } else if (this.isUpdateView()) {
+          this.makeRequest(PUT);
         }
       }
     }
@@ -108,7 +119,7 @@ class PolicyComponent extends Component {
       );
     }
 
-    if (Object.keys(this.props.versionedPolicyDetails.data).length !== 0) {
+    if (this.isCreateView() || this.isUpdateView()) {
       return (
         <div className="mdl-grid mdl-grid--no-spacing mdl-cell--11-col mdl-shadow--3dp">
           {this.getDisplayDetails()}
@@ -127,7 +138,7 @@ class PolicyComponent extends Component {
         <div className="mdl-grid mdl-cell--12-col">
           <div
             className="mdl-typography--headline mdl-typography--font-thin mdl-color-text--accent mdl-cell--12-col">There
-            was a problem getting the policy, please try later.
+            was a problem loading the page, please try later.
           </div>
         </div>
         <div id="policy-submit" className="mdl-js-snackbar mdl-snackbar">
@@ -140,13 +151,17 @@ class PolicyComponent extends Component {
 
 
   isCreateView() {
-    return (this.props.versionedPolicyDetails.error.status === 404 && this.props.versionedPolicyDetails.reqType === 'GET') || (this.props.versionedPolicyDetails.reqType === 'POST' && (this.props.versionedPolicyDetails.asyncStatus === 'ERROR' || this.props.versionedPolicyDetails.asyncStatus === 'PENDING'));
+    return (( this.props.versionedPolicyDetails.reqType === 'GET' && this.props.versionedPolicyDetails.asyncStatus === 'ERROR' && this.props.versionedPolicyDetails.error.status === 404)
+      || (this.props.versionedPolicyDetails.reqType === 'POST' && this.props.versionedPolicyDetails.asyncStatus === 'ERROR'));
+  }
+
+  isUpdateView() {
+    return ((this.props.versionedPolicyDetails.reqType === 'PUT')
+      || ((this.props.versionedPolicyDetails.reqType === 'GET' || this.props.versionedPolicyDetails.reqType === 'POST' ) && this.props.versionedPolicyDetails.asyncStatus === 'SUCCESS'));
   }
 
   getDisplayDetails() {
-    if (this.isCreateView()) {
-      return;
-    } else {
+    if (this.isUpdateView()) {
       const createdDate = new Date(this.props.versionedPolicyDetails.data.policyDetails.createdAt);
       const modifiedDate = new Date(this.props.versionedPolicyDetails.data.policyDetails.modifiedAt);
       const createdString = createdDate.toDateString() + ', ' + createdDate.toLocaleTimeString();

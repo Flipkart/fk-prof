@@ -36,20 +36,33 @@ export function policyAction(reqType, policiesApp, policiesCluster, policiesProc
     dispatch(policyRequestAction(reqType));
     const url = `/api/policy/${policiesApp}/${policiesCluster}/${policiesProc}`;
     let req = undefined;
+    let msg = undefined;
     switch (reqType) {
       case GET:
         req = http.get(url);
+        msg = 'Policy found';
         break;
       case POST:
         req = http.post(url, versionedPolicyDetails);
+        msg = 'Policy created';
         break;
       case PUT:
         req = http.put(url, versionedPolicyDetails);
+        msg = 'Policy updated';
+        break;
+      default:
+        console.log('Unsupported request initiated');
         break;
     }
     if (req) {
-      return req.then(json => dispatch(policySuccessAction(reqType, json))) // success, send the data to reducers
-        .catch(err => dispatch(policyFailureAction(reqType, err))); // for error
+      return req.then(json => {
+        dispatch(policySuccessAction(reqType, json));
+        return msg;
+      }) // success, send the data to reducers
+        .catch(err => {
+          dispatch(policyFailureAction(reqType, err));
+          throw(err.response.message);
+        }); // for error
     }
     return null;
   }
