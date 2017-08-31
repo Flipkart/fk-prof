@@ -34,37 +34,22 @@ export function policyWorkChangeAction(work) {
 export function policyAction(reqType, policiesApp, policiesCluster, policiesProc, versionedPolicyDetails) {
   return (dispatch) => {
     dispatch(policyRequestAction(reqType));
-
-    let url = `/api/policy/${policiesApp}/${policiesCluster}/${policiesProc}`;
-    if(reqType === GET){
-      url += '?mocksc=404';
-    }
-    if(reqType === POST){
-      url += '?mocksc=504';
-    }
-    if(reqType === PUT){
-      url += '?mocksc=404';
-    }
-
+    const url = `/api/policy/${policiesApp}/${policiesCluster}/${policiesProc}`;
     let req = undefined;
-    let msg = undefined;
     switch (reqType) {
       case GET:
-        req = http.get(url); msg = 'Get policy';
+        req = http.get(url);
         break;
       case POST:
-        req = http.post(url, versionedPolicyDetails); msg = 'Create policy';
+        req = http.post(url, versionedPolicyDetails);
         break;
       case PUT:
-        req = http.put(url, versionedPolicyDetails); msg = 'Update policy';
-        break;
-      default:
-        console.log('Unsupported request initiated');
+        req = http.put(url, versionedPolicyDetails);
         break;
     }
     if (req) {
-      return req.then(json => { dispatch(policySuccessAction(reqType, json)); return msg + ' succeeded'; }) // success, send the data to reducers
-        .catch(err => { dispatch(policyFailureAction(reqType, err)); throw(msg + ' failed'); }); // for error
+      return req.then(json => dispatch(policySuccessAction(reqType, json))) // success, send the data to reducers
+        .catch(err => dispatch(policyFailureAction(reqType, err))); // for error
     }
     return null;
   }
