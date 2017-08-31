@@ -32,6 +32,7 @@ import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.LoggerHandler;
 import io.vertx.ext.web.handler.TimeoutHandler;
 import proto.PolicyDTO;
+import recording.Recorder;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -47,6 +48,37 @@ import static fk.prof.userapi.http.UserapiApiPathConstants.*;
  * Created by rohit.patiyal on 18/01/17.
  */
 public class HttpVerticle extends AbstractVerticle {
+    public static class MockPolicyData {
+        private static PolicyDTO.Work mockWork = PolicyDTO.Work.newBuilder().setWType(PolicyDTO.WorkType.cpu_sample_work)
+            .setCpuSample(PolicyDTO.CpuSampleWork.newBuilder().setFrequency(50).setMaxFrames(64).build()).build();
+        private static PolicyDTO.Schedule mockSchedule = PolicyDTO.Schedule.newBuilder()
+            .setAfter("w1").setPgCovPct(100).setDuration(60).build();
+        private static PolicyDTO.Policy mockPolicy = PolicyDTO.Policy.newBuilder()
+            .addWork(mockWork).setSchedule(mockSchedule).setDescription("Test policy").build();
+        public static List<Recorder.ProcessGroup> mockProcessGroups = Arrays.asList(
+            Recorder.ProcessGroup.newBuilder().setAppId("a1").setCluster("c1").setProcName("p1").build(),
+            Recorder.ProcessGroup.newBuilder().setAppId("a1").setCluster("c1").setProcName("p2").build(),
+            Recorder.ProcessGroup.newBuilder().setAppId("a1").setCluster("c2").setProcName("p3").build(),
+            Recorder.ProcessGroup.newBuilder().setAppId("a2").setCluster("c1").setProcName("p1").build(),
+            Recorder.ProcessGroup.newBuilder().setAppId("b1").setCluster("c1").setProcName("p1").build()
+        );
+
+        public static List<PolicyDTO.PolicyDetails> mockPolicyDetails = Arrays.asList(
+            PolicyDTO.PolicyDetails.newBuilder().setPolicy(mockPolicy).setModifiedBy("admin").setCreatedAt("3").setModifiedAt("3").build(),
+            PolicyDTO.PolicyDetails.newBuilder().setPolicy(mockPolicy).setModifiedBy("admin").setCreatedAt("4").setModifiedAt("4").build(),
+            PolicyDTO.PolicyDetails.newBuilder().setPolicy(mockPolicy).setModifiedBy("admin").setCreatedAt("5").setModifiedAt("5").build()
+        );
+        public static List<PolicyDTO.VersionedPolicyDetails> mockVersionedPolicyDetails = Arrays.asList(
+            PolicyDTO.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(0)).setVersion(-1).build(),
+            PolicyDTO.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(1)).setVersion(0).build(),
+            PolicyDTO.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(2)).setVersion(0).build(),
+            PolicyDTO.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(2)).setVersion(1).build()
+        );
+
+        public static PolicyDTO.VersionedPolicyDetails getMockVersionedPolicyDetails(PolicyDTO.PolicyDetails policyDetails, int version) {
+            return PolicyDTO.VersionedPolicyDetails.newBuilder().setPolicyDetails(policyDetails).setVersion(version).build();
+        }
+    }
     private static Logger LOGGER = LoggerFactory.getLogger(HttpVerticle.class);
 
     private String baseDir;
@@ -244,39 +276,85 @@ public class HttpVerticle extends AbstractVerticle {
     }
 
     private void proxyPutPostPolicyToBackend(RoutingContext routingContext) {
-        String payloadVersionedPolicyDetailsJsonString = routingContext.getBodyAsString("utf-8");
-        try {
-            PolicyDTO.VersionedPolicyDetails.Builder payloadVersionedPolicyDetails = PolicyDTO.VersionedPolicyDetails.newBuilder();
-            JsonFormat.parser().merge(payloadVersionedPolicyDetailsJsonString, payloadVersionedPolicyDetails);
-            PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = payloadVersionedPolicyDetails.build();
-            LOGGER.debug("Making request for policy change: {} to backend", PolicyDTOProtoUtil.versionedPolicyDetailsCompactRepr(versionedPolicyDetails));
-            makeRequestToBackend(routingContext.request().method(), routingContext.normalisedPath(), ProtoUtil.buildBufferFromProto(versionedPolicyDetails), false)
-                    .setHandler(ar -> proxyBufferedPolicyResponseFromBackend(routingContext, ar));
-        } catch (Exception ex) {
-            UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ex);
-            UserapiHttpHelper.handleFailure(routingContext, httpFailure);
+        mockPolicyAPI(routingContext);
+        //        String payloadVersionedPolicyDetailsJsonString = routingContext.getBodyAsString("utf-8");
+//        try {
+//            PolicyDTO.VersionedPolicyDetails.Builder payloadVersionedPolicyDetails = PolicyDTO.VersionedPolicyDetails.newBuilder();
+//            JsonFormat.parser().merge(payloadVersionedPolicyDetailsJsonString, payloadVersionedPolicyDetails);
+//            PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = payloadVersionedPolicyDetails.build();
+//            LOGGER.debug("Making request for policy change: {} to backend", PolicyDTOProtoUtil.versionedPolicyDetailsCompactRepr(versionedPolicyDetails));
+//            makeRequestToBackend(routingContext.request().method(), routingContext.normalisedPath(), ProtoUtil.buildBufferFromProto(versionedPolicyDetails), false)
+//                    .setHandler(ar -> proxyBufferedPolicyResponseFromBackend(routingContext, ar));
+//        } catch (Exception ex) {
+//            UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ex);
+//            UserapiHttpHelper.handleFailure(routingContext, httpFailure);
+//        }
+    }
+
+
+    private void mockPolicyAPI(RoutingContext routingContext){
+        String mocksc = routingContext.request().getParam("mocksc");
+        if(mocksc != null && !mocksc.isEmpty()){
+            int sc = Integer.parseInt(mocksc);
+            Future f = Future.future();
+            if(sc==504) {
+                vertx.executeBlocking(event -> {
+                    try {
+                        Thread.sleep(6000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }, f);
+            }else {
+                routingContext.response().setStatusCode(sc).end();
+            }
+        } else {
+            try {
+                routingContext.response().end(JsonFormat.printer().print(MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),0)));
+            } catch (InvalidProtocolBufferException e) {
+                e.printStackTrace();
+            }
         }
     }
 
     private void proxyGetPolicyToBackend(RoutingContext routingContext) {
-        try {
-            makeRequestToBackend(routingContext.request().method(), routingContext.normalisedPath(), null, false)
-                    .setHandler(ar -> proxyBufferedPolicyResponseFromBackend(routingContext, ar));
-        } catch (Exception ex) {
-            UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ex);
-            UserapiHttpHelper.handleFailure(routingContext, httpFailure);
-        }
+        mockPolicyAPI(routingContext);
+//        try {
+//            makeRequestToBackend(routingContext.request().method(), routingContext.normalisedPath(), null, false)
+//                    .setHandler(ar -> proxyBufferedPolicyResponseFromBackend(routingContext, ar));
+//        } catch (Exception ex) {
+//            UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ex);
+//            UserapiHttpHelper.handleFailure(routingContext, httpFailure);
+//        }
     }
 
     private void proxyListAPIToBackend(RoutingContext routingContext) {
-        final String path = routingContext.normalisedPath().substring((META_PREFIX + POLICIES_PREFIX).length()) + ((routingContext.request().query() != null)? "?" + routingContext.request().query(): "");
-        try {
-            makeRequestToBackend(routingContext.request().method(), path, routingContext.getBody(), false)
-                    .setHandler(ar -> proxyResponseFromBackend(routingContext, ar));
-        } catch (Exception ex) {
-            UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ex);
-            UserapiHttpHelper.handleFailure(routingContext, httpFailure);
+        String mocksc = routingContext.request().getParam("mocksc");
+        if(mocksc != null && !mocksc.isEmpty()){
+            int sc = Integer.parseInt(mocksc);
+            Future f = Future.future();
+            if(sc==504) {
+                vertx.executeBlocking(event -> {
+                    try {
+                        Thread.sleep(6000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }, f);
+            }else
+                routingContext.response().setStatusCode(sc).end();
+        } else {
+            String res = Json.encode(Arrays.asList("item1", "item2", "item3", "item4"));
+            routingContext.response().end(res);
         }
+//        final String path = routingContext.normalisedPath().substring((META_PREFIX + POLICIES_PREFIX).length()) + ((routingContext.request().query() != null)? "?" + routingContext.request().query(): "");
+//        try {
+//            makeRequestToBackend(routingContext.request().method(), path, routingContext.getBody(), false)
+//                    .setHandler(ar -> proxyResponseFromBackend(routingContext, ar));
+//        } catch (Exception ex) {
+//            UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ex);
+//            UserapiHttpHelper.handleFailure(routingContext, httpFailure);
+//        }
     }
 
     private Future<ProfHttpClient.ResponseWithStatusTuple> makeRequestToBackend(HttpMethod method, String path, Buffer payloadAsBuffer, boolean withRetry) {
