@@ -8,14 +8,16 @@ import aggregatedProfileData from 'reducers/AggregatedProfileDataReducer';
 import policiesApps from 'reducers/PoliciesAppReducer';
 import policiesClusters from 'reducers/PoliciesClusterReducer';
 import policiesProcs from 'reducers/PoliciesProcReducer';
+import versionedPolicyDetails from '../reducers/PolicyReducer';
 
 export default combineReducers({
   profilesApps,
   profilesClusters,
   profilesProcs,
-  profiles,
-  aggregatedProfileData,
   policiesApps,
   policiesClusters,
   policiesProcs,
+  profiles,
+  aggregatedProfileData,
+  versionedPolicyDetails,
 });
