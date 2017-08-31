@@ -32,6 +32,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ZookeeperBasedBackendAssociationStore implements BackendAssociationStore {
   private static Logger logger = LoggerFactory.getLogger(ZookeeperBasedBackendAssociationStore.class);
 
+  private boolean initialized;
   private final Vertx vertx;
   private final CuratorFramework curatorClient;
   private final String backendAssociationPath;
@@ -73,22 +74,7 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
     this.loadReportIntervalInSeconds = loadReportIntervalInSeconds;
     this.loadMissTolerance = loadMissTolerance;
     this.availableBackendsByPriority = new ConcurrentSkipListSet<>(backendPriorityComparator);
-
-    try {
-      loadDataFromZookeeperInBackendLookup();
-    } catch (Exception ex) {
-      ctrLoadFailure.inc();
-      throw ex;
-    }
-
-    for(BackendDetail backendDetail: this.backendDetailLookup.values()) {
-      for(Recorder.ProcessGroup processGroup: backendDetail.getAssociatedProcessGroups()) {
-        if (this.processGroupToBackendLookup.putIfAbsent(processGroup, backendDetail.getBackend()) != null) {
-          ctrLoadFailure.inc();
-          throw new IllegalStateException(String.format("Backend mapping already exists for process group=%s", RecorderProtoUtil.processGroupCompactRepr(processGroup)));
-        }
-      }
-    }
+    this.initialized = false;
   }
 
   @Override
@@ -221,7 +207,6 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
                   } finally {
                     safelyReAddBackendToAvailableBackendSet(availableBackend);
                   }
-
                 }
               } else {
                 BackendDetail existingBackend = backendDetailLookup.get(existingBackendAssociation);
@@ -306,6 +291,41 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
   @Override
   public Recorder.AssignedBackend getAssociatedBackend(Recorder.ProcessGroup processGroup) {
     return processGroupToBackendLookup.get(processGroup);
+  }
+
+  @Override
+  public Recorder.BackendAssociations getAssociations() {
+    Recorder.BackendAssociations.Builder builder = Recorder.BackendAssociations.newBuilder();
+    this.backendDetailLookup.entrySet().forEach(backendEntry ->
+      builder.addAssociations(
+          Recorder.BackendAssociation.newBuilder()
+              .setBackend(backendEntry.getKey())
+              .addAllProcessGroups(backendEntry.getValue().getAssociatedProcessGroups())));
+    return builder.build();
+  }
+
+  @Override
+  public void init() throws Exception {
+    synchronized (this) {
+      if(!initialized) {
+        try {
+          loadDataFromZookeeperInBackendLookup();
+        } catch (Exception ex) {
+          ctrLoadFailure.inc();
+          throw ex;
+        }
+
+        for (BackendDetail backendDetail : this.backendDetailLookup.values()) {
+          for (Recorder.ProcessGroup processGroup : backendDetail.getAssociatedProcessGroups()) {
+            if (this.processGroupToBackendLookup.putIfAbsent(processGroup, backendDetail.getBackend()) != null) {
+              ctrLoadFailure.inc();
+              throw new IllegalStateException(String.format("Backend mapping already exists for process group=%s", RecorderProtoUtil.processGroupCompactRepr(processGroup)));
+            }
+          }
+        }
+        initialized = true;
+      }
+    }
   }
 
   private void safelyReAddBackendToAvailableBackendSet(BackendDetail availableBackend) {
@@ -396,6 +416,7 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
 
     List<String> backendZNodeNames = curatorClient.getChildren().forPath(backendAssociationPath);
     for(String backendZNodeName: backendZNodeNames) {
+      logger.debug("Found associations for : {}", backendZNodeName);
       String backendZNodePath = getZNodePathForBackend(backendZNodeName);
       List<String> processGroupNodes = curatorClient.getChildren().forPath(backendZNodePath);
       Set<Recorder.ProcessGroup> processGroups = new HashSet<>();
@@ -403,6 +424,9 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
       for(String processGroupZNodeName: processGroupNodes) {
         String processGroupZNodePath = getZNodePathForProcessGroup(backendZNodeName, processGroupZNodeName);
         Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.parseFrom(ZookeeperUtil.readZNode(curatorClient, processGroupZNodePath));
+        if(logger.isDebugEnabled()) {
+          logger.debug("\t{}", RecorderProtoUtil.processGroupCompactRepr(processGroup));
+        }
         if(processGroupToZNodePathLookup.get(processGroup) != null) {
           throw new BackendAssociationException("Found multiple nodes in zookeeper backend association tree for same process group, aborting load from ZK. Process group=" +
               RecorderProtoUtil.processGroupCompactRepr(processGroup), true);

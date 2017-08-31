@@ -1,11 +1,20 @@
 .main {
   margin-bottom: 4px;
-  border: 1px solid #F5B800;
+  padding-bottom: 4px;
+  border: 1px solid #b53f49;
+  
   .heading {
-    background: #ffe7a1;
-    padding: 8px;
+    background: #b53f49;
+    padding: 4px 16px;
+    color: white;
+    display: flex;
+  }
+
+  h5 {
     margin: 0;
-    text-align: center;
+    flex: 1;
+    padding-top: 4px;
+    padding-bottom: 4px
   }
 
   .center {
@@ -13,7 +22,39 @@
   }
 
   .highlighted {
-    font-weight: bold;
-    color: rgb(63,81,181);
+    background-color: rgb(63,81,181);
+  }
+
+  .highlighted a, .highlighted span {
+    color: white !important;
+  }
+
+  .itemContainer {
+    margin: 4px 0px;
+    padding: 4px;
+    border-radius: 8px;
+  }
+
+  a {
+    text-decoration: none;
+    width: 100%;
+    text-align: left;
+    padding: 4px 0;
+    color: rgba(0,0,0,0.87);
+  }
+
+  .profileInfoIcon {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    cursor: hand;    
+    cursor: pointer;
+    align-self: center;
+    span {
+      font-size: 28px;
+    }
+    &:hover {
+      color: rgb(63,81,181);
+    }
   }
 }

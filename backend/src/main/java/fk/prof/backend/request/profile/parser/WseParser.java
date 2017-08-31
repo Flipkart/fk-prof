@@ -1,5 +1,6 @@
 package fk.prof.backend.request.profile.parser;
 
+import com.codahale.metrics.Histogram;
 import fk.prof.backend.exception.AggregationFailure;
 import fk.prof.backend.request.CompositeByteBufInputStream;
 import recording.Recorder;
@@ -15,8 +16,11 @@ public class WseParser {
   private int maxMessageSizeInBytes;
   private boolean endMarkerReceived = false;
 
-  public WseParser(int maxMessageSizeInBytes) {
+  private MessageParser msgParser;
+
+  public WseParser(int maxMessageSizeInBytes, Histogram histWseSize) {
     this.maxMessageSizeInBytes = maxMessageSizeInBytes;
+    this.msgParser = new MessageParser(histWseSize);
   }
 
   /**
@@ -59,7 +63,7 @@ public class WseParser {
     try {
       if (wse == null) {
         in.markAndDiscardRead();
-        wse = MessageParser.readDelimited(Recorder.Wse.parser(), in, maxMessageSizeInBytes, "WSE");
+        wse = msgParser.readDelimited(Recorder.Wse.parser(), in, maxMessageSizeInBytes, "WSE");
         if(wse == null) {
           endMarkerReceived = true;
           return;
@@ -67,7 +71,7 @@ public class WseParser {
         in.updateChecksumSinceMarked(wseChecksum);
       }
       in.markAndDiscardRead();
-      int checksumValue = MessageParser.readRawVariantInt(in, "wseChecksumValue");
+      int checksumValue = msgParser.readRawVariantInt(in, "wseChecksumValue");
       if (checksumValue != ((int) wseChecksum.getValue())) {
         throw new AggregationFailure("Checksum of wse does not match");
       }

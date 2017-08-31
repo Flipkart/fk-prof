@@ -27,12 +27,14 @@ public class AggregationWindowPlannerStore {
   private final WorkAssignmentScheduleBootstrapConfig workAssignmentScheduleBootstrapConfig;
   private final int aggregationWindowDurationInSecs;
   private final int policyRefreshBufferInSecs;
+  private final int thresholdForDefunctRecorderInSecs;
 
   public AggregationWindowPlannerStore(Vertx vertx,
                                        int backendId,
                                        int windowDurationInSecs,
                                        int windowEndToleranceInSecs,
                                        int policyRefreshBufferInSecs,
+                                       int thresholdForDefunctRecorderInSecs,
                                        int schedulingBufferInSecs,
                                        int maxAcceptableDelayForWorkAssignmentInSecs,
                                        WorkSlotPool workSlotPool,
@@ -51,6 +53,7 @@ public class AggregationWindowPlannerStore {
         maxAcceptableDelayForWorkAssignmentInSecs);
     this.aggregationWindowDurationInSecs = windowDurationInSecs;
     this.policyRefreshBufferInSecs = policyRefreshBufferInSecs;
+    this.thresholdForDefunctRecorderInSecs = thresholdForDefunctRecorderInSecs;
   }
 
   /**
@@ -64,6 +67,7 @@ public class AggregationWindowPlannerStore {
           backendId,
           aggregationWindowDurationInSecs,
           policyRefreshBufferInSecs,
+          thresholdForDefunctRecorderInSecs,
           workAssignmentScheduleBootstrapConfig,
           workSlotPool,
           processGroupContextForScheduling,

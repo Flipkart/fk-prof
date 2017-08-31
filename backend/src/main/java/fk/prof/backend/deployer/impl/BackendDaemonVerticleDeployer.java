@@ -2,7 +2,7 @@ package fk.prof.backend.deployer.impl;
 
 import com.google.common.base.Preconditions;
 import fk.prof.aggregation.model.AggregationWindowStorage;
-import fk.prof.backend.ConfigManager;
+import fk.prof.backend.Configuration;
 import fk.prof.backend.deployer.VerticleDeployer;
 import fk.prof.backend.model.aggregation.ActiveAggregationWindows;
 import fk.prof.backend.model.assignment.AssociatedProcessGroups;
@@ -22,13 +22,13 @@ public class BackendDaemonVerticleDeployer extends VerticleDeployer {
   private final AggregationWindowStorage aggregationWindowStorage;
 
   public BackendDaemonVerticleDeployer(Vertx vertx,
-                                       ConfigManager configManager,
+                                       Configuration config,
                                        LeaderReadContext leaderReadContext,
                                        AssociatedProcessGroups associatedProcessGroups,
                                        ActiveAggregationWindows activeAggregationWindows,
                                        WorkSlotPool workSlotPool,
                                        AggregationWindowStorage aggregationWindowStorage) {
-    super(vertx, configManager);
+    super(vertx, config);
     this.leaderReadContext = Preconditions.checkNotNull(leaderReadContext);
     this.associatedProcessGroups = Preconditions.checkNotNull(associatedProcessGroups);
     this.activeAggregationWindows = Preconditions.checkNotNull(activeAggregationWindows);
@@ -38,14 +38,11 @@ public class BackendDaemonVerticleDeployer extends VerticleDeployer {
 
   @Override
   protected DeploymentOptions getDeploymentOptions() {
-    DeploymentOptions deploymentOptions = new DeploymentOptions(getConfigManager().getBackendDaemonDeploymentConfig());
-    //Backend daemon should never be deployed more than once, so hardcoding verticle count to 1, to protect from illegal configuration
-    deploymentOptions.getConfig().put("verticle.count", 1);
-    return deploymentOptions;
+    return getConfig().getDaemonDeploymentOpts();
   }
 
   @Override
   protected Verticle buildVerticle() {
-    return new BackendDaemon(getConfigManager(), leaderReadContext, associatedProcessGroups, activeAggregationWindows, workSlotPool, aggregationWindowStorage);
+    return new BackendDaemon(getConfig(), leaderReadContext, associatedProcessGroups, activeAggregationWindows, workSlotPool, aggregationWindowStorage);
   }
 }

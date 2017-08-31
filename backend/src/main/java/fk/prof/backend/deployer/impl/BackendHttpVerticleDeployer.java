@@ -1,7 +1,7 @@
 package fk.prof.backend.deployer.impl;
 
 import com.google.common.base.Preconditions;
-import fk.prof.backend.ConfigManager;
+import fk.prof.backend.Configuration;
 import fk.prof.backend.deployer.VerticleDeployer;
 import fk.prof.backend.http.BackendHttpVerticle;
 import fk.prof.backend.model.assignment.ProcessGroupDiscoveryContext;
@@ -16,11 +16,11 @@ public class BackendHttpVerticleDeployer extends VerticleDeployer {
   private final ProcessGroupDiscoveryContext processGroupDiscoveryContext;
 
   public BackendHttpVerticleDeployer(Vertx vertx,
-                                     ConfigManager configManager,
+                                     Configuration config,
                                      LeaderReadContext leaderReadContext,
                                      AggregationWindowDiscoveryContext aggregationWindowDiscoveryContext,
                                      ProcessGroupDiscoveryContext processGroupDiscoveryContext) {
-    super(vertx, configManager);
+    super(vertx, config);
     this.leaderReadContext = Preconditions.checkNotNull(leaderReadContext);
     this.aggregationWindowDiscoveryContext = Preconditions.checkNotNull(aggregationWindowDiscoveryContext);
     this.processGroupDiscoveryContext = Preconditions.checkNotNull(processGroupDiscoveryContext);
@@ -28,12 +28,12 @@ public class BackendHttpVerticleDeployer extends VerticleDeployer {
 
   @Override
   protected DeploymentOptions getDeploymentOptions() {
-    return new DeploymentOptions(getConfigManager().getBackendHttpDeploymentConfig());
+    return getConfig().getBackendDeploymentOpts();
   }
 
   @Override
   protected Verticle buildVerticle() {
-    return new BackendHttpVerticle(getConfigManager(), leaderReadContext, aggregationWindowDiscoveryContext, processGroupDiscoveryContext);
+    return new BackendHttpVerticle(getConfig(), leaderReadContext, aggregationWindowDiscoveryContext, processGroupDiscoveryContext);
   }
 
 }

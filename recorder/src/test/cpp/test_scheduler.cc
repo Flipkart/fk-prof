@@ -1,6 +1,7 @@
 #include <thread>
 #include <vector>
 #include <iostream>
+#include <utility>
 #include <cstdint>
 #include "fixtures.hh"
 #include "test.hh"
@@ -129,11 +130,11 @@ TEST(Scheduler___schedules_in_desired_order___when_another_thd_enqueues___during
 
     CHECK_EQUAL(0, order_tracker);
 
-    std::thread t100_0(schedule_after_sleep, static_cast<std::uint32_t>(10), std::ref(s), static_cast<std::uint32_t>(90), std::move([&] { order_tracker = 100; co_trigger_tracker++; }));
-    std::thread t100_1(schedule_after_sleep, static_cast<std::uint32_t>(10), std::ref(s), static_cast<std::uint32_t>(90), std::move([&] { co_trigger_tracker++; }));
-    std::thread t100_2(schedule_after_sleep, static_cast<std::uint32_t>(10), std::ref(s), static_cast<std::uint32_t>(90), std::move([&] { co_trigger_tracker++; }));
-    std::thread t50(schedule_after_sleep, static_cast<std::uint32_t>(10), std::ref(s), static_cast<std::uint32_t>(40), std::move([&] { order_tracker = 50; }));
-    std::thread t250(schedule_after_sleep, static_cast<std::uint32_t>(10), std::ref(s), static_cast<std::uint32_t>(240), std::move([&] { order_tracker = 250; }));
+    std::thread t100_0(schedule_after_sleep, static_cast<std::uint32_t>(10), std::ref(s), static_cast<std::uint32_t>(90), std::forward<std::function<void()>>([&] { order_tracker = 100; co_trigger_tracker++; }));
+    std::thread t100_1(schedule_after_sleep, static_cast<std::uint32_t>(10), std::ref(s), static_cast<std::uint32_t>(90), std::forward<std::function<void()>>([&] { co_trigger_tracker++; }));
+    std::thread t100_2(schedule_after_sleep, static_cast<std::uint32_t>(10), std::ref(s), static_cast<std::uint32_t>(90), std::forward<std::function<void()>>([&] { co_trigger_tracker++; }));
+    std::thread t50(schedule_after_sleep, static_cast<std::uint32_t>(10), std::ref(s), static_cast<std::uint32_t>(40), std::forward<std::function<void()>>([&] { order_tracker = 50; }));
+    std::thread t250(schedule_after_sleep, static_cast<std::uint32_t>(10), std::ref(s), static_cast<std::uint32_t>(240), std::forward<std::function<void()>>([&] { order_tracker = 250; }));
 
     t100_0.join();
     t100_1.join();

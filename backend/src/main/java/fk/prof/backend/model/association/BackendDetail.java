@@ -20,7 +20,7 @@ public class BackendDetail {
   private final Set<Recorder.ProcessGroup> associatedProcessGroups;
 
   private long lastReportedTick = 0;
-  //lastReportedTime is null unless backend reports stable load at least once (i.e. currTick reported by backend > 0)
+  //lastReportedTime is null unless backend reports stable load more than once (i.e. currTick reported by backend > 0, since in first load report currTick = 0)
   private volatile Long lastReportedTime;
   private float lastReportedLoad;
 

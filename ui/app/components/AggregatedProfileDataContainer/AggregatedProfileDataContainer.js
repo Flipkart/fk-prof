@@ -57,7 +57,7 @@ class AggregatedProfileDataContainer extends React.Component {
               className="mdl-button mdl-js-button mdl-js-ripple-effect"
               style={
                 selectedWorkType === w.workType
-                  ? { background: '#ccc' } : {}
+                  ? { background: 'rgb(63,81,181)', color: 'white', cursor: 'default' } : {}
               }
             >
               {`${workTypeMap[w.workType].text} (${w.samples})`}

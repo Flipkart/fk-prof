@@ -62,7 +62,7 @@ public class AggregationWindowSerDeTest {
 
         String startime = "2017-03-01T07:00:00";
         ZonedDateTime startimeZ = ZonedDateTime.parse(startime + "Z", DateTimeFormatter.ISO_ZONED_DATE_TIME);
-        FinalizedAggregationWindow window = MockAggregationWindow.buildAggregationWindow(startime, () -> sampleStackTraces);
+        FinalizedAggregationWindow window = MockAggregationWindow.buildAggregationWindow(startime, () -> sampleStackTraces, 1800);
 
         // store
         storage.store(window);

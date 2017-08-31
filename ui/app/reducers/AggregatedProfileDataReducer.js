@@ -4,39 +4,43 @@ import {
   AGGREGATED_PROFILE_DATA_FAILURE,
 } from 'actions/AggregatedProfileDataActions';
 
-function createTree (input, methodLookup, terminalNodes = []) {
+import FrameNode from '../pojos/FrameNode';
+
+
+function createTree (input, methodLookup, terminalNodeIndexes = []) {
+  methodLookup = methodLookup.map(methodName => {
+    const splits =  methodName.split(" ");
+    if(splits.length === 2){
+      return splits;
+    }else{
+      return [methodName, ""];
+    }
+  });
+
   const allNodes = [];
   function formTree (index) {
     let currentNode = input[index];
     if (!currentNode) return {};
-    currentNode = {
-      childCount: currentNode[1],
-      name: currentNode[0],
-      onStack: currentNode[3][0],
-      onCPU: currentNode[3][1],
-      parent: [],
-    };
+    currentNode = new FrameNode(currentNode[0], currentNode[1], currentNode[2], currentNode[3][0], currentNode[3][1]);
     const currentNodeIndex = allNodes.push(currentNode) - 1;
-    let nextChildIndex = currentNodeIndex;
     if (currentNode.childCount !== 0) {
       for (let i = 0; i < currentNode.childCount; i++) {
-        if (!currentNode.children) currentNode.children = [];
         const returnValue = formTree(allNodes.length);
         if (returnValue && returnValue.index !== undefined) {
-          nextChildIndex = returnValue.index;
-          allNodes[returnValue.index].parent.push(currentNodeIndex);
-          currentNode.children.push(nextChildIndex);
+          const childIndex = returnValue.index;
+          allNodes[childIndex].parent = currentNodeIndex;
+          currentNode.children.push(childIndex);
         }
       }
     }
-    if (currentNode.onCPU > 0) terminalNodes.push(currentNode);
+    if (currentNode.onCPU > 0) terminalNodeIndexes.push(currentNodeIndex);
     return { index: currentNodeIndex };
   }
   return {
     treeRoot: allNodes[formTree(0).index],
     allNodes,
     methodLookup,
-    terminalNodes: terminalNodes.sort((a, b) => b.onCPU - a.onCPU),
+    terminalNodeIndexes: terminalNodeIndexes,
   };
 }
 

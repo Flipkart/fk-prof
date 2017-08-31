@@ -30,7 +30,7 @@ class ClusterSelectComponent extends Component {
     const valueOption = this.props.value && { name: this.props.value };
     return (
       <div>
-        <label className={styles.label} htmlFor="cluster">Select Cluster</label>
+        <label className={styles.label} htmlFor="cluster">Cluster</label>
         <Select
           id="cluster"
           clearable={false}

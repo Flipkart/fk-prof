@@ -1,6 +1,8 @@
 package fk.prof.storage.buffer;
 
-import fk.prof.storage.Callback;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,18 +13,14 @@ import java.nio.ByteBuffer;
  * @author gaurav.ashok
  */
 public class ByteBufferInputStream extends InputStream {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ByteBufferInputStream.class);
+    private final GenericObjectPool<ByteBuffer> bufferPool;
+    private final ByteBuffer buf;
+    private boolean closed = false;
 
-    private Callback closeHandler;
-    private ByteBuffer buf;
-
-    public ByteBufferInputStream(ByteBuffer buf) {
+    public ByteBufferInputStream(GenericObjectPool<ByteBuffer> bufferPool, ByteBuffer buf) {
         this.buf = buf;
-        this.closeHandler = null;
-    }
-
-    public ByteBufferInputStream(ByteBuffer buf, Callback closeHandler) {
-        this.buf = buf;
-        this.closeHandler = closeHandler;
+        this.bufferPool = bufferPool;
     }
 
     @Override
@@ -52,8 +50,12 @@ public class ByteBufferInputStream extends InputStream {
 
     @Override
     public void close() throws IOException {
-        if(closeHandler != null) {
-            closeHandler.call();
+        LOGGER.debug("returning buffer to bufferPool");
+        synchronized (this) {
+            if(!closed) {
+                bufferPool.returnObject(buf);
+                closed = true;
+            }
         }
     }
 }

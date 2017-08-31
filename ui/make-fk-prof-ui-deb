@@ -21,7 +21,9 @@ echo "Copying DEBIAN into ${DIST_DIR}..."
 cp -r $DEBIAN_DIR $DIST_DIR/
 
 echo "Copying app files into ${DEST_PATH}..."
-cp -r node_modules server.js package.json public $DEST_PATH
+cp -r server.js package.json public $DEST_PATH
+
+tar -czhf "$DEST_PATH/node_modules.tar.gz" node_modules
 
 export VERSION=$(date +%Y%m%d-%H%M)
 echo $VERSION

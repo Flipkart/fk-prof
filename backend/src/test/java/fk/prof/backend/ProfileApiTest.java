@@ -56,15 +56,15 @@ public class ProfileApiTest {
   @BeforeClass
   public static void setUp(TestContext context) throws Exception {
     ConfigManager.setDefaultSystemProperties();
-    ConfigManager configManager = spy(new ConfigManager(ProfileApiTest.class.getClassLoader().getResource("config.json").getFile()));
+    Configuration config = spy(ConfigManager.loadConfig(ProfileApiTest.class.getClassLoader().getResource("config.json").getFile()));
 
-    vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
+    vertx = Vertx.vertx(new VertxOptions(config.getVertxOptions()));
     activeAggregationWindows = new ActiveAggregationWindowsImpl();
-    leaderReadContext = new InMemoryLeaderStore(configManager.getIPAddress(), configManager.getLeaderHttpPort());
-    associatedProcessGroups = new AssociatedProcessGroupsImpl(configManager.getRecorderDefunctThresholdInSeconds());
-    port = configManager.getBackendHttpPort();
+    leaderReadContext = new InMemoryLeaderStore(config.getIpAddress(), config.getLeaderHttpServerOpts().getPort());
+    associatedProcessGroups = new AssociatedProcessGroupsImpl(config.getRecorderDefunctThresholdSecs());
+    port = config.getBackendHttpServerOpts().getPort();
 
-    VerticleDeployer backendVerticleDeployer = new BackendHttpVerticleDeployer(vertx, configManager, leaderReadContext, activeAggregationWindows, associatedProcessGroups);
+    VerticleDeployer backendVerticleDeployer = new BackendHttpVerticleDeployer(vertx, config, leaderReadContext, activeAggregationWindows, associatedProcessGroups);
     backendVerticleDeployer.deploy();
     //Wait for some time for verticles to be deployed
     Thread.sleep(1000);

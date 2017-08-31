@@ -23,8 +23,13 @@ void sleep_for_millis(uint period) {
 Processor::Processor(jvmtiEnv* _jvmti, Processes&& _processes)
     : jvmti(_jvmti), running(false), processes(_processes),
 
-      s_t_yield_tm(GlobalCtx::metrics_registry->new_timer({METRICS_DOMAIN, "processor", "sched_yield", "time"})) {}
+      s_t_yield_tm(get_metrics_registry().new_timer({METRICS_DOMAIN, "processor", "sched_yield", "time"})) {}
 
+Processor::~Processor() {
+    for (auto& p : processes) {
+        delete p;
+    }
+}
 
 void Processor::run() {
     while (true) {

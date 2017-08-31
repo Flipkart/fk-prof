@@ -46,6 +46,7 @@ public class AggregationWindowPlanner {
   private final Recorder.ProcessGroup processGroup;
   private final int aggregationWindowDurationInSecs;
   private final int policyRefreshBufferInSecs;
+  private final long aggregationWindowStartupTimer;
   private final Future<Long> aggregationWindowScheduleTimer;
 
   private AggregationWindow currentAggregationWindow = null;
@@ -65,6 +66,7 @@ public class AggregationWindowPlanner {
                                   int backendId,
                                   int aggregationWindowDurationInSecs,
                                   int policyRefreshBufferInSecs,
+                                  int thresholdForDefunctRecorderInSecs,
                                   WorkAssignmentScheduleBootstrapConfig workAssignmentScheduleBootstrapConfig,
                                   WorkSlotPool workSlotPool,
                                   ProcessGroupContextForScheduling processGroupContextForScheduling,
@@ -100,18 +102,20 @@ public class AggregationWindowPlanner {
     this.mtrWindowExpireFailure = metricRegistry.meter(MetricRegistry.name(MetricName.AW_Expire_Failure.get(), processGroupStr));
 
     this.aggregationWindowScheduleTimer = Future.future();
-    getWorkForNextAggregationWindow(currentAggregationWindowIndex + 1).setHandler(ar -> {
-      aggregationWindowSwitcher();
+    this.aggregationWindowStartupTimer = vertx.setTimer(thresholdForDefunctRecorderInSecs * MILLIS_IN_SEC, tId -> {
+      getWorkForNextAggregationWindow(currentAggregationWindowIndex + 1).setHandler(ar -> {
+        aggregationWindowSwitcher();
 
-      // From vertx docs:
-      // Keep in mind that the timer will fire on a periodic basis.
-      // If your periodic treatment takes a long amount of time to proceed, your timer events could run continuously or even worse : stack up.
-      // NOTE: The above is a fringe scenario since aggregation window duration is going to be in excess of 20 minutes
-      // Still, there is a way to detect if this build-up happens. If aggregation window switch event happens before work profile is fetched, we publish a metric
-      // If /leader/work API latency is within bounds but this metric is high, this implies a build-up of aggregation window events
-      long periodicTimerId = vertx.setPeriodic(aggregationWindowDurationInSecs * MILLIS_IN_SEC,
-          timerId -> aggregationWindowSwitcher());
-      this.aggregationWindowScheduleTimer.complete(periodicTimerId);
+        // From vertx docs:
+        // Keep in mind that the timer will fire on a periodic basis.
+        // If your periodic treatment takes a long amount of time to proceed, your timer events could run continuously or even worse : stack up.
+        // NOTE: The above is a fringe scenario since aggregation window duration is going to be in excess of 20 minutes
+        // Still, there is a way to detect if this build-up happens. If aggregation window switch event happens before work profile is fetched, we publish a metric
+        // If /leader/work API latency is within bounds but this metric is high, this implies a build-up of aggregation window events
+        long periodicTimerId = vertx.setPeriodic(aggregationWindowDurationInSecs * MILLIS_IN_SEC,
+            timerId -> aggregationWindowSwitcher());
+        this.aggregationWindowScheduleTimer.complete(periodicTimerId);
+      });
     });
   }
 
@@ -120,6 +124,7 @@ public class AggregationWindowPlanner {
    * To be called when leader de-associates relevant process group from the backend
    */
   public void close() {
+    vertx.cancelTimer(aggregationWindowStartupTimer);
     aggregationWindowScheduleTimer.setHandler(ar -> {
       if(ar.succeeded()) {
         vertx.cancelTimer(ar.result());

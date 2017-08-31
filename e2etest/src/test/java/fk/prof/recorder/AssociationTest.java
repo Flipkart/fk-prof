@@ -44,7 +44,8 @@ public class AssociationTest {
             "inst_typ=c0.small," +
             "backoff_start=2," +
             "backoff_max=5," +
-            "log_lvl=trace";
+            "log_lvl=trace," +
+            "stats_syslog_tag=foobar";
     private TestBackendServer server;
     private Function<byte[], byte[]>[] association = new Function[10];
     private Function<byte[], byte[]>[] poll = new Function[10];
@@ -113,6 +114,19 @@ public class AssociationTest {
 
         assertThat(pollCalledMoreThanOnce.getValue(), is(false));
         assertThat(assocCalledMoreThanOnce.getValue(), is(false));
+    }
+
+    @Test(timeout = 10000)
+    public void should_DieCleanly_InAbsenceOfAssociate() throws ExecutionException, InterruptedException, IOException, TimeoutException {
+        associateServer.stop();
+        associateServer2.stop();
+        setupRunner(DEFAULT_ARGS + ",allow_sigprof=n");
+        runner.start();
+
+        Thread.sleep(4000);
+
+        assertThat(runner.stop(), is(true));//this actually waits for the process to be reaped
+        assertThat(runner.exitCode(), is(128 + 15)); //15 == SIGTERM
     }
 
     @Test
@@ -379,7 +393,7 @@ public class AssociationTest {
         assertThat(recorderInfo.getCluster(), is("quux-cluster"));
         assertThat(recorderInfo.getInstanceId(), is("corge-iid"));
         assertThat(recorderInfo.getProcName(), is("grault-proc"));
-        assertThat(recorderInfo.getVmId(), is("garply-vmid"));
+        assertThat(recorderInfo.getVmId(), is(getVmInfo() + "garply-vmid"));
         assertThat(recorderInfo.getZone(), is("waldo-zone"));
         assertThat(recorderInfo.getInstanceType(), is("c0.small"));
         DateTime dateTime = ISODateTimeFormat.dateTimeParser().parseDateTime(recorderInfo.getLocalTime());
@@ -392,6 +406,19 @@ public class AssociationTest {
         long recorderTick = recorderInfo.getRecorderTick();
         assertThat(recorderTick, recorderTickMatcher);
         return recorderTick;
+    }
+
+    private static String getVmInfo() {
+        String vmInfoHack = wrap(System.getProperty("java.vm.info") + ", sharing");
+        return p("java.vm.name") + p("java.vm.specification.version") + p("java.vm.version") + vmInfoHack + p("java.vm.vendor");
+    }
+
+    private static String p(String key) {
+        return wrap(System.getProperty(key));
+    }
+
+    private static String wrap(String value) {
+        return value + "; ";
     }
 
     public static Recorder.RecorderCapabilities rc(boolean cpuSamp) {

@@ -51,6 +51,7 @@ private:
     std::shared_ptr<ProfileWriter> writer;
     std::shared_ptr<ProfileSerializingWriter> serializer;
     std::shared_ptr<Processor> processor;
+    std::function<void()> cancel_work;
     BlockingRingBuffer raw_writer_ring;
 
     Scheduler scheduler;
@@ -66,6 +67,8 @@ private:
 
     SerializationFlushThresholds sft;
     TruncationThresholds tts;
+
+    std::string vm_id;
 
     //[metrics......
     metrics::Timer& s_t_poll_rpc;
@@ -83,8 +86,6 @@ private:
 
     void run();
     
-    void run_with_associate(const Buff& associate_response_buff, const Time::Pt& start_time);
-
     void accept_work(Buff& poll_response_buff, const std::string& host, const std::uint32_t port);
 
     void with_current_work(std::function<void(W&, WSt&, WRes&, Time::Pt&, Time::Pt&)> proc);

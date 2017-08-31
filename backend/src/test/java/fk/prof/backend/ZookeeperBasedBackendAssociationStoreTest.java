@@ -30,7 +30,7 @@ public class ZookeeperBasedBackendAssociationStoreTest {
 
   private static List<Recorder.ProcessGroup> mockProcessGroups;
   private static Vertx vertx;
-  private static ConfigManager configManager;
+  private static Configuration config;
 
   private TestingServer testingServer;
   private CuratorFramework curatorClient;
@@ -46,9 +46,9 @@ public class ZookeeperBasedBackendAssociationStoreTest {
     );
 
     ConfigManager.setDefaultSystemProperties();
-    configManager = new ConfigManager(ZookeeperBasedBackendAssociationStoreTest.class.getClassLoader().getResource("config.json").getFile());
+    config = ConfigManager.loadConfig(ZookeeperBasedBackendAssociationStoreTest.class.getClassLoader().getResource("config.json").getFile());
 
-    vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
+    vertx = Vertx.vertx(new VertxOptions(config.getVertxOptions()));
   }
 
   @AfterClass
@@ -67,6 +67,7 @@ public class ZookeeperBasedBackendAssociationStoreTest {
 
     backendAssociationStore = new ZookeeperBasedBackendAssociationStore(
         vertx, curatorClient, backendAssociationPath, 2, 0, new ProcessGroupCountBasedBackendComparator());
+    backendAssociationStore.init();
   }
 
   @After
@@ -127,6 +128,47 @@ public class ZookeeperBasedBackendAssociationStoreTest {
   }
 
   @Test(timeout = 10000)
+  public void testGetOfAllAssociations(TestContext context) {
+    final Async async = context.async();
+    Future<Recorder.ProcessGroups> f1 = backendAssociationStore.reportBackendLoad(
+        BackendDTO.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.1f).setCurrTick(1).build());
+    Future<Recorder.ProcessGroups> f2 = backendAssociationStore.reportBackendLoad(
+        BackendDTO.LoadReportRequest.newBuilder().setIp("2").setPort(1).setLoad(0.2f).setCurrTick(1).build());
+    CompositeFuture.all(Arrays.asList(f1, f2)).setHandler(ar1 -> {
+      if (ar1.failed()) {
+        context.fail(ar1.cause());
+      } else {
+        Future<Recorder.AssignedBackend> f3 = backendAssociationStore.associateAndGetBackend(mockProcessGroups.get(0));
+        Future<Recorder.AssignedBackend> f4 = backendAssociationStore.associateAndGetBackend(mockProcessGroups.get(1));
+        Future<Recorder.AssignedBackend> f5 = backendAssociationStore.associateAndGetBackend(mockProcessGroups.get(2));
+        CompositeFuture.all(Arrays.asList(f3, f4, f5)).setHandler(ar2 -> {
+          if (ar2.failed()) {
+            context.fail(ar2.cause());
+          } else {
+            Recorder.BackendAssociations associations = backendAssociationStore.getAssociations();
+            Set<Recorder.ProcessGroup> expectedPGs = new HashSet<>(Arrays.asList(mockProcessGroups.get(0), mockProcessGroups.get(1), mockProcessGroups.get(2)));
+            Set<Recorder.ProcessGroup> actualPGs = new HashSet<>();
+            int actualPGCount = 0;
+            Set<String> expectedIPs = new HashSet<>(Arrays.asList("1", "2"));
+            Set<String> actualIPs = new HashSet<>();
+            for (Recorder.BackendAssociation backendAssociation: associations.getAssociationsList()) {
+              actualIPs.add(backendAssociation.getBackend().getHost());
+              for (Recorder.ProcessGroup processGroup: backendAssociation.getProcessGroupsList()) {
+                actualPGCount++;
+                actualPGs.add(processGroup);
+              }
+            }
+            context.assertEquals(expectedIPs, actualIPs);
+            context.assertEquals(expectedPGs, actualPGs);
+            context.assertEquals(expectedPGs.size(), actualPGCount); //asserting counts because actualPGs is a set and de-duplication can happen so just asserting equality of sets is not sufficient here
+            async.complete();
+          }
+        });
+      }
+    });
+  }
+
+  @Test(timeout = 10000)
   public void testReloadOfAssociationsFromZK(TestContext context) {
     final Async async = context.async();
     Future<Recorder.ProcessGroups> f1 = backendAssociationStore.reportBackendLoad(
@@ -148,6 +190,7 @@ public class ZookeeperBasedBackendAssociationStoreTest {
             try {
               BackendAssociationStore anotherAssociationStore = new ZookeeperBasedBackendAssociationStore(
               vertx, curatorClient, backendAssociationPath, 2, 0, new ProcessGroupCountBasedBackendComparator());
+              anotherAssociationStore.init();
               Future<Recorder.AssignedBackend> f3_1 = anotherAssociationStore.associateAndGetBackend(mockProcessGroups.get(0));
               Future<Recorder.AssignedBackend> f4_1 = anotherAssociationStore.associateAndGetBackend(mockProcessGroups.get(1));
               Future<Recorder.AssignedBackend> f5_1 = anotherAssociationStore.associateAndGetBackend(mockProcessGroups.get(2));

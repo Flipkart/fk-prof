@@ -1,3 +1,6 @@
+#ifndef METRICS_H
+#define METRICS_H
+
 #include <medida/medida.h>
 
 namespace metrics {
@@ -16,6 +19,6 @@ namespace metrics {
 #define METRICS_TYPE_LOCK "lock"
 #define METRICS_TYPE_OP "op"
 
-namespace GlobalCtx {
-    extern medida::MetricsRegistry* metrics_registry;
-};
+medida::MetricsRegistry& get_metrics_registry();
+
+#endif

@@ -2,22 +2,15 @@ package fk.prof.storage;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
-import com.amazonaws.ClientConfiguration;
-import com.amazonaws.Protocol;
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.AnonymousAWSCredentials;
-import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.ListObjectsRequest;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
-import com.amazonaws.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Set;
@@ -34,39 +27,15 @@ public class S3AsyncStorage implements AsyncStorage {
     private static String NO_SUCH_KEY = "NoSuchKey";
     private static String NO_SUCH_BUCKET = "NoSuchBucket";
     private AmazonS3 client;
-    private String endpoint;
-    private String accessKey;
-    private String secretKey;
-    private ExecutorService executorService;
+    private final ExecutorService executorService;
+    private final long listObjectsTimeoutInMs;
 
-    public S3AsyncStorage(String endpoint, String accessKey, String secretKey, ExecutorService executorService) {
-        assert !StringUtils.isNullOrEmpty(endpoint) : "S3 endpoint cannot be null/empty";
-        assert executorService != null : "S3AsyncStorage.executorService cannot be null";
+    public S3AsyncStorage(AmazonS3 client, ExecutorService executorService, long listObjectsTimeoutInMs) {
+        assert client != null : "S3Client cannot be null";
 
-        this.endpoint = endpoint;
-        this.accessKey = accessKey;
-        this.secretKey = secretKey;
+        this.client = client;
         this.executorService = executorService;
-
-        initialize();
-    }
-
-    private void initialize() {
-        ClientConfiguration clientConfig = new ClientConfiguration();
-        clientConfig.setProtocol(Protocol.HTTP);
-
-        AWSCredentials credentials;
-        if(StringUtils.isNullOrEmpty(accessKey) || StringUtils.isNullOrEmpty(secretKey)) {
-            LOGGER.warn("S3 access key | secret key is empty. Trying anonymous credentials");
-            credentials = new AnonymousAWSCredentials();
-        }
-        else {
-            credentials = new BasicAWSCredentials(accessKey, secretKey);
-        }
-
-        client = new AmazonS3Client(credentials, clientConfig);
-        client.setEndpoint(endpoint);
-        client.setS3ClientOptions(new S3ClientOptions().withPathStyleAccess(true));
+        this.listObjectsTimeoutInMs = listObjectsTimeoutInMs;
     }
 
     @Override
@@ -80,7 +49,13 @@ public class S3AsyncStorage implements AsyncStorage {
             } catch (AmazonClientException e) { // content InputStream is by default closed by the S3Client, so need to close it.
                 throw mapClientException(e);
             } catch (Exception ex) {
-                throw new StorageException("Unexpected error during S3 PUT for path=" + path, ex);
+                throw new StorageException("Unexpected error during S3 PUT for path: " + path, ex);
+            } finally {
+                try {
+                    content.close();
+                } catch (IOException e) {
+                    LOGGER.error("Failed to close inputStream for path: {}", path, e);
+                }
             }
         }, executorService);
     }
@@ -106,22 +81,33 @@ public class S3AsyncStorage implements AsyncStorage {
         S3ObjectPath objectPath = new S3ObjectPath(prefixPath);
         return CompletableFuture.supplyAsync(() -> {
             try {
+                long startTime = System.currentTimeMillis();
                 Set<String> allObjects = new HashSet<>();
-                ObjectListing objects;
-                if (recursive) {
-                    objects = client.listObjects(new ListObjectsRequest().withBucketName(objectPath.bucket).withPrefix(objectPath.fileName));
-                } else {
-                    objects = client.listObjects(new ListObjectsRequest().withBucketName(objectPath.bucket).withDelimiter(DELIMITER).withPrefix(objectPath.fileName));
+                ObjectListing objects = null;
+                ListObjectsRequest request = new ListObjectsRequest().withBucketName(objectPath.bucket).withPrefix(objectPath.fileName);
+                if(!recursive) {
+                    request.withDelimiter(DELIMITER);
                 }
 
                 do {
+                    if(objects != null) {
+                        request.setMarker(objects.getNextMarker());
+                    }
+                    objects = client.listObjects(request);
+
                     for (S3ObjectSummary objSummary : objects.getObjectSummaries()) {
                         allObjects.add(objectPath.bucket + "/" + objSummary.getKey());                    //All files with prefix with complete path
                     }
-                    for (String commonPrefix : objects.getCommonPrefixes()) {   //Folders in current dir (if delimiter passed)
+                    for (String commonPrefix : objects.getCommonPrefixes()) {                             //Folders in current dir (if delimiter passed)
                         allObjects.add(objectPath.bucket + "/" + commonPrefix);                           //with complete path
                     }
+
+                    if(startTime + listObjectsTimeoutInMs < System.currentTimeMillis()) {
+                        LOGGER.warn("Timeout while listing objects for prefix: {}, isRecursive: {}, fileCount: {}", prefixPath, recursive, allObjects.size());
+                        break;
+                    }
                 } while (objects.isTruncated());
+                // TODO add metric to track the time taken by this method.
                 return allObjects;
             } catch (AmazonServiceException svcEx) {
                 LOGGER.error("S3 ListObjects failed: {}", prefixPath, svcEx);

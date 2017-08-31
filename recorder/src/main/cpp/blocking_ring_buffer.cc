@@ -6,13 +6,13 @@
 BlockingRingBuffer::BlockingRingBuffer(std::uint32_t _capacity) :
     read_idx(0), write_idx(0), capacity(_capacity), available(0), buff(new std::uint8_t[capacity]), allow_writes(true),
     
-    s_t_write(GlobalCtx::metrics_registry->new_timer({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "write"})),
-    s_t_write_wait(GlobalCtx::metrics_registry->new_timer({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "write_wait"})),
-    s_h_write_sz(GlobalCtx::metrics_registry->new_histogram({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "write_sz"})),
+    s_t_write(get_metrics_registry().new_timer({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "write"})),
+    s_t_write_wait(get_metrics_registry().new_timer({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "write_wait"})),
+    s_h_write_sz(get_metrics_registry().new_histogram({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "write_sz"})),
 
-    s_t_read(GlobalCtx::metrics_registry->new_timer({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "read"})),
-    s_t_read_wait(GlobalCtx::metrics_registry->new_timer({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "read_wait"})),
-    s_h_read_sz(GlobalCtx::metrics_registry->new_histogram({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "read_sz"})) {
+    s_t_read(get_metrics_registry().new_timer({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "read"})),
+    s_t_read_wait(get_metrics_registry().new_timer({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "read_wait"})),
+    s_h_read_sz(get_metrics_registry().new_histogram({METRICS_DOMAIN, METRICS_TYPE_OP, METRIC_RING, "read_sz"})) {
     
     logger->trace("Created a ring of capacity: {}, available: {}", capacity, available);
 }

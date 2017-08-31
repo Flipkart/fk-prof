@@ -2,10 +2,10 @@
 #include <vector>
 #include <iostream>
 #include <cstdint>
+#include "../../main/cpp/perf_ctx.hh"
 #include "fixtures.hh"
 #include "test.hh"
 #include "../../main/cpp/globals.hh"
-#include "../../main/cpp/perf_ctx.hh"
 
 using namespace PerfCtx;
 
@@ -64,21 +64,31 @@ TEST(ThreadPerfCtxTracker__should_not_allow_unpaired_pop) {
     ThreadTracker t_ctx(r, prob_pct, 210);
     std::array<TracePt, MAX_NESTING> curr;
 
+    reg(r, "ctx-2", PerfCtx::MergeSemantic::to_parent);
+    reg(r, "ctx-3", PerfCtx::MergeSemantic::to_parent);
+
     LOAD_AND_ASSERT_CURRENT_CTX_IS(0, t_ctx, curr);
-    t_ctx.enter(10);
-    t_ctx.enter(20);
     try {
-        t_ctx.exit(10);
+        t_ctx.exit(2);
         CHECK(false); //should never reach here
     } catch (const IncorrectEnterExitPairing& e) {
-        CHECK_EQUAL("Expected 20 got 10", e.what());
+        CHECK_EQUAL("Unexpected exit for 'ctx-2'(2)", e.what());
     }
-    std::array<TracePt, 1> expected{{10}};
+    LOAD_AND_ASSERT_CURRENT_CTX_IS(0, t_ctx, curr);
+    t_ctx.enter(2);
+    t_ctx.enter(3);
+    try {
+        t_ctx.exit(2);
+        CHECK(false); //should never reach here
+    } catch (const IncorrectEnterExitPairing& e) {
+        CHECK_EQUAL("Expected exit for 'ctx-3'(3) got 'ctx-2'(2)", e.what());
+    }
+    std::array<TracePt, 1> expected{{2}};
     LOAD_AND_ASSERT_CURRENT_CTX_IS(1, t_ctx, curr);
     CHECK_ARRAY_EQUAL(expected, curr, 1);
-    t_ctx.exit(20);
+    t_ctx.exit(3);
     CHECK_ARRAY_EQUAL(expected, curr, 1);
-    t_ctx.exit(10);
+    t_ctx.exit(2);
     LOAD_AND_ASSERT_CURRENT_CTX_IS(0, t_ctx, curr);
 }
 
@@ -225,7 +235,7 @@ TEST(ThreadPerfCtxTracker__not_nest_beyond_max_depth__when_scoping_under_parent)
         t_ctx.exit(42); //now gibberish won't work, because ctx is tracking it
         CHECK(false); //should never reach here
     } catch (const IncorrectEnterExitPairing& e) {
-        CHECK_EQUAL(Util::to_s("Expected ", SCOPED_MASK | 11, " got 42"), e.what());
+        CHECK_EQUAL(Util::to_s("Expected exit for '11'(", SCOPED_MASK | 11, ") got '~ Un-registered ~'(42)"), e.what());
     }
     
     t_ctx.exit(SCOPED_MASK | 11);

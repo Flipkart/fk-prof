@@ -28,10 +28,15 @@ import java.util.zip.GZIPOutputStream;
  * Created by gaurav.ashok on 27/03/17.
  */
 public class S3Util {
+    private final String sampleStackTraces = "[\n [\n\"B():10\",\n\"A():10\"\n ],\n [\n\"B():10\",\n\"A():10\"\n ],\n [\n\"C():10\",\n\"B():11\",\n\"A():10\"\n ],\n [\n\"C():10\",\n\"B():11\",\n\"A():10\"\n ],\n [\n\"B():10\",\n\"A():11\"\n ],\n [\n\"C():10\",\n\"B():11\",\n\"A():11\"\n ],\n [\n\"C():10\",\n\"B():11\",\n\"A():11\"\n ],\n [\n\"C():10\",\n\"B():11\",\n\"A():10\",\n\"C():10\"\n ],\n [\n\"B():10\",\n\"B():11\",\n\"A():10\",\n\"C():10\"\n ],\n [\n\"B():10\",\n\"C():10\"\n ]\n]";
+
+
     public void uploadFile() throws Exception {
 
-        String startime = "2017-03-01T07:00:00";
-        FinalizedAggregationWindow window =  MockAggregationWindow.buildAggregationWindow(startime, new MockAggregationWindow.FileLoader("/Users/gaurav.ashok/Documents/fk-profiler/methodids_mock"));
+        String startime = "2017-03-14T07:00:00";
+        int durationInSeconds = 300;
+
+        FinalizedAggregationWindow window =  MockAggregationWindow.buildAggregationWindow(startime, () -> sampleStackTraces, durationInSeconds);
         ZonedDateTime startimeZ = ZonedDateTime.parse(startime + "Z", DateTimeFormatter.ISO_ZONED_DATE_TIME);
 
         ByteArrayOutputStream boutWS = new ByteArrayOutputStream();
@@ -55,12 +60,12 @@ public class S3Util {
         // check for validity
         AggregatedProfileLoader loader = new AggregatedProfileLoader(null);
         Future f1 =  Future.future();
-        AggregatedProfileNamingStrategy file1 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, 1800, AggregatedProfileModel.WorkType.cpu_sample_work);
+        AggregatedProfileNamingStrategy file1 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, durationInSeconds, AggregatedProfileModel.WorkType.cpu_sample_work);
         loader.loadFromInputStream(f1, file1, new GZIPInputStream(new ByteArrayInputStream(boutWS.toByteArray())));
         assert f1.succeeded();
 
         Future f2 =  Future.future();
-        AggregatedProfileNamingStrategy file2 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, 1800);
+        AggregatedProfileNamingStrategy file2 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, durationInSeconds);
         loader.loadSummaryFromInputStream(f2, file2, new GZIPInputStream(new ByteArrayInputStream(boutSummary.toByteArray())));
         assert f2.succeeded();
 

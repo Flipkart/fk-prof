@@ -13,6 +13,18 @@ import 'react-treeview/react-treeview.css';
 
 
 class ProfileListComponent extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      hideEmptyProfiles: true
+    }
+    this.toggleEmptyProfiles = this.toggleEmptyProfiles.bind(this);    
+  }
+
+  componentDidUpdate () {
+    componentHandler.upgradeDom(); // eslint-disable-line
+  }
+
   componentDidMount () {
     const { app, cluster, proc, start, end } = this.props;
     const startObject = moment(start);
@@ -49,6 +61,12 @@ class ProfileListComponent extends Component {
     }
   }
 
+  toggleEmptyProfiles() {
+    this.setState({
+      hideEmptyProfiles: !this.state.hideEmptyProfiles
+    });
+  }
+
   render () {
     const { profiles } = this.props;
     if (!profiles) return null;
@@ -65,30 +83,79 @@ class ProfileListComponent extends Component {
 
       const sortedProfiles = profiles.data.succeeded
         .slice()
-        .filter(p => p.traces.length)
         .sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime());
+      
+      const profilesWithTracesScoreAndIndicator = [];
+      for(let i = 0;i<sortedProfiles.length;i++) {
+        let p = sortedProfiles[i];
+        if(!p.traces.length) {
+          profilesWithTracesScoreAndIndicator.push([p, null, 0]);
+        } else {
+          let tracesScore = this.calculateTraceScoreForProfile(p);
+          if(tracesScore && tracesScore.length > 0) {
+            profilesWithTracesScoreAndIndicator.push([p, tracesScore, 2]);
+          } else {
+            profilesWithTracesScoreAndIndicator.push([p, tracesScore, 1]);
+          }
+        }
+      }
 
       return (
-        <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
-          {sortedProfiles.map((profile) => {
-            const startTime = new Date(profile.start);
-            const endTime = new Date(startTime.getTime() + (profile.duration * 1000));
-            return (
-              <Profile
-                key={profile.start}
-                heading={`
-                  ${dateFormat(startTime, 'profileList')} - ${dateFormat(endTime, 'profileList')}
-                `}
-                traces={profile.traces}
-                start={profile.start}
-                workTypeSummary={profile.ws_summary}
-              />
-            );
-          })}
+        <div>
+          <div style={{margin: "0px 4px 16px 4px"}}>
+            <div style={{display: "inline-block", marginRight: "16px"}}>
+              Hide empty profiles
+            </div>          
+            <div style={{display: "inline-block"}}>
+              <label htmlFor="hideEmptySwitch" className="mdl-switch mdl-js-switch" style={{zIndex: 0}}>
+                <input type="checkbox" id="hideEmptySwitch" className="mdl-switch__input"
+                  checked={this.state.hideEmptyProfiles}
+                  onChange={this.toggleEmptyProfiles}
+                />
+              </label>
+            </div>  
+          </div>
+          <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
+            {profilesWithTracesScoreAndIndicator.map((profileDetail) => {
+              if(this.state.hideEmptyProfiles && profileDetail[2] != 2) {
+                return null;
+              }
+
+              const startTime = new Date(profileDetail[0].start);
+              const endTime = new Date(startTime.getTime() + (profileDetail[0].duration * 1000));
+              return (
+                <Profile
+                  key={profileDetail[0].start}
+                  heading={`
+                    ${dateFormat(startTime, 'profileList')} - ${dateFormat(endTime, 'profileList')}
+                  `}
+                  profile={profileDetail[0]}
+                  tracesScore={profileDetail[1]}
+                />
+              );
+            })}
+          </div>
         </div>
       );
     }
     return null;
+  }
+
+  calculateTraceScoreForProfile(profile) {
+    return Object.keys(profile.ws_summary)
+    .reduce((scores, workType) => {
+      profile.ws_summary[workType].traces.forEach((trace) => {
+        scores[trace.trace_idx] = scores[trace.trace_idx] || 0;
+        scores[trace.trace_idx] += trace.props.samples;
+      });
+      return scores;
+    }, [])
+    .map((eachScore, i) => ({
+      score: eachScore,
+      name: profile.traces[i],
+    }))
+    .filter(x => x !== undefined)
+    .sort((a, b) => b.score - a.score);
   }
 }
 

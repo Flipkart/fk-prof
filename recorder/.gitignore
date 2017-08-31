@@ -1,2 +1,3 @@
 libbagent.a
 libtestbase.a
+*.tmp

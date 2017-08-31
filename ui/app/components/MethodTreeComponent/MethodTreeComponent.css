@@ -1,16 +1,11 @@
-.label {
-  color: #666;
+.filterBox {
+  font-size: 14px;
+  width: 300px;
 }
 
-.bold {
-  font-weight: bold;
-}
-
-.filter {
-  padding: 6px;
-  border: 1px solid #eee;
-  margin-left: 20px;
-  font-size: 0.7em;
+.filterBox input {
+  color: rgb(255,64,129);
+  border-bottom: 1px solid rgb(63,81,181);
 }
 
 .alert {
@@ -21,84 +16,56 @@
   font-size: 16px;
 }
 
-.card {
-  padding: 4px;
-  box-shadow: rgba(0, 0, 0, 0.117647) 0px 1px 6px, rgba(0, 0, 0, 0.117647) 0px 1px 4px;
-  border-radius: 2px;
+input:focus {
+  border-radius: 0px;
+  outline-width: 1px;
+  outline-color: rgb(63,81,181);
 }
 
-.listItem {
-  display: inline-block;
-  height: 14px;
+.GridRow {
+  position: relative;
+  display: flex;
+  flex-direction: row;
 }
 
-.hover {
-  padding: 1px;
-  border-bottom: 1px solid rgba(158, 158, 158, 0.28);
-  &:HOVER {
-    background: #eee;
+.RightGridContainer {
+  flex: 0 0 150px;
+  z-index: 10;
+  flex-direction: column;
+}
+
+.RightGrid {
+  outline: 0;
+  overflow: hidden !important;
+}
+
+.LeftGridContainer {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  margin-left: 10px;
+}
+
+.GridHeader {
+  flex: 0 0 auto;
+  height: 87px;
+  display: flex;
+  align-items: center;
+  label {
+    font-weight: bold;
+    color: rgb(63,81,181);
   }
 }
 
-.pill {
-  display: inline-block;
-  width: 90px;
-  font-weight: bold;
-  color: #ff4081;
+.GridBody {
+  flex: 1 1 auto;
 }
 
-.onCPU {
-  position: absolute;
-  right: 110px;
-  width: 100px;
+.GridHeaderContent {
+  flex: 1 1 auto;
 }
 
-.onStack {
-  position: absolute;
-  right: 0px;
-  width: 100px;
-}
-
-.relative {
-  position: relative;
-}
-
-.code {
-  position: absolute;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  left: 14px;
-  white-space: nowrap;
-  right: 220px;
-}
-
-.heading {
-  font-weight: bold;
-  text-align: center;
-}
-
-.number {
-  text-align: left;
-  display: inline-block;
-  width: 30%;
-}
-
-.percentage {
-  text-align: center;
-  display: inline-block;
-  position: relative;
-  width: 70%;
-  .shade {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    background: #ff4081;
-    opacity: 0.2;
-    height: inherit;
-  }
-}
-
-.yellow {
-  background: #9DFF0A;
+.LeftGrid {
+  width: 100%;
+  outline: 0;
 }

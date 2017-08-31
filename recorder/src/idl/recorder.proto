@@ -124,11 +124,17 @@ message TraceContext {
 }
 
 message MethodInfo {
-  required int64 method_id = 1;
+  required int64 method_id = 1; //this is int64 for backward compatibility (it should be uint32), as we were earlier passing jMethodId un-translated
   required string file_name = 2;
   required string class_fqdn = 3;
   required string method_name = 4;
   required string signature = 5;
+  enum CodeClass {
+    cls_java                = 0;
+    cls_native              = 1;
+    // jruby, clojure etc can all go here
+  }
+  optional CodeClass c_cls = 6 [default = cls_java];
 }
 
 message ThreadInfo {
@@ -179,7 +185,9 @@ message StackSample {
     ticks_thread_exit           = 8;
     ticks_deopt                 = 9;
     ticks_safepoint             = 10;
-  }
+    fkp_no_error                = 100;
+    fkp_no_jni_env              = 101;
+  } // TODO: write me a test (to bijectively match BacktraceError)
   optional Error error = 6;
 }
 
@@ -217,4 +225,13 @@ message ProcessGroup {
 
 message ProcessGroups {
   repeated ProcessGroup processGroup = 1;
+}
+
+message BackendAssociation {
+  required AssignedBackend backend = 1;
+  repeated ProcessGroup processGroups = 2;
+}
+
+message BackendAssociations {
+  repeated BackendAssociation associations = 1;
 }

@@ -22,6 +22,8 @@ class Processor {
 public:
     explicit Processor(jvmtiEnv* _jvmti, Processes&& _tasks);
 
+    ~Processor();
+
     void start(JNIEnv *jniEnv);
 
     void run();

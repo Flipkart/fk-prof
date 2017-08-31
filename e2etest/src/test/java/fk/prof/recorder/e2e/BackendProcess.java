@@ -29,12 +29,14 @@ public class BackendProcess {
         String java = System.getProperty("java.home") + "/bin/java";
 
         List<String> classpath = Util.discoverClasspath(getClass());
-        String[] command = new String[] {java, "-cp", String.join(":", classpath), fqdn, "--conf", confPath.toString()};
+        String[] command = new String[] {java, "-Dvertx.logger-delegate-factory-class-name=io.vertx.core.logging.SLF4JLogDelegateFactory",
+                "-cp", String.join(":", classpath), fqdn, "--conf", confPath.toString()};
 
         process = new ProcessBuilder()
                 .command(command)
-                .redirectError(new File("/tmp/fkprof_backend_stderr.log"))
-                .redirectOutput(new File("/tmp/fkprof_backend_stdout.log"))
+                .inheritIO()
+//                .redirectError(new File("/tmp/fkprof_backend_stderr.log"))
+//                .redirectOutput(new File("/tmp/fkprof_backend_stdout.log"))
                 .start();
     }
 

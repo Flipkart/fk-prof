@@ -11,8 +11,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#define NOCTX_NAME "~ OTHERS ~"
-
 class RawWriter {
 public:
     RawWriter() {}
@@ -78,6 +76,8 @@ private:
     typedef std::int64_t MthId;
     typedef std::int64_t ThdId;
     typedef std::uint32_t CtxId;
+    typedef SiteResolver::Addr Pc;
+    typedef std::int32_t PcOffset;
     
     ProfileWriter& w;
     SiteResolver::MethodInfoResolver fir;
@@ -86,7 +86,8 @@ private:
 
     recording::Wse cpu_sample_accumulator;
     
-    std::unordered_set<MthId> known_methods;
+    std::unordered_map<MthId, MthId> known_methods;
+    std::unordered_map<Pc, std::pair<MthId, PcOffset>> known_symbols;
     MthId next_mthd_id;
     std::unordered_map<ThdId, ThdId> known_threads;
     ThdId next_thd_id;
@@ -102,6 +103,7 @@ private:
     metrics::Ctr& s_c_new_ctx_info;
     metrics::Ctr& s_c_total_mthd_info;
     metrics::Ctr& s_c_new_mthd_info;
+    metrics::Ctr& s_c_new_pc;
 
     metrics::Ctr& s_c_bad_lineno;
 
@@ -110,6 +112,20 @@ private:
     metrics::Mtr& s_m_stack_sample_err;
     metrics::Mtr& s_m_cpu_sample_add;
 
+    SiteResolver::SymInfo syms;
+
+    CtxId report_ctx(PerfCtx::TracePt trace_pt);
+
+    void fill_frame(const JVMPI_CallFrame& jvmpi_cf, recording::Frame* f);
+
+    void fill_frame(const NativeFrame& pc, recording::Frame* f);
+
+    MthId report_new_mthd_info(const char *file_name, const char *class_name, const char *method_name, const char *method_signature, const BacktraceType bt_type);
+
+    CtxId report_new_ctx(const std::string& name, const bool is_generated, const std::uint8_t coverage_pct, const PerfCtx::MergeSemantic m_sem);
+
+    void report_new_ctx(const CtxId ctx_id, const std::string& name, const bool is_generated, const std::uint8_t coverage_pct, const PerfCtx::MergeSemantic m_sem);
+
 public:
     ProfileSerializingWriter(jvmtiEnv* _jvmti, ProfileWriter& _w, SiteResolver::MethodInfoResolver _fir, SiteResolver::LineNoResolver _lnr,
                              PerfCtx::Registry& _reg, const SerializationFlushThresholds& _sft, const TruncationThresholds& _trunc_thresholds,
@@ -117,9 +133,9 @@ public:
 
     ~ProfileSerializingWriter();
 
-    virtual void record(const JVMPI_CallTrace &trace, ThreadBucket *info = nullptr, std::uint8_t ctx_len = 0, PerfCtx::ThreadTracker::EffectiveCtx* ctx = nullptr);
+    virtual void record(const Backtrace &trace, ThreadBucket *info = nullptr, std::uint8_t ctx_len = 0, PerfCtx::ThreadTracker::EffectiveCtx* ctx = nullptr, bool default_ctx = false);
 
-    virtual void recordNewMethod(const jmethodID method_id, const char *file_name, const char *class_name, const char *method_name, const char *method_signature);
+    virtual MthId recordNewMethod(const jmethodID method_id, const char *file_name, const char *class_name, const char *method_name, const char *method_signature);
 
     void flush();
 };

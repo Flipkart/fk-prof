@@ -35,7 +35,7 @@ class ProcSelectComponent extends Component {
     const valueOption = this.props.value && { name: this.props.value };
     return (
       <div>
-        <label className={styles.label} htmlFor="proc">Select Proc</label>
+        <label className={styles.label} htmlFor="proc">Process</label>
         <Select
           id="proc"
           clearable={false}

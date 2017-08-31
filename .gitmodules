@@ -1,6 +1,6 @@
 [submodule "recorder/vendor/concurrentqueue"]
 	path = recorder/vendor/concurrentqueue
-	url = git://github.com/cameron314/concurrentqueue.git
+	url = http://github.com/cameron314/concurrentqueue.git
 [submodule "recorder/vendor/spdlog"]
 	path = recorder/vendor/spdlog
-	url = git://github.com/gabime/spdlog.git
+	url = http://github.com/gabime/spdlog.git

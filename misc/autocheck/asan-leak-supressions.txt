@@ -1,0 +1,3 @@
+# JVM managed stuff (eg. caches)
+leak:InstanceKlass::get_jmethod_id
+leak:ConstantPool::allocate

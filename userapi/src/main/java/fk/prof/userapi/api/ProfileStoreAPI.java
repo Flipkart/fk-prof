@@ -3,7 +3,6 @@ package fk.prof.userapi.api;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.AggregationWindowSummary;
-import fk.prof.userapi.model.FilteredProfiles;
 import io.vertx.core.Future;
 
 import java.time.ZonedDateTime;

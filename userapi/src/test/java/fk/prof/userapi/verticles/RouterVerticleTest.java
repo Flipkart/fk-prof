@@ -2,6 +2,7 @@ package fk.prof.userapi.verticles;
 
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.userapi.Configuration;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.deployer.VerticleDeployer;
@@ -23,13 +24,11 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentMatchers;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.internal.util.collections.Sets;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
-import java.net.ServerSocket;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -71,28 +70,28 @@ public class RouterVerticleTest {
     private Vertx vertx;
     private HttpClient client;
     private int port = 8082;
-    @InjectMocks
-    private HttpVerticle routerVerticle;
 
     @Mock
     private ProfileStoreAPIImpl profileDiscoveryAPI;
 
     @Before
-    public void setUp(TestContext testContext) throws Exception {
+    public void setUp(TestContext context) throws Exception {
+        final Async async = context.async();
         ProtoSerializers.registerSerializers(Json.mapper);
 
-        ServerSocket socket = new ServerSocket(0);
-        port = socket.getLocalPort();
-        socket.close();
-
-      UserapiConfigManager.setDefaultSystemProperties();
-        UserapiConfigManager userapiConfigManager = new UserapiConfigManager(ProfileStoreAPIImpl.class.getClassLoader().getResource("userapi-conf.json").getFile());
-      vertx = Vertx.vertx();
-      port = userapiConfigManager.getUserapiHttpPort();
+        UserapiConfigManager.setDefaultSystemProperties();
+        Configuration config = UserapiConfigManager.loadConfig(ProfileStoreAPIImpl.class.getClassLoader().getResource("userapi-conf.json").getFile());
+        vertx = Vertx.vertx();
+        port = config.getHttpConfig().getHttpPort();
         client = vertx.createHttpClient();
 
-        VerticleDeployer verticleDeployer = new UserapiHttpVerticleDeployer(vertx, userapiConfigManager, profileDiscoveryAPI);
-        verticleDeployer.deploy();
+        VerticleDeployer verticleDeployer = new UserapiHttpVerticleDeployer(vertx, config, profileDiscoveryAPI);
+        verticleDeployer.deploy().setHandler(ar -> {
+            if(ar.failed()) {
+                context.fail(ar.cause());
+            }
+            async.complete();
+        });
     }
 
     @After
@@ -100,7 +99,7 @@ public class RouterVerticleTest {
       vertx.close(testContext.asyncAssertSuccess());
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void TestRequestTimeout(TestContext testContext) throws Exception {
         final Async async = testContext.async();
         String pPrefixSet = "(^$|a|ap|app|app1)";
@@ -126,7 +125,7 @@ public class RouterVerticleTest {
         });
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void TestGetAppsRoute(TestContext testContext) throws Exception {
         final Async async = testContext.async();
         String pPrefixSet = "(^$|a|ap|app|app1)";
@@ -175,7 +174,7 @@ public class RouterVerticleTest {
 
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void TestHealthcheckRoute(TestContext testContext) throws Exception {
         final Async async = testContext.async();
         client.getNow(port, "localhost", "/health", httpClientResponse -> {
@@ -184,7 +183,7 @@ public class RouterVerticleTest {
         });
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void TestGetClustersRoute(TestContext testContext) throws Exception {
         final Async async = testContext.async();
         String pPrefixSet = "(^$|c|cl|clu|clus|clust|cluste|cluster|cluster1)";
@@ -267,7 +266,7 @@ public class RouterVerticleTest {
         CompositeFuture.all(pAndCorrectPrefix, pAndIncorrectPrefix, pAndNoPrefix, npAndPPrefix, npAndNpPrefix, npAndNoPrefix).setHandler(compositeFutureAsyncResult -> async.complete());
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void TestGetProcRoute(TestContext testContext) throws Exception {
         final Async async = testContext.async();
         String pPrefixSet = "(^$|p|pr|pro|proc|proce|proces|process|process1)";
@@ -357,7 +356,7 @@ public class RouterVerticleTest {
 
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void TestGetProfilesRoute(TestContext testContext) throws Exception {
         final Async async = testContext.async();
 
@@ -410,7 +409,7 @@ public class RouterVerticleTest {
         CompositeFuture.all(pAndCorrectPrefix, pAndIncorrectPrefix, pAndNoPrefix).setHandler(compositeFutureAsyncResult -> async.complete());
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void TestGetProfilesRoute_shouldReturnFailedProfilesIfThereIsExceptionWhenLoadingFiles(TestContext testContext) throws Exception {
         final Async async = testContext.async();
 

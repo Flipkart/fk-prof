@@ -506,11 +506,11 @@ TEST(BlockingRingBuffer_should_not_block_reads____or_allow_writes____when_readon
 
     start = std::chrono::steady_clock::now();
     CHECK_EQUAL(0, ring.read(buff, 0, 20));
-    CHECK_CLOSE(2, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count(), 2);
+    CHECK_CLOSE(1, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count(), 1);
 
     start = std::chrono::steady_clock::now();
     CHECK_EQUAL(0, ring.write(buff, 0, 20));
-    CHECK_CLOSE(8, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count(), 3);
+    CHECK_CLOSE(1, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count(), 1);
 }
 
 TEST(BlockingRingBuffer_should_not_block_writes____when_readonly____but_should_allow_completion_of_read) {

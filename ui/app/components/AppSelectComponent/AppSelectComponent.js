@@ -22,7 +22,7 @@ class AppSelectComponent extends React.Component {
     const valueOption = this.props.value && { name: this.props.value };
     return (
       <div>
-        <label className={styles.label} htmlFor="appid">Select App</label>
+        <label className={styles.label} htmlFor="appid">App</label>
         <Select
           clearable={false}
           id="appid"

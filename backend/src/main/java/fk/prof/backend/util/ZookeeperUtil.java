@@ -2,14 +2,38 @@ package fk.prof.backend.util;
 
 import io.vertx.core.Future;
 import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.utils.ZKPaths;
 import org.apache.zookeeper.KeeperException;
 
+import java.util.AbstractMap;
+import java.util.List;
+import java.util.Map;
+
 public class ZookeeperUtil {
+    public static final String DELIMITER = "/";
 
   public static byte[] readZNode(CuratorFramework curatorClient, String zNodePath)
       throws Exception {
     return curatorClient.getData().forPath(zNodePath);
   }
+
+    public static Map.Entry<String, byte[]> readLatestSeqZNodeChild(CuratorFramework curatorClient, String zNodePath) throws Exception {
+        List<String> sortedPolicyNodes = ZKPaths.getSortedChildren(curatorClient.getZookeeperClient().getZooKeeper(), zNodePath);
+        if (sortedPolicyNodes.isEmpty()) {
+            return null;
+        }
+        zNodePath = zNodePath + DELIMITER + sortedPolicyNodes.get(sortedPolicyNodes.size() - 1);
+        return new AbstractMap.SimpleEntry<>(ZKPaths.getNodeFromPath(zNodePath), readZNode(curatorClient, zNodePath));
+  }
+
+    public static String getLatestSeqZNodeChildName(CuratorFramework curatorClient, String zNodePath) throws Exception {
+        List<String> sortedPolicyNodes = ZKPaths.getSortedChildren(curatorClient.getZookeeperClient().getZooKeeper(), zNodePath);
+        if (sortedPolicyNodes.isEmpty()) {
+            return null;
+        }
+        zNodePath = zNodePath + DELIMITER + sortedPolicyNodes.get(sortedPolicyNodes.size() - 1);
+        return ZKPaths.getNodeFromPath(zNodePath);
+    }
 
   public static void writeZNode(CuratorFramework curatorClient, String zNodePath, byte[] data, boolean create)
       throws Exception {
@@ -35,37 +59,4 @@ public class ZookeeperUtil {
     }
     return future;
   }
-
-  //TODO: Keeping this around in case required for policy CRUD. If not used there, remove
-  public static Future<byte[]> readZNodeAsync(CuratorFramework curatorClient, String zNodePath)
-      throws Exception {
-    Future<byte[]> future = Future.future();
-    curatorClient.getData().inBackground((client, event) -> {
-      if (KeeperException.Code.OK.intValue() == event.getResultCode()) {
-        future.complete(event.getData());
-      } else {
-        future.fail(new RuntimeException("Error reading association data from backend znode. result_code=" + event.getResultCode()));
-      }
-    }).forPath(zNodePath);
-    return future;
-  }
-
-  //TODO: Keeping this around in case required for policy CRUD. If not used there, remove
-  public static Future<Void> writeZNodeAsync(CuratorFramework curatorClient, String zNodePath, byte[] data, boolean create)
-      throws Exception {
-    Future<Void> future = Future.future();
-    if(create) {
-      curatorClient.create().inBackground((client, event) -> {
-        if (KeeperException.Code.OK.intValue() == event.getResultCode()) {
-          future.complete(null);
-        } else {
-          future.fail(new RuntimeException("Error writing association data to backend znode. result_code=" + event.getResultCode()));
-        }
-      }).forPath(zNodePath, data);
-    } else {
-      curatorClient.setData().forPath(zNodePath, data);
-    }
-    return future;
-  }
-
 }

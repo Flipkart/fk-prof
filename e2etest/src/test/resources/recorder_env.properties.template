@@ -1,1 +1,3 @@
-LD_LIBRARY_PATH=/home/janmejay/tools/libs.local/lib
+LD_PRELOAD=/usr/lib/clang/3.7.1/lib/linux/libclang_rt.asan-x86_64.so
+ASAN_OPTIONS=handle_segv=0
+LSAN_OPTIONS=suppressions=asan-leak-supressions.txt

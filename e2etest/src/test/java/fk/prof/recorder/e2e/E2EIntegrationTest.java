@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.hamcrest.core.Is.*;
+import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.Assert.*;
 import static fk.prof.recorder.utils.Util.*;
 
@@ -191,11 +192,12 @@ public class E2EIntegrationTest {
         String getProfileUrl = "http://127.0.0.1:8082/profiles/bar-app_1/quux-cluster_1/grault-proc_1?start=" + someTimeFromNearPast.format(DateTimeFormatter.ISO_ZONED_DATE_TIME) + "&duration=3600";
 
         HttpResponse<String> httpResponse = cast(doRequest(getProfileUrl, "get", null, 200, false));
-        Map<String, Object> res = toMap(httpResponse.getBody());
+        String profileResp = httpResponse.getBody();
+        Map<String, Object> res = toMap(profileResp);
 
         ListProfilesMatcher responseMatcher = new ListProfilesMatcher()
                 .hasAggrWindows(2)
-                .latestAggrWindowHasTraces("inferno", "~ OTHERS ~");
+                .latestAggrWindowHasTraces("inferno", "~ OTHERS ~", "~ UNKNOWN ~");
 
         assertThat(res, responseMatcher);
 
@@ -228,7 +230,7 @@ public class E2EIntegrationTest {
         assertThat(recorderInfo.get("cluster"), is("quux-cluster_1"));
         assertThat(recorderInfo.get("instace_id"), is("corge-iid_1_1"));
         assertThat(recorderInfo.get("process_name"), is("grault-proc_1"));
-        assertThat(recorderInfo.get("vm_id"), is("garply-vmid"));
+        assertThat(recorderInfo.get("vm_id"), containsString("garply-vmid"));
         assertThat(recorderInfo.get("zone"), is("waldo-zone"));
         assertThat(recorderInfo.get("instance_type"), is("c0.small"));
 
@@ -343,7 +345,7 @@ public class E2EIntegrationTest {
         assertThat(res1, new ListProfilesMatcher()
                 .hasAggrWindows(1)
                 .latestAggrWindowHasWorkCount(2)                        // 1 for each recorder
-                .latestAggrWindowHasTraces("inferno", "~ OTHERS ~"));
+                .latestAggrWindowHasTraces("inferno", "~ OTHERS ~", "~ UNKNOWN ~"));
 
         assertThat(res2, new ListProfilesMatcher()
                 .hasAggrWindows(1)
@@ -464,6 +466,7 @@ public class E2EIntegrationTest {
         recorderParams.put("backoff_max", "5");
         recorderParams.put("log_lvl", "trace");
         recorderParams.put("poll_itvl", "10");
+        recorderParams.put("stats_syslog_tag", "foobar");
     }
 
     private static Map<String, String> getRecorderArgs(int processGroupVariant, int recorderVariant) {

@@ -29,7 +29,7 @@ TEST_FIXTURE(GivenQueue, OnlyInOnlyOut) {
   givenStackTrace(5);
 
   // when you push then pop
-  CHECK(queue->push(trace));
+  CHECK(queue->push(trace, BacktraceError::Fkp_no_error, false));
   // then you get the same value back
   CHECK(pop(5));
   // and no more
@@ -38,7 +38,7 @@ TEST_FIXTURE(GivenQueue, OnlyInOnlyOut) {
 
 void pushLocalTraceOnto(CircularQueue &queue, const long envId) {
   givenStackTrace(envId);
-  CHECK(queue.push(trace));
+  CHECK(queue.push(trace, BacktraceError::Fkp_no_error, false));
 }
 
 TEST_FIXTURE(GivenQueue, ElementsAreGenuinelyCopied) {
@@ -67,7 +67,7 @@ TEST_FIXTURE(GivenQueue, CantOverWriteUnreadInput) {
   }
 
   givenStackTrace(5);
-  CHECK(!queue->push(trace));
+  CHECK(!queue->push(trace, BacktraceError::Fkp_no_error, false));
 
   for (int i = 0; i < Size; i++) {
     CHECK(pop(5));
@@ -87,7 +87,7 @@ void runnable(long start, CircularQueue* queue) {
   int end = start + THREAD_GAP;
   for (long i = start; i < end; i++) {
     trace.env_id = (JNIEnv *) i;
-    CHECK(queue->push(trace));
+    CHECK(queue->push(trace, BacktraceError::Fkp_no_error, false));
   }
 }
 

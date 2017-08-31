@@ -13,4 +13,6 @@ public:
     bool on(std::uint32_t counter, std::uint8_t pct);
 };
 
+ProbPct& get_prob_pct();
+
 #endif

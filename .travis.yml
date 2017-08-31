@@ -1,0 +1,30 @@
+language: java
+jdk:
+  - oraclejdk8
+
+dist: trusty
+group: edge
+
+before_install:
+  - sudo apt-get remove cmake
+  - wget https://cmake.org/files/v3.8/cmake-3.8.2-Linux-x86_64.tar.gz -O /tmp/cmake.tar.gz
+  - tar -xf /tmp/cmake.tar.gz
+  - export PATH=$PATH:$PWD/cmake-3.8.2-Linux-x86_64/bin/
+
+install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y tree libunittest++-dev libboost-all-dev libprotobuf-dev protobuf-compiler elfutils libelf-dev valgrind libunwind8-dev
+  - elfutil_version=$(dpkg -l | grep libelf | grep dev | awk '{print $3}' | sed -e 's/-.\+//g')
+  - sed -i 's/{{elfutil_version}}/'${elfutil_version}'/g' libelf.pc
+  - sudo mv libelf.pc /usr/lib/pkgconfig/libelf.pc
+  
+before_script:
+  - git clone https://github.com/efficient/libcuckoo.git
+  - pushd libcuckoo && git checkout v0.2 && cmake . && sudo make install && popd
+  - git clone https://github.com/janmejay/medida.git
+  - pushd medida && cmake CMakeLists.txt && sudo make install && sudo ldconfig && popd
+
+script:
+  - pushd recorder && cmake CMakeLists.txt && make && popd
+  - mvn install -DskipTests=true -Dmaven.javadoc.skip=true -B -V -q
+  - mvn test -B --projects '!e2etest'

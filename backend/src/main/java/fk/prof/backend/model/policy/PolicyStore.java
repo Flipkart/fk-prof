@@ -25,13 +25,31 @@ public class PolicyStore {
   public static String policyStorePath = "/policy_store_temp";
   private final Map<Recorder.ProcessGroup, BackendDTO.RecordingPolicy> store = new ConcurrentHashMap<>();
   private final CuratorFramework curator;
+  private boolean initialized;
 
   public PolicyStore(CuratorFramework curator) throws Exception {
     this.curator = curator;
+    this.initialized = false;
     ensurePolicyStorePath();
+  }
 
-    // populate all existing configs
-    loadAllExistingPolicies();
+  /**
+   * Method to allow delayed initialization. Calling other method before init may result in undefined behaviour.
+   */
+  public void init() throws Exception {
+    synchronized (this) {
+      if (!initialized) {
+        // populate all existing policies
+        try {
+          loadAllExistingPolicies();
+        }
+        catch (Exception e) {
+          logger.error("Failed to load existing policies", e);
+          throw e;
+        }
+        initialized = true;
+      }
+    }
   }
 
   public void put(Recorder.ProcessGroup processGroup, BackendDTO.RecordingPolicy recordingPolicy) throws Exception {

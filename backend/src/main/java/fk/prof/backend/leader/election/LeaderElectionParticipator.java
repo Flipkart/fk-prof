@@ -1,6 +1,6 @@
 package fk.prof.backend.leader.election;
 
-import fk.prof.backend.ConfigManager;
+import fk.prof.backend.Configuration;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -12,14 +12,14 @@ public class LeaderElectionParticipator extends AbstractVerticle {
   private static Logger logger = LoggerFactory.getLogger(LeaderElectionParticipator.class);
   private final CuratorFramework curatorClient;
   private final Runnable leaderElectedTask;
-  private final ConfigManager configManager;
+  private final Configuration config;
 
   private LeaderSelector leaderSelector;
 
-  public LeaderElectionParticipator(ConfigManager configManager, CuratorFramework curatorClient, Runnable leaderElectedTask) {
+  public LeaderElectionParticipator(Configuration config, CuratorFramework curatorClient, Runnable leaderElectedTask) {
     this.curatorClient = curatorClient;
     this.leaderElectedTask = leaderElectedTask;
-    this.configManager = configManager;
+    this.config = config;
   }
 
   @Override
@@ -42,8 +42,8 @@ public class LeaderElectionParticipator extends AbstractVerticle {
 
   private LeaderSelectorListener createLeaderSelectorListener() {
     return new LeaderSelectorListenerImpl(
-        configManager.getIPAddress(),
-        configManager.getLeaderHttpPort(),
+        config.getIpAddress(),
+        config.getLeaderHttpServerOpts().getPort(),
         config().getString("leader.watching.path", "/backends"),
         KillBehavior.valueOf(config().getString("kill.behavior", "DO_NOTHING")),
         leaderElectedTask);

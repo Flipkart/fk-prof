@@ -11,6 +11,7 @@ PerfCtx::MergeSemantic PerfCtx::merge_semantic(PerfCtx::TracePt pt) {
 
 metrics::Mtr* s_m_bad_pairing;
 metrics::Mtr* s_m_nesting_overflow;
+metrics::Mtr* s_m_null_tracker;
 
 PerfCtx::ThreadTracker::ThreadTracker(Registry& _reg, ProbPct& _pct, int _tid) :
     reg(_reg), pct(_pct), ignore_count(0), effective_start(0), effective_end(0), record(false), tid(_tid) {
@@ -103,10 +104,15 @@ void PerfCtx::ThreadTracker::exit(PerfCtx::TracePt pt) throw (IncorrectEnterExit
         }
     }
 
+    if (actual_stack.size() == 0) {
+        s_m_bad_pairing->mark();
+        throw IncorrectEnterExitPairing(reg, pt);
+    }
+
     auto top = actual_stack.back();
     if (top.ctx != pt) {
         s_m_bad_pairing->mark();
-        throw IncorrectEnterExitPairing(top.ctx, pt);
+        throw IncorrectEnterExitPairing(reg, top.ctx, pt);
     }
     effective.resize(top.prev.end);
     effective_start = top.prev.start;
@@ -168,22 +174,31 @@ static void assert_equal(const char* name, std::uint8_t cov_pct, std::uint8_t me
 
 PerfCtx::Registry::Registry() :
     unused_prime_nos(MAX_USER_CTX_COUNT),
-    exhausted({false}),
+    exhausted(false),
 
-    s_c_ctx(GlobalCtx::metrics_registry->new_counter({METRICS_DOMAIN, METRIC_TYPE, "count"})),
-    s_m_create_rebind(GlobalCtx::metrics_registry->new_meter({METRICS_DOMAIN, METRIC_TYPE, "create"}, "rebind")),
-    s_m_create_conflict(GlobalCtx::metrics_registry->new_meter({METRICS_DOMAIN, METRIC_TYPE, "create"}, "conflict")),
-    s_m_create_runout(GlobalCtx::metrics_registry->new_meter({METRICS_DOMAIN, METRIC_TYPE, "create"}, "runout")),
+    s_c_ctx(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "count"})),
+    s_m_create_rebind(get_metrics_registry().new_meter({METRICS_DOMAIN, METRIC_TYPE, "create", "rebind"}, "rate")),
+    s_m_create_conflict(get_metrics_registry().new_meter({METRICS_DOMAIN, METRIC_TYPE, "create", "conflict"}, "rate")),
+    s_m_create_runout(get_metrics_registry().new_meter({METRICS_DOMAIN, METRIC_TYPE, "create", "runout"}, "rate")),
 
-    s_m_merge_reuse(GlobalCtx::metrics_registry->new_meter({METRICS_DOMAIN, METRIC_TYPE, "merge"}, "reuse")),
-    s_c_merge_new(GlobalCtx::metrics_registry->new_counter({METRICS_DOMAIN, METRIC_TYPE, "merge", "new"})) {
+    s_m_merge_reuse(get_metrics_registry().new_meter({METRICS_DOMAIN, METRIC_TYPE, "merge", "reuse"}, "rate")),
+    s_c_merge_new(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "merge", "new"})) {
 
-    s_m_bad_pairing = &GlobalCtx::metrics_registry->new_meter({METRICS_DOMAIN, METRIC_TYPE, "entry"}, "bad_pairing");
-    s_m_nesting_overflow = &GlobalCtx::metrics_registry->new_meter({METRICS_DOMAIN, METRIC_TYPE, "entry"}, "nesting_overflow");
+    s_m_bad_pairing = &get_metrics_registry().new_meter({METRICS_DOMAIN, METRIC_TYPE, "entry", "bad_pairing"}, "rate");
+    s_m_nesting_overflow = &get_metrics_registry().new_meter({METRICS_DOMAIN, METRIC_TYPE, "entry", "nesting_overflow"}, "rate");
+    s_m_null_tracker = &get_metrics_registry().new_meter({METRICS_DOMAIN, METRIC_TYPE, "trace", "null_tracker"}, "rate");
     load_unused_primes(MAX_USER_CTX_COUNT);
 }
 
 PerfCtx::Registry::~Registry() {}
+
+void PerfCtx::Registry::user_ctxs(std::vector<PerfCtx::TracePt>& trace_pts) {
+    trace_pts.reserve(name_to_pt.size());
+    auto l = name_to_pt.lock_table();
+    for (auto it = l.cbegin(); it != l.cend(); it++) {
+        trace_pts.push_back(it->second);
+    }
+}
 
 PerfCtx::TracePt PerfCtx::Registry::find_or_bind(const char* name, std::uint8_t coverage_pct, std::uint8_t merge_type) throw (PerfCtx::CtxCreationFailure) {
     TracePt pt;
@@ -287,9 +302,7 @@ PerfCtx::TracePt PerfCtx::Registry::merge_bind(const std::vector<ThreadCtx>& ctx
         buff << component_name;
     }
     auto name = buff.str();
-    if (name_to_pt.insert(std::ref(name), trace_pt)) {
-        auto inserted = pt_to_name.insert(trace_pt, name);
-        assert(inserted);
+    if (pt_to_name.insert(trace_pt, name)) {
         s_c_merge_new.inc();
     } else {
         logger->warn("Couldn't insert merge-generated ctx '{}' (0x{:x}), perhaps it was inserted concurrently", name, trace_pt);
@@ -334,16 +347,41 @@ std::ostream& operator<<(std::ostream& os, PerfCtx::MergeSemantic ms) {
     return os;
 }
 
-JNIEXPORT jlong JNICALL Java_fk_prof_PerfCtx_registerCtx(JNIEnv* env, jobject self, jstring name, jint coverage_pct, jint merge_type) {
-    const char* name_str = nullptr;
+static void name_for(PerfCtx::Registry& reg, const PerfCtx::TracePt pt, std::string& name) {
     try {
-        name_str = env->GetStringUTFChars(name, nullptr);
-        SPDLOG_DEBUG(logger, "Attempting registration of perf-ctx {} (cov: {}, merge: {})", name_str, coverage_pct, merge_type);
-        auto id = GlobalCtx::ctx_reg->find_or_bind(name_str, static_cast<std::uint8_t>(coverage_pct), static_cast<std::uint8_t>(merge_type));
-        SPDLOG_DEBUG(logger, "Registered perf-ctx {} as {}", name_str, id);
+        reg.name_for(pt, name);
+    } catch (const PerfCtx::UnknownCtx& e) {
+        name = "~ Un-registered ~";
+    }
+}
+
+PerfCtx::IncorrectEnterExitPairing::IncorrectEnterExitPairing(Registry& reg, const TracePt expected, const TracePt got) {
+    std::string expected_name, got_name;
+    name_for(reg, expected, expected_name);
+    name_for(reg, got, got_name);
+    msg = Util::to_s("Expected exit for '", expected_name, "'(", expected, ") got '", got_name, "'(", got, ")");
+}
+
+PerfCtx::IncorrectEnterExitPairing::IncorrectEnterExitPairing(Registry& reg, const TracePt got) {
+    std::string got_name;
+    name_for(reg, got, got_name);
+    msg = Util::to_s("Unexpected exit for '", got_name , "'(", got, ")");
+}
+
+const char* PerfCtx::IncorrectEnterExitPairing::what() const {
+    return msg.c_str();
+}
+
+JNIEXPORT jlong JNICALL Java_fk_prof_PerfCtx_registerCtx(JNIEnv* env, jobject self, jstring name, jint coverage_pct, jint merge_type) {
+    try {
+        std::unique_ptr<const char, std::function<void(const char*)>>
+            name_str(env->GetStringUTFChars(name, nullptr),
+                     [&](const char* str) { if (str != nullptr) env->ReleaseStringUTFChars(name, str); });
+        SPDLOG_DEBUG(logger, "Attempting registration of perf-ctx {} (cov: {}, merge: {})", name_str.get(), coverage_pct, merge_type);
+        auto id = get_ctx_reg().find_or_bind(name_str.get(), static_cast<std::uint8_t>(coverage_pct), static_cast<std::uint8_t>(merge_type));
+        SPDLOG_DEBUG(logger, "Registered perf-ctx {} as {}", name_str.get(), id);
         return static_cast<jlong>(id);
     } catch (PerfCtx::CtxCreationFailure& e) {
-        if (name_str != nullptr) env->ReleaseStringUTFChars(name, name_str);
         if (env->ThrowNew(env->FindClass("fk/prof/PerfCtxInitException"), e.what()) == 0) return -1;
         logger->warn("Conflicting definition of perf-ctx ignored, details: {}", e.what());
         return -1;
@@ -352,6 +390,11 @@ JNIEXPORT jlong JNICALL Java_fk_prof_PerfCtx_registerCtx(JNIEnv* env, jobject se
 
 JNIEXPORT void JNICALL Java_fk_prof_PerfCtx_end(JNIEnv* env, jobject self, jlong ctx_id) {
     auto thd_info = get_thread_map().get(env);
+    if (thd_info == nullptr) {
+        SPDLOG_TRACE(logger, "Couldn't discover thd_info for jniEnv: {} to exit ctx_id: {}", reinterpret_cast<std::uint64_t>(env), ctx_id);
+        s_m_null_tracker->mark();
+        return;
+    }
     try {
         SPDLOG_TRACE(logger, "Ending perf-ctx {} for jniEnv: {}", ctx_id, reinterpret_cast<std::uint64_t>(env));
         thd_info->ctx_tracker.exit(static_cast<PerfCtx::TracePt>(ctx_id));
@@ -362,7 +405,13 @@ JNIEXPORT void JNICALL Java_fk_prof_PerfCtx_end(JNIEnv* env, jobject self, jlong
 }
 
 JNIEXPORT void JNICALL Java_fk_prof_PerfCtx_begin(JNIEnv* env, jobject self, jlong ctx_id) {
+    
     auto thd_info = get_thread_map().get(env);
+    if (thd_info == nullptr) {
+        SPDLOG_TRACE(logger, "Couldn't discover thd_info for jniEnv: {} to enter ctx_id: {}", reinterpret_cast<std::uint64_t>(env), ctx_id);
+        s_m_null_tracker->mark();
+        return;
+    }
     SPDLOG_TRACE(logger, "Begining perf-ctx {} for jniEnv: {}", ctx_id, reinterpret_cast<std::uint64_t>(env));
     thd_info->ctx_tracker.enter(static_cast<PerfCtx::TracePt>(ctx_id));
     thd_info->release();

@@ -17,15 +17,17 @@
 #define GETENV_NEW_THREAD_ASYNC_UNSAFE
 #endif
 
-LoggerP logger(nullptr);
+LoggerP logger = spdlog::syslog_logger("syslog", "fk-prof-rec", LOG_PID);
 static ConfigurationOptions* CONFIGURATION;
 static Controller* controller;
-static ThreadMap threadMap;
-PerfCtx::Registry* GlobalCtx::ctx_reg;
-ProbPct* GlobalCtx::prob_pct;
-medida::MetricsRegistry* GlobalCtx::metrics_registry;
-medida::reporting::UdpReporter* metrics_reporter;
-MetricFormatter::SyslogTsdbFormatter *formatter;
+static ThreadMap thread_map;
+static medida::MetricsRegistry metrics_registry;
+static PerfCtx::Registry ctx_reg;
+static ProbPct prob_pct;
+static medida::reporting::UdpReporter* metrics_reporter;
+static MetricFormatter::SyslogTsdbFormatter *formatter;
+static ThdProcP metrics_thd;
+std::atomic<bool> abort_metrics_poll;
 
 // This has to be here, or the VM turns off class loading events.
 // And AsyncGetCallTrace needs class loading events to be turned on!
@@ -61,6 +63,14 @@ void CreateJMethodIDsForClass(jvmtiEnv *jvmti, jclass klass) {
     }
 }
 
+void metrics_poller(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg) {
+    auto itvl = std::chrono::seconds(5);
+    while (! abort_metrics_poll.load(std::memory_order_relaxed)) {
+        std::this_thread::sleep_for(itvl);
+        metrics_reporter->run();
+    }
+}
+
 void JNICALL OnVMInit(jvmtiEnv *jvmti, JNIEnv *jniEnv, jthread thread) {
     IMPLICITLY_USE(thread);
     // Forces the creation of jmethodIDs of the classes that had already
@@ -75,6 +85,7 @@ void JNICALL OnVMInit(jvmtiEnv *jvmti, JNIEnv *jniEnv, jthread thread) {
         CreateJMethodIDsForClass(jvmti, klass);
     }
 
+    metrics_thd = start_new_thd(jniEnv, jvmti, "Fk-Prof Metrics Reporter", metrics_poller, nullptr);
     controller->start();
 }
 
@@ -203,7 +214,7 @@ void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread)
                 main_started = true;
             }
         }
-        threadMap.put(jni_env, thread_info.name, thread_info.priority, thread_info.is_daemon);
+        thread_map.put(jni_env, thread_info.name, thread_info.priority, thread_info.is_daemon);
         jvmti_env->Deallocate((unsigned char *) thread_info.name);
     }
     pthread_sigmask(SIG_UNBLOCK, &prof_signal_mask, NULL);
@@ -211,15 +222,15 @@ void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread)
 
 void JNICALL OnThreadEnd(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread) {
     pthread_sigmask(SIG_BLOCK, &prof_signal_mask, NULL);
-    threadMap.remove(jni_env);
+    thread_map.remove(jni_env);
 }
 
 static bool RegisterJvmti(jvmtiEnv *jvmti) {
     sigemptyset(&prof_signal_mask);
     sigaddset(&prof_signal_mask, SIGPROF);
     // Create the list of callbacks to be called on given events.
-    jvmtiEventCallbacks *callbacks = new jvmtiEventCallbacks();
-    memset(callbacks, 0, sizeof(jvmtiEventCallbacks));
+    std::unique_ptr<jvmtiEventCallbacks> callbacks(new jvmtiEventCallbacks());
+    memset(callbacks.get(), 0, sizeof(jvmtiEventCallbacks));
 
     callbacks->VMInit = &OnVMInit;
     callbacks->VMDeath = &OnVMDeath;
@@ -233,7 +244,7 @@ static bool RegisterJvmti(jvmtiEnv *jvmti) {
     callbacks->ThreadStart = &OnThreadStart;
     callbacks->ThreadEnd = &OnThreadEnd;
 
-    JVMTI_ERROR_RET((jvmti->SetEventCallbacks(callbacks, sizeof(jvmtiEventCallbacks))), false);
+    JVMTI_ERROR_RET((jvmti->SetEventCallbacks(callbacks.get(), sizeof(jvmtiEventCallbacks))), false);
 
     jvmtiEvent events[] = { JVMTI_EVENT_VM_DEATH, JVMTI_EVENT_VM_INIT,
                             JVMTI_EVENT_CLASS_FILE_LOAD_HOOK, JVMTI_EVENT_CLASS_LOAD, JVMTI_EVENT_CLASS_PREPARE, JVMTI_EVENT_COMPILED_METHOD_LOAD,
@@ -276,8 +287,6 @@ AGENTEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved
     IMPLICITLY_USE(reserved);
     int err;
     jvmtiEnv *jvmti;
-    logger = spdlog::syslog_logger("syslog", "fk-prof-rec", LOG_PID);
-    
     CONFIGURATION = new ConfigurationOptions(options);
 
     logger->set_level(CONFIGURATION->log_level);
@@ -320,15 +329,11 @@ AGENTEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved
     Asgct::SetAsgct(Accessors::GetJvmFunction<ASGCTType>("AsyncGetCallTrace"));
     Asgct::SetIsGCActive(Accessors::GetJvmFunction<IsGCActiveType>("IsGCActive"));
 
-    GlobalCtx::metrics_registry = new medida::MetricsRegistry();
-    GlobalCtx::ctx_reg = new PerfCtx::Registry();
-    GlobalCtx::prob_pct = new ProbPct();
-
-    formatter = new MetricFormatter::SyslogTsdbFormatter(tsdb_tags());
-    metrics_reporter = new medida::reporting::UdpReporter(*GlobalCtx::metrics_registry, *formatter, CONFIGURATION->metrics_dst_port);
-    metrics_reporter->start();
+    formatter = new MetricFormatter::SyslogTsdbFormatter(tsdb_tags(), CONFIGURATION->stats_syslog_tag);
+    metrics_reporter = new medida::reporting::UdpReporter(metrics_registry, *formatter, CONFIGURATION->metrics_dst_port);
+    abort_metrics_poll.store(false, std::memory_order_relaxed);
     
-    controller = new Controller(jvm, jvmti, threadMap, *CONFIGURATION);
+    controller = new Controller(jvm, jvmti, thread_map, *CONFIGURATION);
 
     return 0;
 }
@@ -336,17 +341,28 @@ AGENTEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved
 AGENTEXPORT void JNICALL Agent_OnUnload(JavaVM *vm) {
     IMPLICITLY_USE(vm);
 
+    abort_metrics_poll.store(true, std::memory_order_relaxed);
     controller->stop();
+    await_thd_death(metrics_thd);
 
     delete controller;
     delete metrics_reporter;
     delete formatter;
-    delete GlobalCtx::ctx_reg;
-    delete GlobalCtx::prob_pct;
-    delete GlobalCtx::metrics_registry;
     delete CONFIGURATION;
 }
 
 ThreadMap& get_thread_map() {
-    return threadMap;
+    return thread_map;
+}
+
+medida::MetricsRegistry& get_metrics_registry() {
+    return metrics_registry;
+}
+
+ProbPct& get_prob_pct() {
+    return prob_pct;
+}
+
+PerfCtx::Registry& get_ctx_reg() {
+    return ctx_reg;
 }

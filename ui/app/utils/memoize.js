@@ -10,7 +10,7 @@ import hashCode from 'utils/hash';
 
 export default function memoize (fn, getUniqueId = JSON.stringify, isArray) {
   return function () {
-    const args = Array.prototype.slice.call(arguments);
+    let args = Array.prototype.slice.call(arguments);
     let hash = '';
     let i = args.length;
     let currentArg = null;

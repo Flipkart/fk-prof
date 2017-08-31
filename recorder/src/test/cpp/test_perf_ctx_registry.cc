@@ -2,10 +2,10 @@
 #include <vector>
 #include <iostream>
 #include <cstdint>
+#include "../../main/cpp/perf_ctx.hh"
 #include "fixtures.hh"
 #include "test.hh"
 #include "../../main/cpp/globals.hh"
-#include "../../main/cpp/perf_ctx.hh"
 #include "../../main/cpp/util.hh"
 
 using namespace PerfCtx;

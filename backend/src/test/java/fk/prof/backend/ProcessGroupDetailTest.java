@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 @RunWith(VertxUnitRunner.class)
 public class ProcessGroupDetailTest {
   private Vertx vertx;
-  private ConfigManager configManager;
+  private Configuration config;
   private Recorder.ProcessGroup mockPG;
   private List<Recorder.RecorderInfo.Builder> mockRIBuilders;
 
@@ -38,8 +38,8 @@ public class ProcessGroupDetailTest {
     );
 
     ConfigManager.setDefaultSystemProperties();
-    configManager = new ConfigManager(ProcessGroupDetailTest.class.getClassLoader().getResource("config.json").getFile());
-    vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
+    config = ConfigManager.loadConfig(ProcessGroupDetailTest.class.getClassLoader().getResource("config.json").getFile());
+    vertx = Vertx.vertx(new VertxOptions(config.getVertxOptions()));
   }
 
   @Test

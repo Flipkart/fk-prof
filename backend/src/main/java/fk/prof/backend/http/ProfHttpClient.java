@@ -1,5 +1,6 @@
 package fk.prof.backend.http;
 
+import fk.prof.backend.Configuration;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
@@ -7,7 +8,6 @@ import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientOptions;
 import io.vertx.core.http.HttpClientRequest;
 import io.vertx.core.http.HttpMethod;
-import io.vertx.core.json.JsonObject;
 
 public class ProfHttpClient {
   private final Vertx vertx;
@@ -127,12 +127,12 @@ public class ProfHttpClient {
       return this;
     }
 
-    public Builder setConfig(JsonObject httpClientConfig) {
-      keepAlive(httpClientConfig.getBoolean("keepalive", false));
-      useCompression(httpClientConfig.getBoolean("compression", true));
-      setConnectTimeoutInMs(httpClientConfig.getInteger("connect.timeout.ms", 2000));
-      setIdleTimeoutInSeconds(httpClientConfig.getInteger("idle.timeout.secs", 3));
-      setMaxAttempts(httpClientConfig.getInteger("max.attempts", 1));
+    public Builder setConfig(Configuration.HttpClientConfig httpClientConfig) {
+      keepAlive(httpClientConfig.getKeepAlive());
+      useCompression(httpClientConfig.getSupportCompression());
+      setConnectTimeoutInMs(httpClientConfig.getConnectTimeoutMs());
+      setIdleTimeoutInSeconds(httpClientConfig.getIdleTimeoutSecs());
+      setMaxAttempts(httpClientConfig.getMaxAttempts());
       return this;
     }
 

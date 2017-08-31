@@ -1,15 +1,21 @@
 #include "profiler.hh"
+#include "stacktraces.hh"
 
 ASGCTType Asgct::asgct_;
 IsGCActiveType Asgct::is_gc_active_;
 
+static thread_local std::atomic<bool> in_handler{false};
+
 static void handle_profiling_signal(int signum, siginfo_t *info, void *context) {
-    std::shared_ptr<Profiler> cpu_profiler = GlobalCtx::recording.cpu_profiler;
-    if (cpu_profiler.get() == nullptr) {
-        logger->warn("Received profiling signal while recording is off! Something wrong?");
-    } else {
-        cpu_profiler->handle(signum, info, context);
+    if (in_handler.load(std::memory_order_seq_cst)) return;
+    in_handler.store(true, std::memory_order_seq_cst);
+    {
+        ReadsafePtr<Profiler> p(GlobalCtx::recording.cpu_profiler);
+        if (p.available()) {
+            p->handle(signum, info, context);
+        }
     }
+    in_handler.store(false, std::memory_order_seq_cst);
 }
 
 void Profiler::handle(int signum, siginfo_t *info, void *context) {
@@ -20,51 +26,53 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
     ThreadBucket *thread_info = nullptr;
     PerfCtx::ThreadTracker* ctx_tracker = nullptr;
     auto current_sampling_attempt = sampling_attempts.fetch_add(1, std::memory_order_relaxed);
+    bool default_ctx = false;
     if (jniEnv != nullptr) {
         thread_info = thread_map.get(jniEnv);
         bool do_record = true;
         if (thread_info != nullptr) {//TODO: increment a counter here to monitor freq of this, it could be GC thd or compiler-broker etc
             ctx_tracker = &(thread_info->ctx_tracker);
-            do_record = ctx_tracker->in_ctx() ? ctx_tracker->should_record() : prob_pct.on(current_sampling_attempt, noctx_cov_pct);
+            if (ctx_tracker->in_ctx()) {
+                do_record = ctx_tracker->should_record();
+            } else {
+                do_record = get_prob_pct().on(current_sampling_attempt, noctx_cov_pct);
+                default_ctx = true;
+            }
         }
         if (! do_record) {
-            SPDLOG_DEBUG(logger, "Ignoring the sampling opportunity");
             return;
         }
     }
-    SimpleSpinLockGuard<false> guard(ongoing_conf); // sync buffer
 
-    // sample data structure
-    STATIC_ARRAY(frames, JVMPI_CallFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
+    BacktraceError err = BacktraceError::Fkp_no_error;
 
-    JVMPI_CallTrace trace;
-    trace.frames = frames;
-    
-    if (jniEnv == NULL) {
-        IsGCActiveType is_gc_active = Asgct::GetIsGCActive();
-        if ((is_gc_active != NULL) && ((*is_gc_active)() == 1)) {
-            trace.num_frames = -2;
-            s_c_cpu_samp_gc.inc();
-        } else {
-            trace.num_frames = -3;// ticks_unknown_not_Java or GC
-            s_c_cpu_samp_err_no_jni.inc();
-        }
-    } else {
+    if (jniEnv != NULL) {
+        STATIC_ARRAY(frames, JVMPI_CallFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
+        JVMPI_CallTrace trace;
         trace.env_id = jniEnv;
+        trace.frames = frames;
         ASGCTType asgct = Asgct::GetAsgct();
         (*asgct)(&trace, capture_stack_depth(), context);
+        if (trace.num_frames > 0) {
+            buffer->push(trace, err, default_ctx, thread_info);
+            return; // we got java trace, so bail-out
+        }
         if (trace.num_frames <= 0) {
+            err = static_cast<BacktraceError>(-1 * trace.num_frames);
             s_c_cpu_samp_err_unexpected.inc();
         }
+    } else {
+        err = BacktraceError::Fkp_no_jni_env;
+        s_c_cpu_samp_err_no_jni.inc();
     }
-    // log all samples, failures included, let the post processing sift through the data
-    buffer->push(trace, thread_info);
+
+    STATIC_ARRAY(native_trace, NativeFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
+
+    auto bt_len = Stacktraces::fill_backtrace(native_trace, capture_stack_depth());
+    buffer->push(native_trace, bt_len, err, default_ctx, thread_info);
 }
 
 bool Profiler::start(JNIEnv *jniEnv) {
-    SimpleSpinLockGuard<true> guard(ongoing_conf);
-    /* within critical section */
-
     if (running) {
         logger->warn("Start called but sampling is already running");
         return true;
@@ -79,9 +87,6 @@ bool Profiler::start(JNIEnv *jniEnv) {
 }
 
 void Profiler::stop() {
-    /* Make sure it doesn't overlap with configure */
-    SimpleSpinLockGuard<true> guard(ongoing_conf);
-
     if (!running) {
         return;
     }
@@ -115,23 +120,21 @@ void Profiler::configure() {
 
 Profiler::Profiler(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap &_thread_map, ProfileSerializingWriter& _serializer, std::uint32_t _max_stack_depth, std::uint32_t _sampling_freq, ProbPct& _prob_pct, std::uint8_t _noctx_cov_pct)
     : jvm(_jvm), jvmti(_jvmti), thread_map(_thread_map), max_stack_depth(_max_stack_depth), serializer(_serializer),
-      ongoing_conf(false), prob_pct(_prob_pct), sampling_attempts(0), noctx_cov_pct(_noctx_cov_pct), running(false), samples_handled(0),
+      prob_pct(_prob_pct), sampling_attempts(0), noctx_cov_pct(_noctx_cov_pct), running(false), samples_handled(0),
 
-      s_c_cpu_samp_total(GlobalCtx::metrics_registry->new_counter({METRICS_DOMAIN, METRIC_TYPE, "opportunities"})),
+      s_c_cpu_samp_total(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "opportunities"})),
 
-      s_c_cpu_samp_err_no_jni(GlobalCtx::metrics_registry->new_counter({METRICS_DOMAIN, METRIC_TYPE, "err_no_jni"})),
-      s_c_cpu_samp_err_unexpected(GlobalCtx::metrics_registry->new_counter({METRICS_DOMAIN, METRIC_TYPE, "err_unexpected"})),
-      s_c_cpu_samp_gc(GlobalCtx::metrics_registry->new_counter({METRICS_DOMAIN, METRIC_TYPE, "err_in_gc"})),
+      s_c_cpu_samp_err_no_jni(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "err_no_jni"})),
+      s_c_cpu_samp_err_unexpected(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "err_unexpected"})),
 
-      s_h_pop_spree_len(GlobalCtx::metrics_registry->new_histogram({METRICS_DOMAIN, METRIC_TYPE, "pop_spree", "length"})),
-      s_t_pop_spree_tm(GlobalCtx::metrics_registry->new_timer({METRICS_DOMAIN, METRIC_TYPE, "pop_spree", "time"})) {
+      s_h_pop_spree_len(get_metrics_registry().new_histogram({METRICS_DOMAIN, METRIC_TYPE, "pop_spree", "length"})),
+      s_t_pop_spree_tm(get_metrics_registry().new_timer({METRICS_DOMAIN, METRIC_TYPE, "pop_spree", "time"})) {
 
     set_sampling_freq(_sampling_freq);
     configure();
 }
 
 Profiler::~Profiler() {
-    SimpleSpinLockGuard<false> guard(ongoing_conf); // nonblocking
     if (running) stop();
     delete handler;
     delete buffer;

@@ -24,7 +24,6 @@ import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.RetryOneTime;
 import org.apache.curator.test.TestingServer;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -32,7 +31,6 @@ import org.junit.runner.RunWith;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.mockito.Mockito.mock;
@@ -41,7 +39,7 @@ import static org.mockito.Mockito.spy;
 @RunWith(VertxUnitRunner.class)
 public class HealthAPITest {
   private Vertx vertx;
-  private ConfigManager configManager;
+  private Configuration config;
   private TestingServer testingServer;
   private CuratorFramework curatorClient;
   private InMemoryLeaderStore inMemoryLeaderStore;
@@ -55,7 +53,7 @@ public class HealthAPITest {
     curatorClient.start();
     curatorClient.blockUntilConnected(10, TimeUnit.SECONDS);
     curatorClient.create().forPath("/assoc");
-    configManager = new ConfigManager(HealthAPITest.class.getClassLoader().getResource("config.json").getFile());
+    config = ConfigManager.loadConfig(HealthAPITest.class.getClassLoader().getResource("config.json").getFile());
   }
 
   @After
@@ -78,31 +76,32 @@ public class HealthAPITest {
   @Test
   public void testBackendIsHealthy(TestContext context) throws Exception {
     final Async async = context.async();
-    vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
-    inMemoryLeaderStore = spy(new InMemoryLeaderStore(configManager.getIPAddress(), configManager.getLeaderHttpPort()));
-    VerticleDeployer backendHttpVerticleDeployer = new BackendHttpVerticleDeployer(vertx, configManager, inMemoryLeaderStore, new ActiveAggregationWindowsImpl(), mock(AssociatedProcessGroups.class));
-    backendHttpVerticleDeployer.deploy();
-    getHealthRequest().setHandler(ar -> {
-      if(ar.failed()) {
-        context.fail(ar.cause());
-      }
-      context.assertEquals(200, ar.result().getStatusCode());
-      async.complete();
+    vertx = Vertx.vertx(new VertxOptions(config.getVertxOptions()));
+    inMemoryLeaderStore = spy(new InMemoryLeaderStore(config.getIpAddress(), config.getLeaderHttpServerOpts().getPort()));
+    VerticleDeployer backendHttpVerticleDeployer = new BackendHttpVerticleDeployer(vertx, config, inMemoryLeaderStore, new ActiveAggregationWindowsImpl(), mock(AssociatedProcessGroups.class));
+    backendHttpVerticleDeployer.deploy().setHandler(ar1 -> {
+      getHealthRequest().setHandler(ar -> {
+        if(ar.failed()) {
+          context.fail(ar.cause());
+        }
+        context.assertEquals(200, ar.result().getStatusCode());
+        async.complete();
+      });
     });
   }
 
   @Test
   public void testHealthCheckUnavailableWhenBackendIsLeader(TestContext context) throws Exception {
     final Async async = context.async();
-    vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
-    inMemoryLeaderStore = spy(new InMemoryLeaderStore(configManager.getIPAddress(), configManager.getLeaderHttpPort()));
+    vertx = Vertx.vertx(new VertxOptions(config.getVertxOptions()));
+    inMemoryLeaderStore = spy(new InMemoryLeaderStore(config.getIpAddress(), config.getLeaderHttpServerOpts().getPort()));
     BackendAssociationStore backendAssociationStore = mock(BackendAssociationStore.class);
     AssociatedProcessGroups associatedProcessGroups = mock(AssociatedProcessGroups.class);
     ActiveAggregationWindows activeAggregationWindows = mock(ActiveAggregationWindows.class);
 
-    VerticleDeployer backendHttpVerticleDeployer = new BackendHttpVerticleDeployer(vertx, configManager, inMemoryLeaderStore,
+    VerticleDeployer backendHttpVerticleDeployer = new BackendHttpVerticleDeployer(vertx, config, inMemoryLeaderStore,
         activeAggregationWindows, associatedProcessGroups);
-    VerticleDeployer backendDaemonVerticleDeployer = new BackendDaemonVerticleDeployer(vertx, configManager, inMemoryLeaderStore,
+    VerticleDeployer backendDaemonVerticleDeployer = new BackendDaemonVerticleDeployer(vertx, config, inMemoryLeaderStore,
         associatedProcessGroups, activeAggregationWindows, mock(WorkSlotPool.class), mock(AggregationWindowStorage.class));
     CompositeFuture.all(backendHttpVerticleDeployer.deploy(), backendDaemonVerticleDeployer.deploy()).setHandler(ar -> {
       if(ar.failed()) {
@@ -112,11 +111,12 @@ public class HealthAPITest {
         List<String> backendDeployments = new ArrayList<String>(((CompositeFuture)ar.result().list().get(0)).list());
         backendDeployments.add((String)((CompositeFuture)ar.result().list().get(1)).list().get(0));
 
-        VerticleDeployer leaderHttpVerticleDeployer = new LeaderHttpVerticleDeployer(vertx, configManager, backendAssociationStore, mock(PolicyStore.class));
-        Runnable leaderElectedTask = BackendManager.createLeaderElectedTask(vertx, leaderHttpVerticleDeployer, backendDeployments);
+        PolicyStore policyStore = mock(PolicyStore.class);
+        VerticleDeployer leaderHttpVerticleDeployer = new LeaderHttpVerticleDeployer(vertx, config, backendAssociationStore, policyStore);
+        Runnable leaderElectedTask = BackendManager.createLeaderElectedTask(vertx, leaderHttpVerticleDeployer, backendDeployments, backendAssociationStore, policyStore);
         VerticleDeployer leaderElectionParticipatorVerticleDeployer = new LeaderElectionParticipatorVerticleDeployer(
-            vertx, configManager, curatorClient, leaderElectedTask);
-        VerticleDeployer leaderElectionWatcherVerticleDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, configManager, curatorClient, inMemoryLeaderStore);
+            vertx, config, curatorClient, leaderElectedTask);
+        VerticleDeployer leaderElectionWatcherVerticleDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, config, curatorClient, inMemoryLeaderStore);
         CompositeFuture.all(leaderElectionParticipatorVerticleDeployer.deploy(), leaderElectionWatcherVerticleDeployer.deploy()).setHandler(ar1 -> {
           if(ar1.failed()) {
             context.fail(ar1.cause());
@@ -146,7 +146,7 @@ public class HealthAPITest {
   private Future<ProfHttpClient.ResponseWithStatusTuple> getHealthRequest() {
     Future<ProfHttpClient.ResponseWithStatusTuple> future = Future.future();
     HttpClientRequest request = vertx.createHttpClient()
-        .get(configManager.getBackendHttpPort(), "localhost", "/health")
+        .get(config.getBackendHttpServerOpts().getPort(), "localhost", "/health")
         .handler(response -> {
           response.bodyHandler(buffer -> {
             try {
