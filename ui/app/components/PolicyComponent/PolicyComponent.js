@@ -9,7 +9,7 @@ import {
   policyWorkChangeAction
 } from "../../actions/PolicyActions";
 
-import {GET, PUT, POST} from "../../utils/http";
+import {FETCH_POLICY, CREATE_POLICY, UPDATE_POLICY} from "../../actions/PolicyActions";
 
 class PolicyComponent extends Component {
 
@@ -25,22 +25,13 @@ class PolicyComponent extends Component {
     this.makeRequest = this.makeRequest.bind(this);
   }
 
-  showPromptMsg = (msg) => {
-    componentHandler.upgradeDom(); // eslint-disable-line  //To apply mdl JS behaviours on components loaded later https://github.com/google/material-design-lite/issues/5081
-    document.querySelector('#policy-submit').MaterialSnackbar.showSnackbar({message: msg});
-  };
-
-  makeRequest(reqType) {
-    this.props.policyAction(reqType, this.props.app, this.props.cluster, this.props.proc, this.props.versionedPolicyDetails.data).then(this.showPromptMsg, this.showPromptMsg);
-  }
-
   componentDidMount() {
-    this.makeRequest(GET);
+    this.makeRequest(FETCH_POLICY);
   }
 
   componentDidUpdate(prevProps) {
     if (prevProps.proc !== this.props.proc) {
-      this.makeRequest(GET);
+      this.makeRequest(FETCH_POLICY);
     }
   }
 
@@ -93,16 +84,16 @@ class PolicyComponent extends Component {
   }
 
   handleSubmitClick() {
-    if ((this.props.versionedPolicyDetails.reqType === 'POST' || this.props.versionedPolicyDetails.reqType === 'PUT') && this.props.versionedPolicyDetails.asyncStatus === 'PENDING') {
-      document.querySelector('#policy-submit').MaterialSnackbar.showSnackbar({message: 'Please wait, your previous policy change is still pending'});
+    if ((this.props.versionedPolicyDetails.reqType === CREATE_POLICY || this.props.versionedPolicyDetails.reqType === UPDATE_POLICY) && this.props.versionedPolicyDetails.asyncStatus === 'PENDING') {
+      this.showPromptMsg('Please wait, your previous policy change is still pending');
     } else {
       if (document.querySelectorAll(":invalid").length !== 0) {
-        document.querySelector('#policy-submit').MaterialSnackbar.showSnackbar({message: 'Please provide appropriate values to the fields marked in red'});
+        this.showPromptMsg('Please provide appropriate values to the fields marked in red');
       } else {
         if (this.isCreateView()) {
-          this.makeRequest(POST);
+          this.makeRequest(CREATE_POLICY);
         } else if (this.isUpdateView()) {
-          this.makeRequest(PUT);
+          this.makeRequest(UPDATE_POLICY);
         }
       }
     }
@@ -147,17 +138,6 @@ class PolicyComponent extends Component {
         </div>
       </div>
     );
-  }
-
-
-  isCreateView() {
-    return (( this.props.versionedPolicyDetails.reqType === 'GET' && this.props.versionedPolicyDetails.asyncStatus === 'ERROR' && this.props.versionedPolicyDetails.error.status === 404)
-      || (this.props.versionedPolicyDetails.reqType === 'POST' && this.props.versionedPolicyDetails.asyncStatus === 'ERROR'));
-  }
-
-  isUpdateView() {
-    return ((this.props.versionedPolicyDetails.reqType === 'PUT')
-      || ((this.props.versionedPolicyDetails.reqType === 'GET' || this.props.versionedPolicyDetails.reqType === 'POST' ) && this.props.versionedPolicyDetails.asyncStatus === 'SUCCESS'));
   }
 
   getDisplayDetails() {
@@ -325,6 +305,25 @@ class PolicyComponent extends Component {
           </div>
         </div>
       </div>);
+  }
+
+  showPromptMsg = (msg) => {
+    componentHandler.upgradeDom(); // eslint-disable-line  //To apply mdl JS behaviours on components loaded later https://github.com/google/material-design-lite/issues/5081
+    document.querySelector('#policy-submit').MaterialSnackbar.showSnackbar({message: msg});
+  };
+
+  makeRequest(reqType) {
+    this.props.policyAction(reqType, this.props.app, this.props.cluster, this.props.proc, this.props.versionedPolicyDetails.data).then(this.showPromptMsg, this.showPromptMsg);
+  }
+
+  isCreateView() {
+    return (( this.props.versionedPolicyDetails.reqType === FETCH_POLICY && this.props.versionedPolicyDetails.asyncStatus === 'ERROR' && this.props.versionedPolicyDetails.error.status === 404)
+      || (this.props.versionedPolicyDetails.reqType === CREATE_POLICY && this.props.versionedPolicyDetails.asyncStatus === 'ERROR'));
+  }
+
+  isUpdateView() {
+    return ((this.props.versionedPolicyDetails.reqType === UPDATE_POLICY)
+      || ((this.props.versionedPolicyDetails.reqType === FETCH_POLICY || this.props.versionedPolicyDetails.reqType === CREATE_POLICY ) && this.props.versionedPolicyDetails.asyncStatus === 'SUCCESS'));
   }
 
 }

@@ -1,8 +1,13 @@
-import http, {GET, POST, PUT} from '../utils/http';
+import http from '../utils/http';
+
+export const FETCH_POLICY = 'FETCH_POLICY';
+export const CREATE_POLICY = 'CREATE_POLICY';
+export const UPDATE_POLICY = 'UPDATE_POLICY';
 
 export const POLICY_REQUEST = 'POLICY_REQUEST';
 export const POLICY_SUCCESS = 'POLICY_SUCCESS';
 export const POLICY_FAILURE = 'POLICY_FAILURE';
+
 export const POLICY_SCHEDULE_CHANGE = 'POLICY_SCHEDULE_CHANGE';
 export const POLICY_DESCRIPTION_CHANGE = 'POLICY_DESCRIPTION_CHANGE';
 export const POLICY_WORK_CHANGE = 'POLICY_WORK_CHANGE';
@@ -38,15 +43,15 @@ export function policyAction(reqType, policiesApp, policiesCluster, policiesProc
     let req = undefined;
     let msg = undefined;
     switch (reqType) {
-      case GET:
+      case FETCH_POLICY:
         req = http.get(url);
         msg = 'Policy found';
         break;
-      case POST:
+      case CREATE_POLICY:
         req = http.post(url, versionedPolicyDetails);
         msg = 'Policy created';
         break;
-      case PUT:
+      case UPDATE_POLICY:
         req = http.put(url, versionedPolicyDetails);
         msg = 'Policy updated';
         break;

@@ -9,11 +9,6 @@ const defaultConfig = {
   redirect: 'follow',
 };
 
-export const GET = 'GET';
-export const POST = 'POST';
-export const PUT = 'PUT';
-export const DELETE = 'DELETE';
-
 function fireRequest (url, config) {
   const conf = Object.assign({ ...defaultConfig }, config);
   return fetch(url, conf)
@@ -22,7 +17,7 @@ function fireRequest (url, config) {
           return Promise.resolve(response.json());
         }
         if (response.status === 503) {   //Handle server time out separately
-          return Promise.reject({status: response.status, response:  {message: 'Request timed out'}})
+          return Promise.reject({status: response.status, response: {message: 'Request timed out'}})
         }
         return response.json().then(response =>       //Handling a non ok json response
           Promise.reject({status: response.status, response: response})

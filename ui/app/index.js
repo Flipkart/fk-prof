@@ -26,7 +26,8 @@ import './assets/styles/global.css';
 const routes = (
   <Route path="/" component={Root}>
     <IndexRedirect to="/profiles" />
-    <Redirect from="profiler" to="/profiles"/>
+    <Redirect from="/profiler/profile-data/:traceName" to="/profile/profile-data/:traceName"/>    //To stay backward compatible for old urls
+    <Redirect from="/profiler" to="/profiles"/>                  //To stay backward compatible for old urls
     <Route path="/profiles" component={App}>
       <Route path="/profile/profile-data/:traceName" component={AggregatedProfileDataContainer} />
     </Route>
