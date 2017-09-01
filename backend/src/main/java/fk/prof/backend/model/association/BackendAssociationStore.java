@@ -1,5 +1,6 @@
 package fk.prof.backend.model.association;
 
+import fk.prof.backend.exception.BackendAssociationException;
 import fk.prof.backend.proto.BackendDTO;
 import io.vertx.core.Future;
 import recording.Recorder;
@@ -9,6 +10,7 @@ public interface BackendAssociationStore {
   Future<Recorder.AssignedBackend> associateAndGetBackend(Recorder.ProcessGroup processGroup);
   Recorder.AssignedBackend getAssociatedBackend(Recorder.ProcessGroup processGroup);
   Recorder.BackendAssociations getAssociations();
+  Recorder.AssignedBackend removeAssociation(Recorder.ProcessGroup processGroup) throws BackendAssociationException;
 
   /**
    * Method to allow delayed initialization. Calling other methods before init may result in undefined behaviour.

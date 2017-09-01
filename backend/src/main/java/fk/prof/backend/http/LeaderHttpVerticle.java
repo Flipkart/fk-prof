@@ -75,6 +75,10 @@ public class LeaderHttpVerticle extends AbstractVerticle {
     HttpHelper.attachHandlersToRoute(router, HttpMethod.POST, apiPathForUpdatingPolicy,
             BodyHandler.create().setBodyLimit(1024 * 100), this::handlePostPolicy);
 
+    String apiPathForDeleteAssociation = ApiPathConstants.LEADER_ADMIN_DELETE_ASSOCIATION + "/:appId/:clusterId/:procName";
+    HttpHelper.attachHandlersToRoute(router, HttpMethod.DELETE, apiPathForDeleteAssociation,
+        BodyHandler.create().setBodyLimit(1024 * 10), this::handleDeleteAssociation);
+
     return router;
   }
 
@@ -189,7 +193,6 @@ public class LeaderHttpVerticle extends AbstractVerticle {
 
       // for now expecting a json payload
       String payload = context.getBodyAsString("utf-8");
-
       BackendDTO.RecordingPolicy.Builder builder = BackendDTO.RecordingPolicy.newBuilder();
       JsonFormat.parser().merge(payload, builder);
 
@@ -208,6 +211,26 @@ public class LeaderHttpVerticle extends AbstractVerticle {
   private void handleGetAssociations(RoutingContext context) {
     try {
       context.response().end(ProtoUtil.buildBufferFromProto(backendAssociationStore.getAssociations()));
+    } catch (Exception ex) {
+      HttpFailure httpFailure = HttpFailure.failure(ex);
+      HttpHelper.handleFailure(context, httpFailure);
+    }
+  }
+
+  private void handleDeleteAssociation(RoutingContext context) {
+    try {
+      String appId = context.request().getParam("appId");
+      String clusterId = context.request().getParam("clusterId");
+      String procName = context.request().getParam("procName");
+      Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId(appId).setCluster(clusterId).setProcName(procName).build();
+
+      Recorder.AssignedBackend assignedBackend = backendAssociationStore.removeAssociation(processGroup);
+      if(assignedBackend != null) {
+        context.response().putHeader("Content-Type", "application/json");
+        context.response().end(JsonFormat.printer().print(assignedBackend));
+      } else {
+        context.response().end();
+      }
     } catch (Exception ex) {
       HttpFailure httpFailure = HttpFailure.failure(ex);
       HttpHelper.handleFailure(context, httpFailure);

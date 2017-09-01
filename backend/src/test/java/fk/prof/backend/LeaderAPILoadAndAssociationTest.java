@@ -1,5 +1,6 @@
 package fk.prof.backend;
 
+import com.google.protobuf.util.JsonFormat;
 import fk.prof.backend.deployer.VerticleDeployer;
 import fk.prof.backend.deployer.impl.LeaderHttpVerticleDeployer;
 import fk.prof.backend.model.association.BackendAssociationStore;
@@ -257,6 +258,42 @@ public class LeaderAPILoadAndAssociationTest {
     });
   }
 
+  @Test(timeout = 5000)
+  public void associateAndDeassociateBackend(TestContext context) throws IOException {
+    final Async async = context.async();
+    BackendDTO.LoadReportRequest loadRequest1 = BackendDTO.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f).setCurrTick(2).build();
+    BackendDTO.LoadReportRequest loadRequest2 = BackendDTO.LoadReportRequest.newBuilder().setIp("2").setPort(2).setLoad(0.5f).setCurrTick(2).build();
+    Future<Recorder.ProcessGroups> r1 = makeRequestReportLoad(loadRequest1);
+    Future<Recorder.ProcessGroups> r2 = makeRequestReportLoad(loadRequest2);
+    CompositeFuture.all(r1, r2).setHandler(ar -> {
+      if(ar.failed()) {
+        context.fail(ar.cause());
+      }
+      try {
+        Future<Recorder.AssignedBackend> r3 = makeRequestPostAssociation(buildRecorderInfoFromProcessGroup(mockProcessGroups.get(0)));
+        Future<Recorder.AssignedBackend> r4 = makeRequestPostAssociation(buildRecorderInfoFromProcessGroup(mockProcessGroups.get(1)));
+        CompositeFuture.all(r3, r4).setHandler(ar1 -> {
+          if(ar1.failed()) {
+            context.fail(ar1.cause());
+          }
+          try {
+            makeRequestDeleteAssociation(mockProcessGroups.get(1)).setHandler(ar2 -> {
+              if(ar2.failed()) {
+                context.fail(ar2.cause());
+              }
+              context.assertEquals("2", ar2.result().getHost());
+              async.complete();
+            });
+          } catch (Exception ex1) {
+            context.fail(ex1);
+          }
+        });
+      } catch (Exception ex) {
+        context.fail(ex);
+      }
+    });
+  }
+
   private Future<Recorder.ProcessGroups> makeRequestReportLoad(BackendDTO.LoadReportRequest payload)
       throws IOException {
     Future<Recorder.ProcessGroups> future = Future.future();
@@ -300,6 +337,27 @@ public class LeaderAPILoadAndAssociationTest {
     request.end(ProtoUtil.buildBufferFromProto(payload));
     return future;
   }
+
+  private Future<Recorder.AssignedBackend> makeRequestDeleteAssociation(Recorder.ProcessGroup processGroup)
+      throws IOException {
+    Future<Recorder.AssignedBackend> future = Future.future();
+    HttpClientRequest request = vertx.createHttpClient()
+        .delete(port, "localhost", "/leader/admin/association/" + processGroup.getAppId() + "/" + processGroup.getCluster() + "/" + processGroup.getProcName())
+        .handler(response -> {
+          response.bodyHandler(buffer -> {
+            try {
+              Recorder.AssignedBackend.Builder builder = Recorder.AssignedBackend.newBuilder();
+              JsonFormat.parser().merge(buffer.toString(), builder);
+              future.complete(builder.build());
+            } catch (Exception ex) {
+              future.fail(ex);
+            }
+          });
+        }).exceptionHandler(ex -> future.fail(ex));
+    request.end();
+    return future;
+  }
+
 
   private Future<Recorder.BackendAssociations> makeRequestGetAssociations()
       throws IOException {
