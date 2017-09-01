@@ -22,17 +22,14 @@ function fireRequest (url, config) {
           return Promise.resolve(response.json());
         }
         if (response.status === 503) {   //Handle server time out separately
-          const err = new Error();
-          err.response = {message: 'Request timed out'};
-          throw err;
+          return Promise.reject({status: response.status, response:  {message: 'Request timed out'}})
         }
-        return response.json().then(response => {       //Handling a non ok json response
-          console.log('Fetch received a non ok response : ', response);
-          return Promise.reject({status: response.status, response: response});
-        });
+        return response.json().then(response =>       //Handling a non ok json response
+          Promise.reject({status: response.status, response: response})
+        );
       },
     ).catch(error => {
-      console.log('Error while parsing fetch response : ', JSON.stringify(error));    //Handling json parsing exceptions
+      console.log('Error while fetching response : ', error);    //Handling Promise rejects or any exceptions from previous then
       return Promise.reject(error);
     });
 }

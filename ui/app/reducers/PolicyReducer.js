@@ -6,6 +6,7 @@ import {
   POLICY_SCHEDULE_CHANGE,
   POLICY_WORK_CHANGE,
 } from "../actions/PolicyActions";
+import {GET} from '../utils/http';
 
 const INITIAL_STATE = {
   data:
@@ -40,11 +41,15 @@ const INITIAL_STATE = {
 export default function (state = INITIAL_STATE, action) {
   switch (action.type) {
     case POLICY_REQUEST:
-      return {...state, asyncStatus: 'PENDING', reqType: action.reqType};
+      if (action.reqType === GET) {
+        return {...INITIAL_STATE, asyncStatus: 'PENDING', reqType: action.reqType}
+      } else {
+        return {...state, asyncStatus: 'PENDING', reqType: action.reqType};
+      }
     case POLICY_SUCCESS:
       return {data: action.data, asyncStatus: 'SUCCESS', reqType: action.reqType};
     case POLICY_FAILURE:
-      return {...state, error: action.error, asyncStatus: 'ERROR', reqType: action.reqType, };
+      return {...state, error: action.error, asyncStatus: 'ERROR', reqType: action.reqType};
     case POLICY_DESCRIPTION_CHANGE:
       return {
         ...state, data: {

@@ -45,6 +45,8 @@ class AppSelectComponent extends React.Component {
           noResultsText={noResultsText}
           placeholder="Type to search..."
           promptTextCreator={(label) => "Add app: " + label}
+          onOpen={()=>(this.props.value && this.creatable.select && this.creatable.select.setState({inputValue: this.props.value}))}
+          ref={(ref)=> this.creatable = ref}
         />}
         {!this.props.isPoliciesPage &&
         <Select
@@ -59,6 +61,8 @@ class AppSelectComponent extends React.Component {
           isLoading={appsResponse.asyncStatus === 'PENDING'}
           noResultsText={noResultsText}
           placeholder="Type to search..."
+          onOpen={()=>(this.props.value && this.select && this.select.setState({inputValue: this.props.value}))}
+          ref={(ref)=> this.select = ref}
         />}
       </div>
     );

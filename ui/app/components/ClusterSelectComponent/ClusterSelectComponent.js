@@ -49,6 +49,8 @@ class ClusterSelectComponent extends Component {
           noResultsText={clustersResponse.asyncStatus !== 'PENDING' ? 'No results found!' : 'Searching...'}
           placeholder="Type to search..."
           promptTextCreator={(label) => "Add cluster: " + label}
+          onOpen={()=>(this.props.value && this.creatable.select && this.creatable.select.setState({inputValue: this.props.value}))}
+          ref={(ref)=> this.creatable = ref}
         />}
         {!this.props.isPoliciesPage &&
         < Select
@@ -63,6 +65,8 @@ class ClusterSelectComponent extends Component {
           value={valueOption}
           noResultsText={clustersResponse.asyncStatus !== 'PENDING' ? 'No results found!' : 'Searching...'}
           placeholder="Type to search..."
+          onOpen={()=>(this.props.value && this.select && this.select.setState({inputValue: this.props.value}))}
+          ref={(ref)=> this.select = ref}
         />
         }
       </div>
