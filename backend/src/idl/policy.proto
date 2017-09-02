@@ -25,6 +25,7 @@ message Schedule {
     required uint32 duration = 1;
     required uint32 pg_cov_pct = 2;
     required string after = 3;
+    optional uint32 min_healthy = 5;
 }
 
 enum WorkType {

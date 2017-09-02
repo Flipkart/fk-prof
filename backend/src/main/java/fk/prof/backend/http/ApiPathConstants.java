@@ -3,6 +3,7 @@ package fk.prof.backend.http;
 public final class ApiPathConstants {
   private ApiPathConstants() {
   }
+
   public static final String LEADER_PREFIX = "/leader";
   public static final String POLICY_PREFIX = "/policy";
   public static final String APPS_PREFIX = "/apps";
@@ -21,6 +22,12 @@ public final class ApiPathConstants {
   public static final String BACKEND_GET_POLICY_FOR_APP_CLUSTER_PROC = POLICY_PREFIX + "/:appId/:clusterId/:procName";
   public static final String BACKEND_PUT_POLICY_FOR_APP_CLUSTER_PROC = POLICY_PREFIX + "/:appId/:clusterId/:procName";
   public static final String BACKEND_POST_POLICY_FOR_APP_CLUSTER_PROC = POLICY_PREFIX + "/:appId/:clusterId/:procName";
+
+
+  // TODO: ADMIN APIs carry great risk.
+  // Should be used with caution and support some form of authentication in future.
+  // Should be removed when they are not required anymore because of other features getting added
+  public static final String LEADER_ADMIN_DELETE_ASSOCIATION = LEADER_PREFIX + "/admin/association";
 
   public static final String LEADER_POST_LOAD = LEADER_PREFIX + "/load";
   public static final String LEADER_GET_WORK = LEADER_PREFIX + "/work";
