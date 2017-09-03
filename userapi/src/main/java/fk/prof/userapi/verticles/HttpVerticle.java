@@ -13,7 +13,6 @@ import fk.prof.userapi.http.UserapiHttpHelper;
 import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.AggregationWindowSummary;
 import fk.prof.userapi.util.ProtoUtil;
-import fk.prof.userapi.util.proto.PolicyDTOProtoUtil;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
@@ -246,10 +245,9 @@ public class HttpVerticle extends AbstractVerticle {
     private void proxyPutPostPolicyToBackend(RoutingContext routingContext) {
         String payloadVersionedPolicyDetailsJsonString = routingContext.getBodyAsString("utf-8");
         try {
-            PolicyDTO.VersionedPolicyDetails.Builder payloadVersionedPolicyDetails = PolicyDTO.VersionedPolicyDetails.newBuilder();
-            JsonFormat.parser().merge(payloadVersionedPolicyDetailsJsonString, payloadVersionedPolicyDetails);
-            PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = payloadVersionedPolicyDetails.build();
-            LOGGER.debug("Making request for policy change: {} to backend", PolicyDTOProtoUtil.versionedPolicyDetailsCompactRepr(versionedPolicyDetails));
+            PolicyDTO.VersionedPolicyDetails.Builder payloadVersionedPolicyDetailsBuilder = PolicyDTO.VersionedPolicyDetails.newBuilder();
+            JsonFormat.parser().merge(payloadVersionedPolicyDetailsJsonString, payloadVersionedPolicyDetailsBuilder);
+            PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = payloadVersionedPolicyDetailsBuilder.build();
             makeRequestToBackend(routingContext.request().method(), routingContext.normalisedPath(), ProtoUtil.buildBufferFromProto(versionedPolicyDetails), false)
                     .setHandler(ar -> proxyBufferedPolicyResponseFromBackend(routingContext, ar));
         } catch (Exception ex) {

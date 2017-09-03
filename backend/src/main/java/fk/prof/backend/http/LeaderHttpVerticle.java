@@ -244,8 +244,7 @@ public class LeaderHttpVerticle extends AbstractVerticle {
   private void handleCreatePolicy(RoutingContext context) {
     try {
       Recorder.ProcessGroup pg = parseProcessGroup(context);
-      PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = ProtoUtil.buildProtoFromBuffer(PolicyDTO.VersionedPolicyDetails.parser(), context.getBody());
-      PolicyDTOProtoUtil.validatePolicyValues(versionedPolicyDetails);
+      PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = parseVersionedPolicyDetailsFromPayload(context);
       policyStore.createVersionedPolicy(pg, versionedPolicyDetails).setHandler(ar -> setResponse(ar, context, 201));
     } catch (Exception ex) {
       HttpFailure httpFailure = HttpFailure.failure(ex);

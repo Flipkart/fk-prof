@@ -3,6 +3,7 @@ package fk.prof.backend.util.proto;
 import fk.prof.backend.proto.BackendDTO;
 import proto.PolicyDTO;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -11,14 +12,59 @@ import java.util.stream.Collectors;
  */
 public class PolicyDTOProtoUtil {
   private static String policyDetailsCompactRepr(PolicyDTO.PolicyDetails policyDetails) {
-    return String.format("modAt=%s,creatAt=%s,creatBy=%s", policyDetails.getModifiedAt(), policyDetails.getModifiedBy(), policyDetails.getCreatedAt());
+    return String.format("modAt=%s,creatAt=%s,creatBy=%s,policy=%s", policyDetails.getModifiedAt(), policyDetails.getCreatedAt(), policyDetails.getModifiedBy(), policyCompactRepr(policyDetails.getPolicy()));
+  }
+
+  private static String policyCompactRepr(PolicyDTO.Policy policy) {
+    return String.format("desc:%s,sched:{%s},work:[%s]", policy.getDescription(),policyScheduleCompactRepr(policy.getSchedule()),policyWorkListCompactRepr(policy.getWorkList()));
+  }
+
+  private static String policyWorkListCompactRepr(List<PolicyDTO.Work> workList) {
+    StringBuilder sb = new StringBuilder();
+    for(PolicyDTO.Work work: workList){
+      sb.append(policyWorkCompactRepr(work));
+    }
+    return sb.toString();
+  }
+
+  private static String policyWorkCompactRepr(PolicyDTO.Work work) {
+    StringBuilder sb = new StringBuilder();
+    if(work.hasCpuSample()){
+      sb.append("cpuSample:");
+      PolicyDTO.CpuSampleWork cpuSample = work.getCpuSample();
+      sb.append(String.format("{freq=%d,maxFram=%d}",cpuSample.getFrequency(), cpuSample.getMaxFrames()));
+    }
+    if(work.hasThdSample()){
+      sb.append("threadSample:");
+      PolicyDTO.ThreadSampleWork threadSample = work.getThdSample();
+      sb.append(String.format("{freq=%d,maxFram=%d}",threadSample.getFrequency(), threadSample.getMaxFrames()));
+    }
+    if(work.hasMonitorBlock()){
+      sb.append("monitorBlock:");
+      PolicyDTO.MonitorContentionWork monitorContention = work.getMonitorBlock();
+      sb.append(String.format("{maxMon=%d,maxFram=%d}",monitorContention.getMaxMonitors(), monitorContention.getMaxFrames()));
+    }
+    if(work.hasMonitorWait()){
+      sb.append("monitorWait:");
+      PolicyDTO.MonitorWaitWork monitorWait = work.getMonitorWait();
+      sb.append(String.format("{maxMon=%d,maxFram=%d}",monitorWait.getMaxMonitors(), monitorWait.getMaxFrames()));
+    }
+    return sb.toString();
+  }
+
+  private static String policyScheduleCompactRepr(PolicyDTO.Schedule schedule) {
+    String policySchedule = String.format("aft:%s,dur:%d,cov:%d", schedule.getAfter(), schedule.getDuration(), schedule.getPgCovPct());
+    ;
+    if(schedule.hasMinHealthy()){
+      policySchedule = policySchedule + String.format("mHeal=%d", schedule.getMinHealthy());
+    }
+    return policySchedule;
   }
 
   public static String versionedPolicyDetailsCompactRepr(PolicyDTO.VersionedPolicyDetails versionedPolicyDetails) {
-    return String.format("version=%d,policy=(%s)", versionedPolicyDetails.getVersion(), policyDetailsCompactRepr(versionedPolicyDetails.getPolicyDetails()));
+    return String.format("version=%d,policy={%s}", versionedPolicyDetails.getVersion(), policyDetailsCompactRepr(versionedPolicyDetails.getPolicyDetails()));
   }
-
-  public static BackendDTO.RecordingPolicy translateToBackendRecordingPolicy(PolicyDTO.VersionedPolicyDetails versionedPolicy) {
+    public static BackendDTO.RecordingPolicy translateToBackendRecordingPolicy(PolicyDTO.VersionedPolicyDetails versionedPolicy) {
     PolicyDTO.Policy policyDTOPolicy = versionedPolicy.getPolicyDetails().getPolicy();
     BackendDTO.RecordingPolicy.Builder recordingPolicyBuilder = BackendDTO.RecordingPolicy.newBuilder()
         .setCoveragePct(policyDTOPolicy.getSchedule().getPgCovPct())
@@ -76,6 +122,9 @@ public class PolicyDTOProtoUtil {
     PolicyDTO.Policy policy = versionedPolicyDetails.getPolicyDetails().getPolicy();
     validateField("duration", policy.getSchedule().getDuration(), 60, 960);
     validateField("pgCovPct", policy.getSchedule().getPgCovPct(), 0, 100);
+    if(policy.getSchedule().hasMinHealthy()){
+      validateField("minHealthy", policy.getSchedule().getMinHealthy(), 1,10000);
+    }
     for (PolicyDTO.Work work : policy.getWorkList()) {
       int workDetailsCount = 0;
       if (work.hasCpuSample()) {

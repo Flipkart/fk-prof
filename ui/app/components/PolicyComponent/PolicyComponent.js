@@ -39,7 +39,12 @@ class PolicyComponent extends Component {
     const target = e.target;
     const value = parseInt(target.value);
     const id = target.id;
-    const schedule = {...this.props.versionedPolicyDetails.data.policyDetails.policy.schedule, [id]: value};
+    let schedule = {...this.props.versionedPolicyDetails.data.policyDetails.policy.schedule};
+    if(value){
+      schedule[id] = value;
+    } else{
+      delete schedule[id];
+    }
     this.props.policyScheduleChangeAction(schedule);
   }
 
@@ -210,6 +215,17 @@ class PolicyComponent extends Component {
           </div>
         </div>
         <div className="mdl-layout-spacer"/>
+        <div className="mdl-cell--4-col mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+          <input className="mdl-textfield__input" type="number" min="1" max="10000" id="minHealthy"
+                 onChange={this.handleScheduleChange}
+                 value={this.props.versionedPolicyDetails.data.policyDetails.policy.schedule.minHealthy}/>
+          <label className="mdl-textfield__label" htmlFor="minHealthy">Min Healthy (optional)</label>
+          <span className="mdl-textfield__error">Min healthy recorders must be greater than 0</span>
+          <div className="mdl-tooltip mdl-tooltip--large" htmlFor="minHealthy">
+            How many minimum recorder-enabled hosts in your cluster should be healthy for enabling profiling?
+          </div>
+        </div>
+        <div className="mdl-layout-spacer"/>
       </div>
       <div className="mdl-grid mdl-cell--12-col ">
         <div className="mdl-cell--12-col mdl-color-text--primary mdl-typography--caption"
@@ -309,7 +325,7 @@ class PolicyComponent extends Component {
 
   showPromptMsg = (msg) => {
     componentHandler.upgradeDom(); // eslint-disable-line  //To apply mdl JS behaviours on components loaded later https://github.com/google/material-design-lite/issues/5081
-    document.querySelector('#policy-submit').MaterialSnackbar.showSnackbar({message: msg});
+    document.querySelector('#policy-submit').MaterialSnackbar.showSnackbar({message: msg, timeout: 3500});
   };
 
   makeRequest(reqType) {
