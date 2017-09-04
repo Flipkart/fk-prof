@@ -64,14 +64,15 @@ public class PolicyDTOProtoUtil {
   public static String versionedPolicyDetailsCompactRepr(PolicyDTO.VersionedPolicyDetails versionedPolicyDetails) {
     return String.format("version=%d,policyDetails={%s}", versionedPolicyDetails.getVersion(), policyDetailsCompactRepr(versionedPolicyDetails.getPolicyDetails()));
   }
-    public static BackendDTO.RecordingPolicy translateToBackendRecordingPolicy(PolicyDTO.VersionedPolicyDetails versionedPolicy) {
+
+  public static BackendDTO.RecordingPolicy translateToBackendRecordingPolicy(PolicyDTO.VersionedPolicyDetails versionedPolicy) {
     PolicyDTO.Policy policyDTOPolicy = versionedPolicy.getPolicyDetails().getPolicy();
     BackendDTO.RecordingPolicy.Builder recordingPolicyBuilder = BackendDTO.RecordingPolicy.newBuilder()
         .setCoveragePct(policyDTOPolicy.getSchedule().getPgCovPct())
         .setDuration(policyDTOPolicy.getSchedule().getDuration())
         .setDescription(policyDTOPolicy.getDescription())
         .addAllWork(policyDTOPolicy.getWorkList().stream().map(PolicyDTOProtoUtil::translateToBackendDTOWork).collect(Collectors.toList()));
-    if(policyDTOPolicy.getSchedule().hasMinHealthy()){
+    if (policyDTOPolicy.getSchedule().hasMinHealthy()) {
       recordingPolicyBuilder.setMinHealthy(policyDTOPolicy.getSchedule().getMinHealthy());
     }
     return recordingPolicyBuilder.build();

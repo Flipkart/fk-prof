@@ -39,6 +39,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import proto.PolicyDTO;
 import recording.Recorder;
 
 import java.io.File;
@@ -239,8 +240,8 @@ public class PollAndLoadApiTest {
 
   @Test(timeout = 20000)
   public void testAggregationWindowSetupWithMinHealthyRecordersNotSpecified(TestContext context) throws Exception {
-    BackendDTO.RecordingPolicy recordingPolicy = buildRecordingPolicy(1);
-    testAggregationWindowSetupAndPollResponse(context, recordingPolicy, result -> {
+    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),-1);
+    testAggregationWindowSetupAndPollResponse(context, versionedPolicyDetails, result -> {
       try {
         context.assertEquals(200, result.getStatusCode());
         Recorder.PollRes pollRes2 = ProtoUtil.buildProtoFromBuffer(Recorder.PollRes.parser(), result.getResponse());
@@ -255,12 +256,11 @@ public class PollAndLoadApiTest {
 
   @Test(timeout = 20000)
   public void testAggregationWindowSetupWithoutMinHealthyRecorders(TestContext context) throws Exception {
-    BackendDTO.RecordingPolicy recordingPolicy = buildRecordingPolicy(1, 2);
-    testAggregationWindowSetupAndPollResponse(context, recordingPolicy, result -> {
+    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(4),-1);
+    testAggregationWindowSetupAndPollResponse(context, versionedPolicyDetails, result -> {
       try {
         context.assertEquals(200, result.getStatusCode());
         Recorder.PollRes pollRes2 = ProtoUtil.buildProtoFromBuffer(Recorder.PollRes.parser(), result.getResponse());
-        System.err.println("pollRes2" + pollRes2);
         context.assertFalse(pollRes2.hasAssignment());
       } catch (Exception ex) {
         context.fail(ex);
@@ -270,8 +270,8 @@ public class PollAndLoadApiTest {
 
   @Test(timeout = 20000)
   public void testAggregationWindowSetupWithMinHealthyRecorders(TestContext context) throws Exception {
-    BackendDTO.RecordingPolicy recordingPolicy = buildRecordingPolicy(1, 1);
-    testAggregationWindowSetupAndPollResponse(context, recordingPolicy, result -> {
+    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(3),-1);
+    testAggregationWindowSetupAndPollResponse(context, versionedPolicyDetails, result -> {
       try {
         context.assertEquals(200, result.getStatusCode());
         Recorder.PollRes pollRes2 = ProtoUtil.buildProtoFromBuffer(Recorder.PollRes.parser(), result.getResponse());
@@ -284,10 +284,10 @@ public class PollAndLoadApiTest {
     });
   }
 
-  private void testAggregationWindowSetupAndPollResponse(TestContext context, BackendDTO.RecordingPolicy recordingPolicy, Consumer<ProfHttpClient.ResponseWithStatusTuple> assertionTask) throws Exception {
+  private void testAggregationWindowSetupAndPollResponse(TestContext context, PolicyDTO.VersionedPolicyDetails versionedPolicyDetails, Consumer<ProfHttpClient.ResponseWithStatusTuple> assertionTask) throws Exception {
     final Async async = context.async();
     Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
-    policyStore.createVersionedPolicy(processGroup, BackendDTOProtoUtil.translateToPolicyVersionedPolicyDetails(recordingPolicy));
+    policyStore.createVersionedPolicy(processGroup, versionedPolicyDetails);
 
     Recorder.PollReq pollReq = Recorder.PollReq.newBuilder()
         .setRecorderInfo(buildRecorderInfo(processGroup, 1))
@@ -405,25 +405,6 @@ public class PollAndLoadApiTest {
         }).exceptionHandler(ex -> future.fail(ex));
     request.end(ProtoUtil.buildBufferFromProto(payload));
     return future;
-  }
-
-  private BackendDTO.RecordingPolicy buildRecordingPolicy(int profileDuration) {
-    return getPolicyBuilder(profileDuration).build();
-  }
-
-  private BackendDTO.RecordingPolicy buildRecordingPolicy(int profileDuration, int minHealthyRecorders) {
-    return getPolicyBuilder(profileDuration).setMinHealthy(minHealthyRecorders).build();
-  }
-
-  private BackendDTO.RecordingPolicy.Builder getPolicyBuilder(int profileDuration) {
-    return BackendDTO.RecordingPolicy.newBuilder()
-        .setDuration(profileDuration)
-        .setCoveragePct(100)
-        .setDescription("Test work profile")
-        .addWork(BackendDTO.Work.newBuilder()
-            .setWType(BackendDTO.WorkType.cpu_sample_work)
-            .setCpuSample(BackendDTO.CpuSampleWork.newBuilder().setFrequency(10).setMaxFrames(10))
-            .build());
   }
 
   private Recorder.RecorderInfo buildRecorderInfo(Recorder.ProcessGroup processGroup, long tick) {

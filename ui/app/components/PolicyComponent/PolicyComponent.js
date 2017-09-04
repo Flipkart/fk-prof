@@ -222,7 +222,7 @@ class PolicyComponent extends Component {
           <label className="mdl-textfield__label" htmlFor="minHealthy">Min Healthy (optional)</label>
           <span className="mdl-textfield__error">Min healthy recorders must be greater than 0</span>
           <div className="mdl-tooltip mdl-tooltip--large" htmlFor="minHealthy">
-            How many minimum recorder-enabled hosts in your cluster should be healthy for enabling profiling?
+            Profiling will stop if number of recorder-enabled healthy instances is less than this number. Not applicable if no value provided.
           </div>
         </div>
         <div className="mdl-layout-spacer"/>
