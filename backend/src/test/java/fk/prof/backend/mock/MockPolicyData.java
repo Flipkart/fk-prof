@@ -11,7 +11,7 @@ import java.util.List;
  * Created by rohit.patiyal on 10/05/17.
  */
 public class MockPolicyData {
-    private static PolicyDTO.CpuSampleWork mockCpuSampleWork = PolicyDTO.CpuSampleWork.newBuilder().setFrequency(10).setMaxFrames(10).build();
+    private static PolicyDTO.CpuSampleWork mockCpuSampleWork = PolicyDTO.CpuSampleWork.newBuilder().setFrequency(50).setMaxFrames(64).build();
     private static PolicyDTO.Work mockWork = PolicyDTO.Work.newBuilder().setWType(PolicyDTO.WorkType.cpu_sample_work).setCpuSample(mockCpuSampleWork).build();
 
     private static List<PolicyDTO.Schedule> mockSchedules = Arrays.asList(
