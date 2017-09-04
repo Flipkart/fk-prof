@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
  */
 public class PolicyDTOProtoUtil {
   private static String policyDetailsCompactRepr(PolicyDTO.PolicyDetails policyDetails) {
-    return String.format("modAt=%s,creatAt=%s,creatBy=%s,policy=%s", policyDetails.getModifiedAt(), policyDetails.getCreatedAt(), policyDetails.getModifiedBy(), policyCompactRepr(policyDetails.getPolicy()));
+    return String.format("modAt=%s,creatAt=%s,creatBy=%s,policy={%s}", policyDetails.getModifiedAt(), policyDetails.getCreatedAt(), policyDetails.getModifiedBy(), policyCompactRepr(policyDetails.getPolicy()));
   }
 
   private static String policyCompactRepr(PolicyDTO.Policy policy) {
@@ -56,13 +56,13 @@ public class PolicyDTOProtoUtil {
     String policySchedule = String.format("aft:%s,dur:%d,cov:%d", schedule.getAfter(), schedule.getDuration(), schedule.getPgCovPct());
     ;
     if(schedule.hasMinHealthy()){
-      policySchedule = policySchedule + String.format("mHeal=%d", schedule.getMinHealthy());
+      policySchedule = policySchedule + String.format(",minHeal=%d", schedule.getMinHealthy());
     }
     return policySchedule;
   }
 
   public static String versionedPolicyDetailsCompactRepr(PolicyDTO.VersionedPolicyDetails versionedPolicyDetails) {
-    return String.format("version=%d,policy={%s}", versionedPolicyDetails.getVersion(), policyDetailsCompactRepr(versionedPolicyDetails.getPolicyDetails()));
+    return String.format("version=%d,policyDetails={%s}", versionedPolicyDetails.getVersion(), policyDetailsCompactRepr(versionedPolicyDetails.getPolicyDetails()));
   }
     public static BackendDTO.RecordingPolicy translateToBackendRecordingPolicy(PolicyDTO.VersionedPolicyDetails versionedPolicy) {
     PolicyDTO.Policy policyDTOPolicy = versionedPolicy.getPolicyDetails().getPolicy();
