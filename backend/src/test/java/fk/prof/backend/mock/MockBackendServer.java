@@ -1,11 +1,9 @@
 package fk.prof.backend.mock;
 
-import com.google.protobuf.util.JsonFormat;
 import fk.prof.backend.exception.HttpFailure;
 import fk.prof.backend.http.ApiPathConstants;
 import fk.prof.backend.http.HttpHelper;
 import fk.prof.backend.util.ProtoUtil;
-import fk.prof.backend.util.proto.RecorderProtoUtil;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
@@ -80,25 +78,25 @@ public class MockBackendServer {
         }
 
         public void handlePostProfile(RoutingContext context) {
+            String remote =  context.request().connection().remoteAddress().host();
+            logger.info("post profile: " + remote);
             context.response().endHandler(v -> {
-               logger.info("post profile: response end");
+               logger.info("post profile: response end: " + remote);
             });
 
             context.request().handler(buf -> {
-                logger.info("post profile: received data");
             }).exceptionHandler(ex -> {
-                logger.error("post profile: exception", ex);
+                logger.error("post profile: exception: " + remote, ex);
             }).endHandler(v -> {
-                logger.info("post profile: request end");
+                logger.info("post profile: request end: " + remote);
+                context.response().end();
             });
         }
 
         public void handlePostAssociation(RoutingContext context) {
+            String remote =  context.request().connection().remoteAddress().host();
             try {
-                Recorder.RecorderInfo recorderInfo = ProtoUtil.buildProtoFromBuffer(Recorder.RecorderInfo.parser(), context.getBody());
-                Recorder.ProcessGroup processGroup = RecorderProtoUtil.mapRecorderInfoToProcessGroup(recorderInfo);
-
-                logger.info("association\n" + JsonFormat.printer().print(processGroup));
+                logger.info("association: " + remote);
 
                 byte[] bytes = Recorder.AssignedBackend.newBuilder().setHost(localIp).setPort(port).build().toByteArray();
 
@@ -111,8 +109,8 @@ public class MockBackendServer {
         }
 
         public void handlePostPoll(RoutingContext context) {
+            String remote =  context.request().connection().remoteAddress().host();
 
-            logger.info("poll");
             String now = ZonedDateTime.now(Clock.systemUTC()).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 
             try {
@@ -124,18 +122,23 @@ public class MockBackendServer {
                     .setLocalTime(now);
 
                 if(pollReq.getWorkLastIssued().getWorkState().equals(Recorder.WorkResponse.WorkState.complete)) {
+                    logger.info("poll NEW work: " + remote);
                     builder.setAssignment(
                         Recorder.WorkAssignment.newBuilder()
                             .setDelay(30)
                             .setDescription("cpu sample")
-                            .setDuration(300)
+                            .setDuration(75)
                             .setIssueTime(now)
+                            .setWorkId(System.currentTimeMillis()/100)
                             .addWork(
                                 Recorder.Work.newBuilder()
                                     .setWType(Recorder.WorkType.cpu_sample_work)
                                     .setCpuSample(Recorder.CpuSampleWork.newBuilder()
                                         .setFrequency(67)
                                         .setMaxFrames(128))));
+                }
+                else {
+                    logger.info("poll NO work, prev state: " + pollReq.getWorkLastIssued().getWorkState().name() + " : " + remote);
                 }
 
                 byte[] bytes = builder.build().toByteArray();
