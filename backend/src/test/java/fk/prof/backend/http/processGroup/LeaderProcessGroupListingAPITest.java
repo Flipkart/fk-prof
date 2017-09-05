@@ -165,7 +165,7 @@ public class LeaderProcessGroupListingAPITest {
         Future<Void> nullPrefix = Future.future();
 
 
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/clusters/" + P_APP_ID, httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/clusters/" + P_APP_ID, httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_CLUSTER_ID));
@@ -173,7 +173,7 @@ public class LeaderProcessGroupListingAPITest {
                 nullPrefix.complete();
             });
         });
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/clusters/" + P_APP_ID + "?prefix=", httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/clusters/" + P_APP_ID + "?prefix=", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_CLUSTER_ID));
@@ -181,7 +181,7 @@ public class LeaderProcessGroupListingAPITest {
                 pAndNoPrefix.complete();
             });
         });
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/clusters/" + P_APP_ID + "?prefix=" + P_CLUSTER_ID.substring(0, 1 + new Random().nextInt(P_CLUSTER_ID.length() - 1)), httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/clusters/" + P_APP_ID + "?prefix=" + P_CLUSTER_ID.substring(0, 1 + new Random().nextInt(P_CLUSTER_ID.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_CLUSTER_ID));
@@ -189,7 +189,7 @@ public class LeaderProcessGroupListingAPITest {
                 pAndCorrectPrefix.complete();
             });
         });
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/clusters/" + P_APP_ID + "?prefix=" + NP_CLUSTER_ID.substring(0, 1 + new Random().nextInt(NP_CLUSTER_ID.length() - 1)), httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/clusters/" + P_APP_ID + "?prefix=" + NP_CLUSTER_ID.substring(0, 1 + new Random().nextInt(NP_CLUSTER_ID.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_CLUSTER_ID));
@@ -198,7 +198,7 @@ public class LeaderProcessGroupListingAPITest {
             });
         });
 
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/clusters/" + NP_APP_ID + "?prefix=" + P_CLUSTER_ID.substring(0, 1 + new Random().nextInt(P_CLUSTER_ID.length() - 1)), httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/clusters/" + NP_APP_ID + "?prefix=" + P_CLUSTER_ID.substring(0, 1 + new Random().nextInt(P_CLUSTER_ID.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_CLUSTER_ID));
@@ -206,7 +206,7 @@ public class LeaderProcessGroupListingAPITest {
                 npAndPPrefix.complete();
             });
         });
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/clusters/" + NP_APP_ID + "?prefix=" + NP_CLUSTER_ID.substring(0, 1 + new Random().nextInt(NP_CLUSTER_ID.length() - 1)), httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/clusters/" + NP_APP_ID + "?prefix=" + NP_CLUSTER_ID.substring(0, 1 + new Random().nextInt(NP_CLUSTER_ID.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_CLUSTER_ID));
@@ -214,7 +214,7 @@ public class LeaderProcessGroupListingAPITest {
                 npAndNpPrefix.complete();
             });
         });
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/clusters/" + NP_APP_ID + "?prefix=", httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/clusters/" + NP_APP_ID + "?prefix=", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_CLUSTER_ID));
@@ -247,7 +247,7 @@ public class LeaderProcessGroupListingAPITest {
         Future<Void> npAndNoPrefix = Future.future();
         Future<Void> nullPrefix = Future.future();
 
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/procs/" + P_APP_ID + DELIMITER + P_CLUSTER_ID, httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/procs/" + P_APP_ID + DELIMITER + P_CLUSTER_ID, httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_PROC));
@@ -256,7 +256,7 @@ public class LeaderProcessGroupListingAPITest {
             });
 
         });
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/procs/" + P_APP_ID + DELIMITER + P_CLUSTER_ID + "?prefix=" + P_PROC.substring(0, 1 + new Random().nextInt(P_PROC.length() - 1)), httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/procs/" + P_APP_ID + DELIMITER + P_CLUSTER_ID + "?prefix=" + P_PROC.substring(0, 1 + new Random().nextInt(P_PROC.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_PROC));
@@ -265,7 +265,7 @@ public class LeaderProcessGroupListingAPITest {
             });
 
         });
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/procs/" + P_APP_ID + DELIMITER + P_CLUSTER_ID + "?prefix=" + NP_PROC.substring(0, 1 + new Random().nextInt(NP_PROC.length() - 1)), httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/procs/" + P_APP_ID + DELIMITER + P_CLUSTER_ID + "?prefix=" + NP_PROC.substring(0, 1 + new Random().nextInt(NP_PROC.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_PROC));
@@ -274,7 +274,7 @@ public class LeaderProcessGroupListingAPITest {
             });
 
         });
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/procs/" + P_APP_ID + DELIMITER + P_CLUSTER_ID + "?prefix=", httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/procs/" + P_APP_ID + DELIMITER + P_CLUSTER_ID + "?prefix=", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertTrue(buffer.toString().contains(P_PROC));
@@ -283,7 +283,7 @@ public class LeaderProcessGroupListingAPITest {
             });
 
         });
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/procs/" + NP_APP_ID + DELIMITER + NP_CLUSTER_ID + "?prefix=" + P_PROC.substring(0, 1 + new Random().nextInt(P_PROC.length() - 1)), httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/procs/" + NP_APP_ID + DELIMITER + NP_CLUSTER_ID + "?prefix=" + P_PROC.substring(0, 1 + new Random().nextInt(P_PROC.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_PROC));
@@ -292,7 +292,7 @@ public class LeaderProcessGroupListingAPITest {
             });
 
         });
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/procs/" + NP_APP_ID + DELIMITER + NP_CLUSTER_ID + "?prefix=" + NP_PROC.substring(0, 1 + new Random().nextInt(NP_PROC.length() - 1)), httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/procs/" + NP_APP_ID + DELIMITER + NP_CLUSTER_ID + "?prefix=" + NP_PROC.substring(0, 1 + new Random().nextInt(NP_PROC.length() - 1)), httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_PROC));
@@ -301,7 +301,7 @@ public class LeaderProcessGroupListingAPITest {
             });
 
         });
-        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_API_PREFIX + "/procs/" + NP_APP_ID + DELIMITER + NP_CLUSTER_ID + "?prefix=", httpClientResponse -> {
+        client.getNow(leaderPort, "localhost", ApiPathConstants.LEADER_PREFIX + "/procs/" + NP_APP_ID + DELIMITER + NP_CLUSTER_ID + "?prefix=", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
             httpClientResponse.bodyHandler(buffer -> {
                 testContext.assertFalse(buffer.toString().contains(P_PROC));

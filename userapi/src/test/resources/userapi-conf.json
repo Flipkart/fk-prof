@@ -22,6 +22,17 @@
       "queue.maxsize": 50
     }
   },
+  "backend":{
+    "ip": "127.0.0.1",
+    "port": 2491
+  },
+  "http.client": {
+    "connect.timeout.ms": 5000,
+    "idle.timeout.secs": 120,
+    "max.attempts": 3,
+    "keepalive": true,
+    "compression": true
+  },
   "aggregatedProfiles.baseDir": "profiles",
   "vertx.worker.pool.size": 50
 }

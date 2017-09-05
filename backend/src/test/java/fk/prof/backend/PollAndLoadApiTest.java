@@ -21,6 +21,7 @@ import fk.prof.backend.model.slot.WorkSlotPool;
 import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.BitOperationUtil;
 import fk.prof.backend.util.ProtoUtil;
+import fk.prof.backend.util.proto.BackendDTOProtoUtil;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -38,6 +39,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import proto.PolicyDTO;
 import recording.Recorder;
 
 import java.io.File;
@@ -47,14 +49,15 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static fk.prof.backend.util.ZookeeperUtil.DELIMITER;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @RunWith(VertxUnitRunner.class)
 public class PollAndLoadApiTest {
+  private static int workCounter = 0;
+
   private Vertx vertx;
   private Configuration config;
   private CuratorFramework curatorClient;
@@ -236,10 +239,55 @@ public class PollAndLoadApiTest {
   }
 
   @Test(timeout = 20000)
-  public void testAggregationWindowSetupAndPollResponse(TestContext context) throws Exception {
+  public void testAggregationWindowSetupWithMinHealthyRecordersNotSpecified(TestContext context) throws Exception {
+    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),-1);
+    testAggregationWindowSetupAndPollResponse(context, versionedPolicyDetails, result -> {
+      try {
+        context.assertEquals(200, result.getStatusCode());
+        Recorder.PollRes pollRes2 = ProtoUtil.buildProtoFromBuffer(Recorder.PollRes.parser(), result.getResponse());
+        context.assertTrue(pollRes2.hasAssignment());
+        context.assertEquals(BitOperationUtil.constructLongFromInts(config.getBackendId(), ++workCounter),
+            pollRes2.getAssignment().getWorkId());
+      } catch (Exception ex) {
+        context.fail(ex);
+      }
+    });
+  }
+
+  @Test(timeout = 20000)
+  public void testAggregationWindowSetupWithoutMinHealthyRecorders(TestContext context) throws Exception {
+    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(4),-1);
+    testAggregationWindowSetupAndPollResponse(context, versionedPolicyDetails, result -> {
+      try {
+        context.assertEquals(200, result.getStatusCode());
+        Recorder.PollRes pollRes2 = ProtoUtil.buildProtoFromBuffer(Recorder.PollRes.parser(), result.getResponse());
+        context.assertFalse(pollRes2.hasAssignment());
+      } catch (Exception ex) {
+        context.fail(ex);
+      }
+    });
+  }
+
+  @Test(timeout = 20000)
+  public void testAggregationWindowSetupWithMinHealthyRecorders(TestContext context) throws Exception {
+    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(3),-1);
+    testAggregationWindowSetupAndPollResponse(context, versionedPolicyDetails, result -> {
+      try {
+        context.assertEquals(200, result.getStatusCode());
+        Recorder.PollRes pollRes2 = ProtoUtil.buildProtoFromBuffer(Recorder.PollRes.parser(), result.getResponse());
+        context.assertTrue(pollRes2.hasAssignment());
+        context.assertEquals(BitOperationUtil.constructLongFromInts(config.getBackendId(), ++workCounter),
+            pollRes2.getAssignment().getWorkId());
+      } catch (Exception ex) {
+        context.fail(ex);
+      }
+    });
+  }
+
+  private void testAggregationWindowSetupAndPollResponse(TestContext context, PolicyDTO.VersionedPolicyDetails versionedPolicyDetails, Consumer<ProfHttpClient.ResponseWithStatusTuple> assertionTask) throws Exception {
     final Async async = context.async();
     Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
-    policyStore.createVersionedPolicy(processGroup, MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),-1));
+    policyStore.createVersionedPolicy(processGroup, versionedPolicyDetails);
 
     Recorder.PollReq pollReq = Recorder.PollReq.newBuilder()
         .setRecorderInfo(buildRecorderInfo(processGroup, 1))
@@ -253,16 +301,17 @@ public class PollAndLoadApiTest {
       try {
         //400 returned because backend is not associated with the process group of recorder sending poll request
         context.assertEquals(400, ar1.result().getStatusCode());
-        //Wait for sometime for load to get reported twice, so that backend gets marked as available
+        //Wait for sometime for load to get reported twice, so that backend gets marked as available at leader
         vertx.setTimer(2500, timerId -> {
           try {
+            //Simulate recorder asking association from leader, effectively creating association between requesting recorder and some available backend
             makeRequestPostAssociation(buildRecorderInfoFromProcessGroup(processGroup)).setHandler(ar2 -> {
               if (ar2.failed()) {
                 context.fail(ar2.cause());
               }
               context.assertEquals(200, ar2.result().getStatusCode());
               try {
-                //wait for some time so that backend reports load and fetches new associations
+                //wait for some time so that backend reports load to leader and fetches new associations
                 vertx.setTimer(2000, timerId1 -> {
                   try {
                     Recorder.PollReq pollReq1 = Recorder.PollReq.newBuilder()
@@ -289,11 +338,7 @@ public class PollAndLoadApiTest {
                                 context.fail(ar4.cause());
                               }
                               try {
-                                context.assertEquals(200, ar4.result().getStatusCode());
-                                Recorder.PollRes pollRes2 = ProtoUtil.buildProtoFromBuffer(Recorder.PollRes.parser(), ar4.result().getResponse());
-                                context.assertNotNull(pollRes2.getAssignment());
-                                context.assertEquals(BitOperationUtil.constructLongFromInts(config.getBackendId(), 1),
-                                    pollRes2.getAssignment().getWorkId());
+                                assertionTask.accept(ar4.result());
                                 async.complete();
                               } catch (Exception ex) {
                                 context.fail(ex);
@@ -360,18 +405,6 @@ public class PollAndLoadApiTest {
         }).exceptionHandler(ex -> future.fail(ex));
     request.end(ProtoUtil.buildBufferFromProto(payload));
     return future;
-  }
-
-  private BackendDTO.RecordingPolicy buildRecordingPolicy(int profileDuration) {
-    return BackendDTO.RecordingPolicy.newBuilder()
-        .setDuration(profileDuration)
-        .setCoveragePct(100)
-        .setDescription("Test work profile")
-        .addWork(BackendDTO.Work.newBuilder()
-            .setWType(BackendDTO.WorkType.cpu_sample_work)
-            .setCpuSample(BackendDTO.CpuSampleWork.newBuilder().setFrequency(10).setMaxFrames(10))
-            .build())
-        .build();
   }
 
   private Recorder.RecorderInfo buildRecorderInfo(Recorder.ProcessGroup processGroup, long tick) {

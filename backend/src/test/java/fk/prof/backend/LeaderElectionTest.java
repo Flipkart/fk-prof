@@ -256,7 +256,7 @@ public class LeaderElectionTest {
           }
 
           // check the values in store
-          context.assertEquals(policyDetails, policyStore.getVersionedPolicy(pg1).getPolicyDetails(), "policy should match");
+          context.assertEquals(policyDetails.getPolicy(), policyStore.getVersionedPolicy(pg1).getPolicyDetails().getPolicy(), "policy should match");
           Recorder.AssignedBackend backend1 = backendAssociationStore.getAssociatedBackend(pg1);
           context.assertEquals(cf.resultAt(0), backend1);
           Recorder.AssignedBackend backend2 = backendAssociationStore.getAssociatedBackend(pg2);

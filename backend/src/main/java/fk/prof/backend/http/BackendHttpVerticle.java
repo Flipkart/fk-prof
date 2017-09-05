@@ -309,7 +309,7 @@ public class BackendHttpVerticle extends AbstractVerticle {
   }
 
   private Future<ProfHttpClient.ResponseWithStatusTuple> makeRequestToLeader(BackendDTO.LeaderDetail leaderDetail, HttpMethod method, String path, Buffer payloadAsBuffer, boolean withRetry) {
-    path = ApiPathConstants.LEADER_API_PREFIX + path;
+    path = ApiPathConstants.LEADER_PREFIX + path;
     if (withRetry) {
       return httpClient.requestAsyncWithRetry(method, leaderDetail.getHost(), leaderDetail.getPort(), path, payloadAsBuffer);
     } else {
