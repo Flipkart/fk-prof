@@ -3,18 +3,11 @@
 ASGCTType Asgct::asgct_;
 IsGCActiveType Asgct::is_gc_active_;
 
-static thread_local std::atomic<bool> in_handler{false};
-
 static void handle_profiling_signal(int signum, siginfo_t *info, void *context) {
-    if (in_handler.load(std::memory_order_seq_cst)) return;
-    in_handler.store(true, std::memory_order_seq_cst);
-    {
-        ReadsafePtr<Profiler> p(GlobalCtx::recording.cpu_profiler);
-        if (p.available()) {
-            p->handle(signum, info, context);
-        }
+    ReadsafePtr<Profiler> p(GlobalCtx::recording.cpu_profiler);
+    if (p.available()) {
+        p->handle(signum, info, context);
     }
-    in_handler.store(false, std::memory_order_seq_cst);
 }
 
 void Profiler::handle(int signum, siginfo_t *info, void *context) {
