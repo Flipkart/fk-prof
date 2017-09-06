@@ -61,7 +61,7 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
 
     STATIC_ARRAY(native_trace, NativeFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
 
-    auto bt_len = Stacktraces::fill_backtrace(native_trace, capture_stack_depth());
+    auto bt_len = capture_native_bt ? Stacktraces::fill_backtrace(native_trace, capture_stack_depth()) : 0;
     buffer->push(native_trace, bt_len, err, default_ctx, thread_info);
 }
 
@@ -111,9 +111,9 @@ void Profiler::configure() {
 
 #define METRIC_TYPE "cpu_samples"
 
-Profiler::Profiler(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap &_thread_map, ProfileSerializingWriter& _serializer, std::uint32_t _max_stack_depth, std::uint32_t _sampling_freq, ProbPct& _prob_pct, std::uint8_t _noctx_cov_pct)
+Profiler::Profiler(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap &_thread_map, ProfileSerializingWriter& _serializer, std::uint32_t _max_stack_depth, std::uint32_t _sampling_freq, ProbPct& _prob_pct, std::uint8_t _noctx_cov_pct, bool _capture_native_bt)
     : jvm(_jvm), jvmti(_jvmti), thread_map(_thread_map), max_stack_depth(_max_stack_depth), serializer(_serializer),
-      prob_pct(_prob_pct), sampling_attempts(0), noctx_cov_pct(_noctx_cov_pct), running(false), samples_handled(0),
+      prob_pct(_prob_pct), sampling_attempts(0), noctx_cov_pct(_noctx_cov_pct), capture_native_bt(_capture_native_bt), running(false), samples_handled(0),
 
       s_c_cpu_samp_total(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "opportunities"})),
 
@@ -137,10 +137,10 @@ void Profiler::run() {
     {
         auto _ = s_t_pop_spree_tm.time_scope();
 
-        int poppped_before = samples_handled;
+        int popped_before = samples_handled;
         while (buffer->pop()) ++samples_handled;
 
-        s_h_pop_spree_len.update(samples_handled - poppped_before);
+        s_h_pop_spree_len.update(samples_handled - popped_before);
     }
 
     if (samples_handled > 200) {

@@ -667,7 +667,7 @@ void Controller::issue(const recording::CpuSampleWork& csw, Processes& processes
     auto freq = csw.frequency();
     logger->info("Starting cpu-sampling at {} Hz and for upto {} frames", freq, tts.cpu_samples_max_stack_sz);
     
-    GlobalCtx::recording.cpu_profiler.reset(new Profiler(jvm, jvmti, thread_map, *serializer.get(), tts.cpu_samples_max_stack_sz, freq, get_prob_pct(), cfg.noctx_cov_pct));
+    GlobalCtx::recording.cpu_profiler.reset(new Profiler(jvm, jvmti, thread_map, *serializer.get(), tts.cpu_samples_max_stack_sz, freq, get_prob_pct(), cfg.noctx_cov_pct, cfg.capture_native_bt));
     ReadsafePtr<Profiler> p(GlobalCtx::recording.cpu_profiler);
     p->start(env);
     processes.push_back(new CpuProfileProcess());
