@@ -31,12 +31,17 @@ class MethodTreeComponent extends Component {
     super(props);
     this.state = {
       itemCount: 0,
-      req: {url: '', status: 'PENDING', err: ''}
+      req: {url: '', status: 'PENDING', err: ''},
+      asyncStatus: 'PENDING'
     };
 
     this.containerWidth = 0;
-    this.opened = {}; // keeps track of all opened/closed nodes
+    this.opened = {}; // keeps track of all /closed nodes
     this.highlighted = {}; //keeps track of all highlighted nodes
+    this.treeStore = {};
+    this.renderData = [];
+    this.state.itemCount = this.renderData.length;
+
 
     this.initTreeStore = this.initTreeStore.bind(this);
 
@@ -52,11 +57,7 @@ class MethodTreeComponent extends Component {
     this.getRenderedDescendantCountForListItem = this.getRenderedDescendantCountForListItem.bind(this);
     this.getRenderedChildrenCountForListItem = this.getRenderedChildrenCountForListItem.bind(this);
     this.isNodeHavingChildren = this.isNodeHavingChildren.bind(this);
-
-    this.treeStore = {};
-    this.renderData = [];
-    this.state.itemCount = this.renderData.length;
-
+    this.showPromptMsg = this.showPromptMsg.bind(this);
     this.setup(props.containerWidth);
   }
 
@@ -65,33 +66,35 @@ class MethodTreeComponent extends Component {
     const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true});
     const treeType = this.props.nextNodesAccessorField === 'parent'? 'callees': 'callers';
     this.url = `/api/${treeType}/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
-    this.treeStore[this.url] = this.props.nextNodesAccessorField === 'parent' ? new HotMethodStore(this.url) : new CallTreeStore(this.url);
+    if(!this.treeStore[this.url]) {
+      this.treeStore[this.url] = this.props.nextNodesAccessorField === 'parent' ? new HotMethodStore(this.url) : new CallTreeStore(this.url);
+      this.opened[this.url] = {};
+    }
   }
 
   componentDidMount() {
     this.initTreeStore();
-    this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1), this.props.filterKey, -1, false).then(subTreeRenderData => {
+    this.setState({asyncStatus: 'PENDING'});
+    this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.filterKey, -1, false).then(subTreeRenderData => {
       this.renderData = subTreeRenderData;
       this.setState({
-        itemCount: this.renderData.length
+        itemCount: this.renderData.length,
+        asyncStatus: 'SUCCESS'
       });
     });
   }
 
   componentDidUpdate(prevProps) {
-    const {app, cluster, proc, workType, selectedWorkType, profileStart, profileDuration} = this.props.location.query;
+    const {workType, selectedWorkType, profileStart, profileDuration} = this.props.location.query;
     const {workType: prevWorkType, selectedWorkType: prevSelectedWorkType, profileStart: prevProfileStart, profileDuration: prevProfileDuration} = prevProps.location.query;
-    const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true});
     if(prevWorkType !== workType || prevSelectedWorkType !== selectedWorkType || prevProfileStart !== profileStart || prevProfileDuration !== profileDuration || prevProps.traceName !== this.props.traceName){
-      const treeType = this.props.nextNodesAccessorField === 'parent'? 'callees': 'callers';
-      this.url = `/api/${treeType}/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
-      if(!this.treeStore[this.url]) {
-        this.treeStore[this.url] = this.props.nextNodesAccessorField === 'parent' ? new HotMethodStore(this.url) : new CallTreeStore(this.url);
-      }
-      this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1), this.props.filterKey, -1, false).then(subTreeRenderData => {
+      this.initTreeStore();
+      this.setState({asyncStatus: 'PENDING'});
+      this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.filterKey, -1, false).then(subTreeRenderData => {
         this.renderData = subTreeRenderData;
         this.setState({
-          itemCount: this.renderData.length
+          itemCount: this.renderData.length,
+          asyncStatus: 'SUCCESS'
         });
         if(this.stacklineDetailGrid && this.stacklineStatGrid) {
           this.stacklineDetailGrid.forceUpdate();
@@ -113,13 +116,13 @@ class MethodTreeComponent extends Component {
 
   render () {
     // console.log('this.containerWidth: ', this.containerWidth);
-    // if(this.containerWidth === 0) {
-    //   return null;
-    // }
+    if(this.containerWidth === 0) {
+      return null;
+    }
 
     // if (!this.state.req.status) return null;
     //
-    // if (this.state.req.status === 'PENDING') {
+    // if (this.state.asyncStatus === 'PENDING') {
     //   return (
     //     <div>
     //       <h4 style={{textAlign: 'center'}}>Please wait, coming right up!</h4>
@@ -144,7 +147,7 @@ class MethodTreeComponent extends Component {
     return (
       <div style={{display: "flex", flexDirection: "column", width: this.containerWidth}}>
         <div style={{flex: "1 1 auto", height: containerHeight + "px"}}>
-          <ScrollSync>
+          {this.state.asyncStatus !== 'PENDING' && <ScrollSync>
             {({ clientHeight, clientWidth, onScroll, scrollHeight, scrollLeft, scrollTop, scrollWidth }) => (
               <div className={styles.GridRow}>
                 <div className={styles.LeftGridContainer}>
@@ -206,10 +209,18 @@ class MethodTreeComponent extends Component {
               </div>
             )}
           </ScrollSync>
+          }{this.state.asyncStatus === 'PENDING' &&
+          (<div><h4 style={{textAlign: 'center'}}>Please wait, coming right up!</h4>
+            <Loader/>
+          </div>)}
         </div>
-        {!this.state.itemCount && (
-          <div style={{flex: "1 1 auto", marginTop: "-" + (gridHeight) + "px"}} className={styles.alert}>No results</div>
+        {this.state.asyncStatus !== 'PENDING' && !this.state.itemCount && (
+          <div style={{flex: "1 1 auto", marginTop: "-" + (gridHeight) + "px"}} className={styles.alert}>There was a problem loading the page, please try later.</div>
         )}
+        <div id="policy-submit" className="mdl-js-snackbar mdl-snackbar">
+          <div className="mdl-snackbar__text"/>
+          <button className="mdl-snackbar__action" type="button"/>
+        </div>
       </div>
     );
   }
@@ -218,16 +229,17 @@ class MethodTreeComponent extends Component {
     //TODO: Pick a lock for the listIdx, i.e. if any toggle is pending on same uniqueId show a snackBar
     const rowData = this.renderData[listIdx];
     const uniqueId = rowData[0];
-    if (!this.opened[uniqueId]) {
+    if (!this.opened[this.url][uniqueId]) {
       //expand
-      this.getRenderData(this.treeStore[this.url].getChildrenAsync(uniqueId), null, rowData[2], rowData[3] > 1).then(subTreeRenderData => {
+      this.getRenderData(this.treeStore[this.url].getChildrenAsync(uniqueId).catch(this.showPromptMsg), null, rowData[2], rowData[3] > 1).then(subTreeRenderData => {
         this.renderData.splice(listIdx + 1, 0, ...subTreeRenderData);
-        this.opened[uniqueId] = true;
-        if (subTreeRenderData.length === 0) {
+        this.opened[this.url][uniqueId] = true;
+        if (subTreeRenderData.length === 0 && this.stacklineDetailGrid) {
           this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow downwards
         }
         this.setState({
-          itemCount: this.renderData.length
+          itemCount: this.renderData.length,
+          asyncStatus: 'SUCCESS'
         });
       });
     } else {
@@ -235,9 +247,9 @@ class MethodTreeComponent extends Component {
       const descendants = this.getRenderedDescendantCountForListItem(listIdx);
       if (descendants > 0) {
         this.renderData.splice(listIdx + 1, descendants);
-        this.opened[uniqueId] = false;
+        this.opened[this.url][uniqueId] = false;
         this.setState({
-          itemCount: this.renderData.length
+          itemCount: this.renderData.length,
         });
       }
     }
@@ -280,7 +292,7 @@ class MethodTreeComponent extends Component {
   handleFilterChange (e) {
     const { pathname, query } = this.props.location;
     this.props.router.push({ pathname, query: { ...query, [this.props.filterKey]: e.target.value } });
-    this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1), e.target.value, -1, false).then(subTreeRenderData => {
+    this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), e.target.value, -1, false).then(subTreeRenderData => {
       this.renderData = subTreeRenderData;
       this.setState({
         itemCount: this.renderData.length
@@ -304,7 +316,7 @@ class MethodTreeComponent extends Component {
         nodename={displayName}
         stackline={displayName}
         indent={rowData[2]}
-        nodestate={this.opened[uniqueId]}
+        nodestate={this.opened[this.url][uniqueId]}
         highlight={isHighlighted.length}
         subdued={rowData[3] === 1}
         onHighlight={this.highlight.bind(this, uniqueId)}
@@ -349,9 +361,9 @@ class MethodTreeComponent extends Component {
             if (filterText && indent === -1 && !displayName.match(new RegExp(filterText, 'i'))) {
               renderDataList = [];
             }
-            if (ids.length === 1 || this.opened[id]) {
-              this.opened[id] = true;
-              this.getRenderData(this.treeStore[this.url].getChildrenAsync(id), filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
+            if (ids.length === 1 || this.opened[this.url][id]) {
+              this.opened[this.url][id] = true;
+              this.getRenderData(this.treeStore[this.url].getChildrenAsync(id).catch(this.showPromptMsg), filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
                 resolve(renderDataList.concat(subTreeRenderDataList));
               });
             } else {
@@ -383,7 +395,7 @@ class MethodTreeComponent extends Component {
     let rowData = this.renderData[listIdx];
     if(rowData) {
       const uniqueId = rowData[0];
-      if(this.opened[uniqueId]) {
+      if(this.opened[this.url][uniqueId]) {
         if(this.isNodeHavingChildren(uniqueId)) {
           //At least one rendered child item is going to be present for this item
           //Cannot rely on childNodeIndexes(calculated in isNodeHavingChildren method) to get count of children because actual rendered children can be lesser after deduping of nodes for hot method tree
@@ -416,6 +428,12 @@ class MethodTreeComponent extends Component {
   }
   static workTypeMap = {
     cpu_sample_work: 'cpu-sampling',
+  };
+
+  showPromptMsg = (msg) => {
+    componentHandler.upgradeDom(); // eslint-disable-line  //To apply mdl JS behaviours on components loaded later https://github.com/google/material-design-lite/issues/5081
+    document.querySelector('#policy-submit').MaterialSnackbar.showSnackbar({message: msg, timeout: 3500});
+    return [];
   };
 }
 

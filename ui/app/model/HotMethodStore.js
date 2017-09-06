@@ -1,4 +1,4 @@
-import http from 'utils/http';
+import postWithRetryOnAccept from '../utils/httpHelper';
 
 export default class HotMethodStore {
   constructor(url) {
@@ -35,37 +35,61 @@ export default class HotMethodStore {
     Object.entries(deDupNodes).forEach(([k, v]) => {
       this.nodes.push(v);
       const vIndex = this.nodes.length - 1;
-      if(!curLayerIds) {
+      if (!curLayerIds) {
         curLayerIds = [];
       }
       curLayerIds.push(vIndex);
       //Try next layer for this aggregated/deDuped node
-        const nextLayerNodes = {};
-        if(!topLevel) {
-          v[2].filter(([k, v, d]) => v['chld']).forEach(([k, v, d]) => {
-            if (Object.keys(v['chld']).length === 1) {
-              Object.values(v['chld'])[0]['data'][2] = d;
-              Object.assign(nextLayerNodes, v['chld']);
-            } else {
-              console.log('hotMethod node should never happen more than one child/hotMethod parent, this has : ', v['chld']);
-            }
-          });
-          bodyRoot = false;
-        } else {
-          v[2].forEach(([k, v]) => {
-              Object.assign(nextLayerNodes, {[k]:v});
-          });
-          bodyRoot = true;
-        }
+      const nextLayerNodes = {};
+      if (!topLevel) {
+        v[2].filter(([k, v, d]) => v['chld']).forEach(([k, v, d]) => {
+          if (Object.keys(v['chld']).length === 1) {
+            Object.values(v['chld'])[0]['data'][2] = d;
+            Object.assign(nextLayerNodes, v['chld']);
+          } else {
+            console.log('hotMethod node should never happen more than one child/hotMethod parent, this has : ', v['chld']);
+          }
+        });
+        bodyRoot = false;
+      } else {
+        v[2].forEach(([k, v]) => {
+          Object.assign(nextLayerNodes, {[k]: v});
+        });
+        bodyRoot = true;
+      }
       this.nodes[vIndex][1] = this.flatten(nextLayerNodes, false, bodyRoot);
       if (!this.nodes[vIndex][1] && bodyRoot) {        //if no part has a child field and if this is the body's root then it is a leaf node. Also nodes at bodyRoot level are guaranteed to have their children in the response
-          this.nodes[vIndex][1] = [];
-        }
-        if (this.nodes[vIndex][1] && this.nodes[vIndex].length === 3) {
-          this.nodes[vIndex].pop();        //if chld is populated then remove parts
-        }
+        this.nodes[vIndex][1] = [];
+      }
+      if (this.nodes[vIndex][1] && this.nodes[vIndex].length === 3) {
+        this.nodes[vIndex].pop();        //if chld is populated then remove parts
+      }
     });
     return curLayerIds;
+  }
+
+  handleResponse(resp, uniqueId) {
+    if (uniqueId === -1) {
+      this.nodes[uniqueId] = [null, undefined, Object.entries(resp).filter(([k, v]) => k !== 'method_lookup')];
+      this.nodes[uniqueId][1] = this.flatten(resp, uniqueId === -1, true);
+
+    } else {
+      const nextLayerNodes = {};
+      this.nodes[uniqueId][2].map(([k, v, d]) => [k, resp[k], d]).filter(([k, v, d]) => v['chld']).forEach(([k, v, d]) => {
+        if (Object.keys(v['chld']).length === 1) {
+          Object.values(v['chld'])[0]['data'][2] = d;
+          Object.assign(nextLayerNodes, v['chld']);
+        } else {
+          console.log('hotMethod node should never happen more than one child/hotMethod parent, this has : ', v['chld']);
+        }
+      });
+      this.nodes[uniqueId][1] = this.flatten(nextLayerNodes, uniqueId === -1, true);
+    }
+    if (this.nodes[uniqueId][1] && this.nodes[uniqueId].length === 3) {
+      this.nodes[uniqueId].pop();        //if chld is populated then remove parts
+    }
+    Object.assign(this.methodLookup, resp['method_lookup']);
+    return this.nodes[uniqueId][1];
   }
 
   getChildrenAsync(uniqueId) {
@@ -77,33 +101,8 @@ export default class HotMethodStore {
       return Promise.resolve(this.nodes[uniqueId][1]);
     }
     //else fetch from api
-    const body = (uniqueId === -1) ? [] : this.nodes[uniqueId][2].map(([k,v])=>parseInt(k));    //body contains the parts of the aggregated node at uniqueId
-    return http.post(this.url, body).then(
-      resp => {
-        console.log('body: ', body, 'response: ', resp);
-        if (uniqueId === -1) {
-          this.nodes[uniqueId] = [null, undefined, Object.entries(resp).filter(([k, v]) => k !== 'method_lookup')];
-          this.nodes[uniqueId][1] = this.flatten(resp, uniqueId === -1, true);
-
-        } else {
-          const nextLayerNodes = {};
-          this.nodes[uniqueId][2].map(([k, v, d]) => [k,resp[k],d]).filter(([k, v, d]) => v['chld']).forEach(([k, v, d]) => {
-            if (Object.keys(v['chld']).length === 1) {
-              Object.values(v['chld'])[0]['data'][2] = d;
-              Object.assign(nextLayerNodes, v['chld']);
-            } else {
-              console.log('hotMethod node should never happen more than one child/hotMethod parent, this has : ', v['chld']);
-            }
-          });
-          this.nodes[uniqueId][1] = this.flatten(nextLayerNodes, uniqueId === -1, true);
-        }
-        if (this.nodes[uniqueId][1] && this.nodes[uniqueId].length === 3) {
-          this.nodes[uniqueId].pop();        //if chld is populated then remove parts
-        }
-        Object.assign(this.methodLookup, resp['method_lookup']);
-        return this.nodes[uniqueId][1];
-      }
-    );
+    const body = (uniqueId === -1) ? [] : this.nodes[uniqueId][2].map(([k, v]) => parseInt(k));    //body contains the parts of the aggregated node at uniqueId
+    return postWithRetryOnAccept(this.url, body, 5).then((resp) => this.handleResponse(resp, uniqueId), (err)=> Promise.reject(err.response.message||err.response.error));
   }
 
   getNameWithArgs(uniqueId) {
