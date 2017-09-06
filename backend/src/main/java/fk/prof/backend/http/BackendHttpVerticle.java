@@ -5,7 +5,9 @@ import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import com.google.common.primitives.Ints;
+import com.google.protobuf.util.JsonFormat;
 import fk.prof.backend.ConfigManager;
+import fk.prof.backend.Configuration;
 import fk.prof.backend.aggregator.AggregationWindow;
 import fk.prof.backend.exception.AggregationFailure;
 import fk.prof.backend.exception.BadRequestException;
@@ -46,7 +48,7 @@ import java.time.format.DateTimeFormatter;
 public class BackendHttpVerticle extends AbstractVerticle {
   private static Logger logger = LoggerFactory.getLogger(BackendHttpVerticle.class);
 
-  private final ConfigManager configManager;
+  private final Configuration config;
   private final LeaderReadContext leaderReadContext;
   private final AggregationWindowDiscoveryContext aggregationWindowDiscoveryContext;
   private final ProcessGroupDiscoveryContext processGroupDiscoveryContext;
@@ -61,14 +63,14 @@ public class BackendHttpVerticle extends AbstractVerticle {
   private Counter ctrLeaderSelfReq = metricRegistry.counter(MetricName.Backend_Self_Leader_Request.get());
   private Counter ctrLeaderUnknownReq = metricRegistry.counter(MetricName.Backend_Unknown_Leader_Request.get());
 
-  public BackendHttpVerticle(ConfigManager configManager,
+  public BackendHttpVerticle(Configuration config,
                              LeaderReadContext leaderReadContext,
                              AggregationWindowDiscoveryContext aggregationWindowDiscoveryContext,
                              ProcessGroupDiscoveryContext processGroupDiscoveryContext) {
-    this.configManager = configManager;
-    this.backendHttpPort = configManager.getBackendHttpPort();
-    this.ipAddress = configManager.getIPAddress();
-    this.backendVersion = configManager.getBackendVersion();
+    this.config = config;
+    this.backendHttpPort = config.getBackendHttpServerOpts().getPort();
+    this.ipAddress = config.getIpAddress();
+    this.backendVersion = config.getBackendVersion();
 
     this.leaderReadContext = leaderReadContext;
     this.aggregationWindowDiscoveryContext = aggregationWindowDiscoveryContext;
@@ -77,14 +79,14 @@ public class BackendHttpVerticle extends AbstractVerticle {
 
   @Override
   public void start(Future<Void> fut) {
-    JsonObject httpClientConfig = configManager.getHttpClientConfig();
+    Configuration.HttpClientConfig httpClientConfig = config.getHttpClientConfig();
     httpClient = ProfHttpClient.newBuilder().setConfig(httpClientConfig).build(vertx);
 
     Router router = setupRouting();
     workIdsInPipeline = vertx.sharedData().getLocalMap("WORK_ID_PIPELINE");
-    vertx.createHttpServer(HttpHelper.getHttpServerOptions(configManager.getBackendHttpServerConfig()))
+    vertx.createHttpServer(config.getBackendHttpServerOpts())
         .requestHandler(router::accept)
-        .listen(configManager.getBackendHttpPort(), http -> completeStartup(http, fut));
+        .listen(config.getBackendHttpServerOpts().getPort(), http -> completeStartup(http, fut));
   }
 
   private Router setupRouting() {
@@ -96,6 +98,9 @@ public class BackendHttpVerticle extends AbstractVerticle {
 
     HttpHelper.attachHandlersToRoute(router, HttpMethod.POST, ApiPathConstants.BACKEND_POST_ASSOCIATION,
         BodyHandler.create().setBodyLimit(1024 * 10), this::handlePostAssociation);
+
+    HttpHelper.attachHandlersToRoute(router, HttpMethod.GET, ApiPathConstants.BACKEND_GET_ASSOCIATIONS,
+        this::handleGetAssociations);
 
     HttpHelper.attachHandlersToRoute(router, HttpMethod.POST, ApiPathConstants.BACKEND_POST_POLL,
         BodyHandler.create().setBodyLimit(1024 * 100), this::handlePostPoll);
@@ -232,6 +237,42 @@ public class BackendHttpVerticle extends AbstractVerticle {
     }
   }
 
+  // /associations API is requested over ELB, routed to some backend which in turns proxies it to a leader
+  private void handleGetAssociations(RoutingContext context) {
+    BackendDTO.LeaderDetail leaderDetail = verifyLeaderAvailabilityOrFail(context.response());
+    if (leaderDetail != null) {
+      try {
+        //Proxy request to leader
+        makeRequestGetAssociations(leaderDetail).setHandler(ar -> {
+          if(ar.failed()) {
+            HttpFailure httpFailure = HttpFailure.failure(ar.cause());
+            HttpHelper.handleFailure(context, httpFailure);
+            return;
+          }
+
+          int statusCode = ar.result().getStatusCode();
+          if(statusCode != 200) {
+            context.response().setStatusCode(statusCode);
+            context.response().end(ar.result().getResponse());
+            return;
+          }
+
+          try {
+            Recorder.BackendAssociations associations = ProtoUtil.buildProtoFromBuffer(Recorder.BackendAssociations.parser(), ar.result().getResponse());
+            context.response().putHeader("Content-Type", "application/json");
+            context.response().end(JsonFormat.printer().print(associations));
+          } catch (Exception ex) {
+            HttpFailure httpFailure = HttpFailure.failure(ex);
+            HttpHelper.handleFailure(context, httpFailure);
+          }
+        });
+      } catch (Exception ex) {
+        HttpFailure httpFailure = HttpFailure.failure(ex);
+        HttpHelper.handleFailure(context, httpFailure);
+      }
+    }
+  }
+
   private BackendDTO.LeaderDetail verifyLeaderAvailabilityOrFail(HttpServerResponse response) {
     if (leaderReadContext.isLeader()) {
       ctrLeaderSelfReq.inc();
@@ -256,6 +297,13 @@ public class BackendHttpVerticle extends AbstractVerticle {
         HttpMethod.POST,
         leaderDetail.getHost(), leaderDetail.getPort(), ApiPathConstants.LEADER_POST_ASSOCIATION,
         payloadAsBuffer);
+  }
+
+  private Future<ProfHttpClient.ResponseWithStatusTuple> makeRequestGetAssociations(BackendDTO.LeaderDetail leaderDetail)
+      throws IOException {
+    return httpClient.requestAsyncWithRetry(
+        HttpMethod.GET,
+        leaderDetail.getHost(), leaderDetail.getPort(), ApiPathConstants.LEADER_GET_ASSOCIATIONS, null);
   }
 
   private void handleGetHealthCheck(RoutingContext routingContext) {

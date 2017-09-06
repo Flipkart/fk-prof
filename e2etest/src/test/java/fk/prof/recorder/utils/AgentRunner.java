@@ -42,6 +42,8 @@ public class AgentRunner {
     private static final Logger logger = LoggerFactory.getLogger(AgentRunner.class);
     public static final String DEFAULT_AGENT_INTERVAL = "interval=100";
     private static final String PERFCTX_JAR_BASE_NAME_PATTERN = "^perfctx-.+\\.jar$";
+    private static final String RECORDER_BUILD_DIR = "../recorder/build";
+    private static final String EXT = Platforms.getDynamicLibraryExtension();
 
     private final String fqdn;
     private final String args;
@@ -83,15 +85,15 @@ public class AgentRunner {
     
     private void startProcess() throws IOException {
         String finalArgs = (args == null) ? perfCtxArgFrag() : args + "," + perfCtxArgFrag(); 
-        String agentArg = "-agentpath:../recorder/build/libfkpagent" + Platforms.getDynamicLibraryExtension() + "=" + finalArgs;
+        String agentArg = "-agentpath:" + RECORDER_BUILD_DIR + "/libfkpagent" + EXT + "=" + finalArgs;
 
         List<String> classpath = Util.discoverClasspath(getClass());
-
+        //System.out.println("AGENT ARG: " + agentArg);
         //System.out.println("classpath = " + classpath);
         ProcessBuilder pb = new ProcessBuilder();
         populateEnvVars(pb);
         process = pb
-                .command("java", agentArg, "-cp", String.join(":", classpath), fqdn)
+                .command("java", "-XX:+PreserveFramePointer", agentArg, "-verbose:gc", "-XX:+PrintGCDateStamps", "-XX:+PrintGCTimeStamps", "-XX:+PrintGCDetails", "-Xloggc:/tmp/fkprof_gc.log", "-cp", String.join(":", classpath), fqdn)
                 .redirectError(new File("/tmp/fkprof_stderr.log"))
                 .redirectOutput(new File("/tmp/fkprof_stdout.log"))
                 .start();
@@ -115,13 +117,15 @@ public class AgentRunner {
         for (Map.Entry<Object, Object> envProp : prop.entrySet()) {
             env.put(envProp.getKey().toString(), envProp.getValue().toString());
         }
+        env.put("LD_PRELOAD", RECORDER_BUILD_DIR + "/libprefkp.so");
     }
 
     public boolean stop() {
         process.destroy();
         while (true) {
             try {
-                return process.waitFor(5, TimeUnit.SECONDS);
+                if (process.waitFor(5, TimeUnit.SECONDS)) return true;
+                else { process.destroyForcibly(); }
             } catch (InterruptedException e) {
                 logger.info(e.getMessage(), e);
             }

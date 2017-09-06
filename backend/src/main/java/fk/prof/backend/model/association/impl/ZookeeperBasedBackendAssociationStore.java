@@ -149,7 +149,7 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
 
     if(backendAssociation != null
         && !backendDetailLookup.get(backendAssociation).isDefunct()) {
-      // Returning the existing assignment if some backend is something already assigned to this process group and it is not defunct
+      // Returning the existing assignment if some backend is already assigned to this process group and it is not defunct
       if(logger.isDebugEnabled()) {
         logger.debug(String.format("process_group=%s, existing backend=%s, available",
             RecorderProtoUtil.processGroupCompactRepr(processGroup),
@@ -225,7 +225,7 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
                 } else {
                   /**
                    * Presently assigned backend is defunct, find an available backend and if found, de-associate current backend and assign the new one to process group
-                   * Defunct backend is not de-associated eagerly because if no available backend is found, its better to wait for current backend to come back alive
+                   * Defunct backend is not de-associated eagerly because if no available backend is found, it's better to wait for current backend to come back alive
                    */
                   availableBackendsByPriority.remove(existingBackend);
                   BackendDetail newBackend = getAvailableBackendFromPrioritySet();
@@ -294,6 +294,74 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
   }
 
   @Override
+  public Recorder.BackendAssociations getAssociations() {
+    Recorder.BackendAssociations.Builder builder = Recorder.BackendAssociations.newBuilder();
+    this.backendDetailLookup.entrySet().forEach(backendEntry ->
+      builder.addAssociations(
+          Recorder.BackendAssociation.newBuilder()
+              .setBackend(backendEntry.getKey())
+              .addAllProcessGroups(backendEntry.getValue().getAssociatedProcessGroups())));
+    return builder.build();
+  }
+
+  /**
+   * Removes associated backend (if any) with the requested process group in a thread-safe manner
+   * Ensures priority of associated backend is updated in available backends set by using removal-insert technique for SortedSet
+   * @param processGroup
+   * @return
+   * @throws BackendAssociationException
+   */
+  @Override
+  public Recorder.AssignedBackend removeAssociation(Recorder.ProcessGroup processGroup) throws BackendAssociationException {
+    ProcessGroupTag processGroupTag = new ProcessGroupTag(processGroup.getAppId(), processGroup.getCluster(), processGroup.getProcName());
+    String processGroupStr = processGroupTag.toString();
+    try {
+      boolean acquired = backendAssignmentLock.tryLock(2, TimeUnit.SECONDS);
+      if (acquired) {
+        try {
+          //Lookup existing backend association after acquiring lock to avoid race conditions
+          Recorder.AssignedBackend existingBackendAssociation = processGroupToBackendLookup.get(processGroup);
+          if(existingBackendAssociation == null) {
+            return null;
+          }
+
+          BackendDetail existingBackend = backendDetailLookup.get(existingBackendAssociation);
+          BackendTag existingBackendTag = new BackendTag(existingBackend.getBackend().getHost(), existingBackend.getBackend().getPort());
+          Counter ctrRemove = metricRegistry.counter(MetricRegistry.name(MetricName.ZK_Backend_Assoc_Remove.get(), processGroupStr, existingBackendTag.toString()));
+          availableBackendsByPriority.remove(existingBackend);
+
+          try {
+            deAssociateBackendWithProcessGroup(existingBackend, processGroup);
+            ctrRemove.inc();
+            if (logger.isDebugEnabled()) {
+              logger.debug(String.format("process_group=%s, de-associating existing backend=%s",
+                  RecorderProtoUtil.processGroupCompactRepr(processGroup),
+                  RecorderProtoUtil.assignedBackendCompactRepr(existingBackend.getBackend())));
+            }
+            return existingBackendAssociation;
+          } catch (Exception ex) {
+            throw new BackendAssociationException(
+                String.format("Cannot persist removal of association of backend=%s with process_group=%s in zookeeper",
+                    RecorderProtoUtil.assignedBackendCompactRepr(existingBackend.getBackend()), processGroup), true);
+          } finally {
+            safelyReAddBackendToAvailableBackendSet(existingBackend);
+          }
+        } finally {
+          backendAssignmentLock.unlock();
+        }
+      } else {
+        ctrLockTimeout.inc();
+        throw new BackendAssociationException("Timeout while acquiring lock for backend removal for process_group=" + processGroup, true);
+      }
+    } catch (InterruptedException ex) {
+      ctrLockInterrupt.inc();
+      throw new BackendAssociationException("Interrupted while acquiring lock for backend removal for process_group=" + processGroup, ex, true);
+    } catch (Exception ex) {
+      throw new BackendAssociationException("Unexpected error while removing backend assignment for process_group=" + processGroup, ex, true);
+    }
+  }
+
+  @Override
   public void init() throws Exception {
     synchronized (this) {
       if(!initialized) {
@@ -329,7 +397,13 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
   }
 
   /**
-   * Finds an available backend from the available backends set. Removes all backends which have become defunct since they were added
+   * Finds an available backend from the available backends set and removes it from the set
+   * If available backend is defunct, iterates and find the next available backend
+   * Non-defunct available backend is returned.
+   *
+   * NOTE: As a side-effect return value is removed from the set. This is necessary because returned backend is usually associated with some process group later which should result in change of its priority
+   * Adding back this backend will do a fresh insert in the set and ensure it gets positioned according to its new priority.
+   * Without a remove and insert, priority for an element is not recalculated in SortedSet
    * @return available backend or null if none found
    */
   private BackendDetail getAvailableBackendFromPrioritySet() {

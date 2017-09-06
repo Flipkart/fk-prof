@@ -48,7 +48,8 @@ void parse(const std::string& msg, SyslogTsdbMsg& stm) {
     std::regex r("<(\\d+)>(\\S+ \\d+ \\d+:\\d+:\\d+) (\\S+) (\\S+) (\\d+) (\\S+) (\\d+.?\\d*) (.+)");
     std::smatch m;
 
-    assert(std::regex_match(msg, m, r));
+    auto match = std::regex_match(msg, m, r);
+    assert(match);
     assert(m.size() == 9);
 
     stm.pri_sev = std::stoi(m[1]); 
@@ -239,7 +240,8 @@ TEST(SyslogTsdbFormatter__should_format_double_with_unit__and__event_type) {
 
 TEST(SyslogTsdbFormatter__should_default_everything_sensibly) {
     char buff[HOST_NAME_MAX + 1];
-    assert(gethostname(buff, sizeof(buff)) == 0);
+    auto err = gethostname(buff, sizeof(buff));
+    assert(err == 0);
     std::string actual_hostname(buff);
     
     MetricFormatter::SyslogTsdbFormatter stf("grault=garply");

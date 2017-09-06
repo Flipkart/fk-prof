@@ -24,7 +24,6 @@ import fk.prof.storage.S3ClientFactory;
 import fk.prof.storage.buffer.ByteBufferPoolFactory;
 import io.vertx.core.*;
 import io.vertx.core.Future;
-import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.metrics.MetricsOptions;
@@ -47,28 +46,28 @@ public class BackendManager {
   private static Logger logger = LoggerFactory.getLogger(BackendManager.class);
 
   private final Vertx vertx;
-  private final ConfigManager configManager;
+  private final Configuration config;
   private final CuratorFramework curatorClient;
   private AsyncStorage storage;
   private GenericObjectPool<ByteBuffer> bufferPool;
   private MetricRegistry metricRegistry;
 
   public BackendManager(String configFilePath) throws Exception {
-    this(new ConfigManager(configFilePath));
+    this(ConfigManager.loadConfig(configFilePath));
   }
 
-  public BackendManager(ConfigManager configManager) throws Exception {
+  public BackendManager(Configuration config) throws Exception {
     ConfigManager.setDefaultSystemProperties();
-    this.configManager = Preconditions.checkNotNull(configManager);
+    this.config = Preconditions.checkNotNull(config);
 
-    VertxOptions vertxOptions = new VertxOptions(configManager.getVertxConfig());
+    VertxOptions vertxOptions = new VertxOptions(config.getVertxOptions());
     vertxOptions.setMetricsOptions(buildMetricsOptions());
     this.vertx = Vertx.vertx(vertxOptions);
     this.metricRegistry = SharedMetricRegistries.getOrCreate(ConfigManager.METRIC_REGISTRY);
 
     this.curatorClient = createCuratorClient();
     curatorClient.start();
-    curatorClient.blockUntilConnected(configManager.getCuratorConfig().getInteger("connection.timeout.ms", 10000), TimeUnit.MILLISECONDS);
+    curatorClient.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
     ensureRequiredZkNodesPresent();
 
     initStorage();
@@ -92,14 +91,14 @@ public class BackendManager {
 
   public Future<Void> launch() {
     Future result = Future.future();
-    InMemoryLeaderStore leaderStore = new InMemoryLeaderStore(configManager.getIPAddress(), configManager.getLeaderHttpPort());
+    InMemoryLeaderStore leaderStore = new InMemoryLeaderStore(config.getIpAddress(), config.getLeaderHttpServerOpts().getPort());
     ActiveAggregationWindows activeAggregationWindows = new ActiveAggregationWindowsImpl();
-    AssociatedProcessGroups associatedProcessGroups = new AssociatedProcessGroupsImpl(configManager.getRecorderDefunctThresholdInSeconds());
-    WorkSlotPool workSlotPool = new WorkSlotPool(configManager.getSlotPoolCapacity());
-    AggregationWindowStorage aggregationWindowStorage = new AggregationWindowStorage(configManager.getStorageConfig().getString("base.dir", "profiles"), storage, bufferPool, metricRegistry);
+    AssociatedProcessGroups associatedProcessGroups = new AssociatedProcessGroupsImpl(config.getRecorderDefunctThresholdSecs());
+    WorkSlotPool workSlotPool = new WorkSlotPool(config.getScheduleSlotPoolCapacity());
+    AggregationWindowStorage aggregationWindowStorage = new AggregationWindowStorage(config.getProfilesBaseDir(), storage, bufferPool, metricRegistry);
 
-    VerticleDeployer backendHttpVerticleDeployer = new BackendHttpVerticleDeployer(vertx, configManager, leaderStore, activeAggregationWindows, associatedProcessGroups);
-    VerticleDeployer backendDaemonVerticleDeployer = new BackendDaemonVerticleDeployer(vertx, configManager, leaderStore, associatedProcessGroups, activeAggregationWindows, workSlotPool, aggregationWindowStorage);
+    VerticleDeployer backendHttpVerticleDeployer = new BackendHttpVerticleDeployer(vertx, config, leaderStore, activeAggregationWindows, associatedProcessGroups);
+    VerticleDeployer backendDaemonVerticleDeployer = new BackendDaemonVerticleDeployer(vertx, config, leaderStore, associatedProcessGroups, activeAggregationWindows, workSlotPool, aggregationWindowStorage);
     CompositeFuture backendDeploymentFuture = CompositeFuture.all(backendHttpVerticleDeployer.deploy(), backendDaemonVerticleDeployer.deploy());
     backendDeploymentFuture.setHandler(backendDeployResult -> {
       if (backendDeployResult.succeeded()) {
@@ -112,12 +111,12 @@ public class BackendManager {
           BackendAssociationStore backendAssociationStore = createBackendAssociationStore(vertx, curatorClient);
           PolicyStore policyStore = new PolicyStore(curatorClient);
 
-          VerticleDeployer leaderHttpVerticleDeployer = new LeaderHttpVerticleDeployer(vertx, configManager, backendAssociationStore, policyStore);
+          VerticleDeployer leaderHttpVerticleDeployer = new LeaderHttpVerticleDeployer(vertx, config, backendAssociationStore, policyStore);
           Runnable leaderElectedTask = createLeaderElectedTask(vertx, leaderHttpVerticleDeployer, backendDeployments, backendAssociationStore, policyStore);
 
           VerticleDeployer leaderElectionParticipatorVerticleDeployer = new LeaderElectionParticipatorVerticleDeployer(
-              vertx, configManager, curatorClient, leaderElectedTask);
-          VerticleDeployer leaderElectionWatcherVerticleDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, configManager, curatorClient, leaderStore);
+              vertx, config, curatorClient, leaderElectedTask);
+          VerticleDeployer leaderElectionWatcherVerticleDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, config, curatorClient, leaderStore);
 
           CompositeFuture leaderDeployFuture = CompositeFuture.all(
               leaderElectionParticipatorVerticleDeployer.deploy(), leaderElectionWatcherVerticleDeployer.deploy());
@@ -140,43 +139,43 @@ public class BackendManager {
   }
 
   private void initStorage() {
-    JsonObject s3Config = configManager.getS3Config();
-    JsonObject threadPoolConfig = configManager.getStorageThreadPoolConfig();
+    Configuration.StorageConfig.S3Config s3Config = config.getStorageConfig().getS3Config();
+    Configuration.StorageConfig.FixedSizeThreadPoolConfig threadPoolConfig = config.getStorageConfig().getTpConfig();
     Meter threadPoolRejectionsMtr = metricRegistry.meter(MetricName.S3_Threadpool_Rejection.get());
 
     // thread pool with bounded queue for s3 io.
-    BlockingQueue ioTaskQueue = new LinkedBlockingQueue(threadPoolConfig.getInteger("queue.maxsize"));
+    BlockingQueue ioTaskQueue = new LinkedBlockingQueue(threadPoolConfig.getQueueMaxSize());
     ExecutorService storageExecSvc = new InstrumentedExecutorService(
-        new ThreadPoolExecutor(threadPoolConfig.getInteger("coresize"), threadPoolConfig.getInteger("maxsize"), threadPoolConfig.getInteger("idletime.secs"), TimeUnit.SECONDS, ioTaskQueue,
+        new ThreadPoolExecutor(threadPoolConfig.getCoreSize(), threadPoolConfig.getMaxSize(), threadPoolConfig.getIdleTimeSec(), TimeUnit.SECONDS, ioTaskQueue,
                 new AbortPolicy("s3ExectorSvc", threadPoolRejectionsMtr)),
         metricRegistry, "executors.fixed_thread_pool.storage");
 
-    this.storage = new S3AsyncStorage(S3ClientFactory.create(s3Config.getString("endpoint"), s3Config.getString("access.key"), s3Config.getString("secret.key")),
-        storageExecSvc, s3Config.getLong("list.objects.timeout.ms", 5000L));
+    this.storage = new S3AsyncStorage(S3ClientFactory.create(s3Config.getEndpoint(), s3Config.getAccessKey(), s3Config.getSecretKey()),
+        storageExecSvc, s3Config.getListObjectsTimeoutMs());
 
     // buffer pool to temporarily store serialized bytes
-    JsonObject bufferPoolConfig = configManager.getBufferPoolConfig();
+    Configuration.BufferPoolConfig bufferPoolConfig = config.getBufferPoolConfig();
     GenericObjectPoolConfig poolConfig = new GenericObjectPoolConfig();
-    poolConfig.setMaxTotal(bufferPoolConfig.getInteger("max.total"));
-    poolConfig.setMaxIdle(bufferPoolConfig.getInteger("max.idle"));
+    poolConfig.setMaxTotal(bufferPoolConfig.getMaxTotal());
+    poolConfig.setMaxIdle(bufferPoolConfig.getMaxIdle());
 
-    this.bufferPool = new GenericObjectPool<>(new ByteBufferPoolFactory(bufferPoolConfig.getInteger("buffer.size"), false), poolConfig);
+    this.bufferPool = new GenericObjectPool<>(new ByteBufferPoolFactory(bufferPoolConfig.getBufferSize(), false), poolConfig);
   }
 
   private CuratorFramework createCuratorClient() {
-    JsonObject curatorConfig = configManager.getCuratorConfig();
+    Configuration.CuratorConfig curatorConfig = config.getCuratorConfig();
     return CuratorFrameworkFactory.builder()
-        .connectString(curatorConfig.getString("connection.url"))
-        .retryPolicy(new ExponentialBackoffRetry(1000, curatorConfig.getInteger("max.retries", 3)))
-        .connectionTimeoutMs(curatorConfig.getInteger("connection.timeout.ms", 10000))
-        .sessionTimeoutMs(curatorConfig.getInteger("session.timeout.ms", 60000))
-        .namespace(curatorConfig.getString("namespace", "fkprof"))
+        .connectString(curatorConfig.getConnectionUrl())
+        .retryPolicy(new ExponentialBackoffRetry(1000, curatorConfig.getMaxRetries()))
+        .connectionTimeoutMs(curatorConfig.getConnectionTimeoutMs())
+        .sessionTimeoutMs(curatorConfig.getSessionTineoutMs())
+        .namespace(curatorConfig.getNamespace())
         .build();
   }
 
   private void ensureRequiredZkNodesPresent() throws  Exception {
     try {
-      curatorClient.create().forPath(configManager.getLeaderHttpDeploymentConfig().getString("backend.association.path", "/association"));
+      curatorClient.create().forPath(config.getAssociationsConfig().getAssociationPath());
     } catch (KeeperException.NodeExistsException ex) {
       logger.warn(ex);
     }
@@ -185,10 +184,9 @@ public class BackendManager {
   private BackendAssociationStore createBackendAssociationStore(
       Vertx vertx, CuratorFramework curatorClient)
       throws Exception {
-    int loadReportIntervalInSeconds = configManager.getLoadReportIntervalInSeconds();
-    JsonObject leaderHttpDeploymentConfig = configManager.getLeaderHttpDeploymentConfig();
-    String backendAssociationPath = leaderHttpDeploymentConfig.getString("backend.association.path", "/association");
-    int loadMissTolerance = leaderHttpDeploymentConfig.getInteger("load.miss.tolerance", 2);
+    int loadReportIntervalInSeconds = config.getLoadReportItvlSecs();
+    String backendAssociationPath = config.getAssociationsConfig().getAssociationPath();
+    int loadMissTolerance = config.getAssociationsConfig().getLoadMissTolerance();
     return new ZookeeperBasedBackendAssociationStore(vertx, curatorClient, backendAssociationPath,
         loadReportIntervalInSeconds, loadMissTolerance, new ProcessGroupCountBasedBackendComparator());
   }

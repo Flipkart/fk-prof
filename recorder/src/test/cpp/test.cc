@@ -36,3 +36,17 @@ ProbPct& get_prob_pct() {
 PerfCtx::Registry& get_ctx_reg() {
     return *ctx_reg;
 }
+
+std::ostream& operator<<(std::ostream& os, BacktraceType type) {
+     switch (type) {
+     case BacktraceType::Java:
+         os << "Java-Backtrace";
+         break;
+     case BacktraceType::Native:
+         os << "Native-Backtrace";
+         break;
+     default:
+         assert(false);
+     }
+     return os;
+ }

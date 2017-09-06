@@ -1,10 +1,11 @@
 .filterBox {
   font-size: 14px;
-  width: 200px;
+  width: 300px;
 }
 
 .filterBox input {
   color: rgb(255,64,129);
+  border-bottom: 1px solid rgb(63,81,181);
 }
 
 .alert {
@@ -19,4 +20,52 @@ input:focus {
   border-radius: 0px;
   outline-width: 1px;
   outline-color: rgb(63,81,181);
+}
+
+.GridRow {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+}
+
+.RightGridContainer {
+  flex: 0 0 150px;
+  z-index: 10;
+  flex-direction: column;
+}
+
+.RightGrid {
+  outline: 0;
+  overflow: hidden !important;
+}
+
+.LeftGridContainer {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  margin-left: 10px;
+}
+
+.GridHeader {
+  flex: 0 0 auto;
+  height: 87px;
+  display: flex;
+  align-items: center;
+  label {
+    font-weight: bold;
+    color: rgb(63,81,181);
+  }
+}
+
+.GridBody {
+  flex: 1 1 auto;
+}
+
+.GridHeaderContent {
+  flex: 1 1 auto;
+}
+
+.LeftGrid {
+  width: 100%;
+  outline: 0;
 }

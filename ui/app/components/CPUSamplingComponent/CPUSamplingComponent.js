@@ -1,6 +1,6 @@
 import React, { Component, PropTypes } from 'react';
 import { connect } from 'react-redux';
-
+import { AutoSizer } from 'react-virtualized';
 import fetchCPUSamplingAction from 'actions/AggregatedProfileDataActions';
 import safeTraverse from 'utils/safeTraverse';
 import Loader from 'components/LoaderComponent';
@@ -8,10 +8,9 @@ import MethodTree from 'components/MethodTreeComponent';
 import Tabs from 'components/Tabs';
 import styles from './CPUSamplingComponent.css';
 
-
 export class CPUSamplingComponent extends Component {
   componentDidMount () {
-    const { app, cluster, proc, workType, profileStart, selectedWorkType } = this.props.location.query;
+    const {app, cluster, proc, workType, profileStart, selectedWorkType, profileDuration} = this.props.location.query;
     const { traceName } = this.props.params;
     this.props.fetchCPUSampling({
       app,
@@ -20,14 +19,17 @@ export class CPUSamplingComponent extends Component {
       workType,
       selectedWorkType,
       traceName,
-      query: { start: profileStart },
+      query: {
+        start: profileStart,
+        duration: profileDuration
+      },
     });
   }
 
   componentWillReceiveProps (nextProps) {
-    const { app, cluster, proc, workType, profileStart, selectedWorkType } = nextProps.location.query;
+    const {app, cluster, proc, workType, profileStart, selectedWorkType, profileDuration} = nextProps.location.query;
     const didTraceNameChange = this.props.params.traceName !== nextProps.params.traceName;
-    const didProfileChange = profileStart !== this.props.location.query.profileStart;
+    const didProfileChange = profileStart !== this.props.location.query.profileStart || profileDuration !== this.props.location.query.profileDuration;
     if (didTraceNameChange || didProfileChange) {
       const { traceName } = nextProps.params;
       this.props.fetchCPUSampling({
@@ -37,7 +39,10 @@ export class CPUSamplingComponent extends Component {
         workType,
         selectedWorkType,
         traceName,
-        query: { start: profileStart },
+        query: {
+          start: profileStart,
+          duration: profileDuration
+        },
       });
     }
   }
@@ -105,30 +110,38 @@ export class CPUSamplingComponent extends Component {
           </div>
         )}
         <Tabs>
-          <div>
+          <div style={{display: "flex"}}>
             <div>Hot Methods</div>
-            <div>
-              <MethodTree
-                allNodes={safeTraverse(this.props, ['tree', 'data', 'allNodes'])}
-                nodeIndexes={safeTraverse(this.props, ['tree', 'data', 'terminalNodeIndexes'])}
-                nextNodesAccessorField="parent"
-                methodLookup={safeTraverse(this.props, ['tree', 'data', 'methodLookup'])}
-                filterKey="cs_hm_filter"
-              />
+            <div style={{display: "flex", flex: "1 1 auto"}}>
+              <AutoSizer disableHeight>
+                {({ width }) => (
+                  <MethodTree
+                    allNodes={safeTraverse(this.props, ['tree', 'data', 'allNodes'])}
+                    nodeIndexes={safeTraverse(this.props, ['tree', 'data', 'terminalNodeIndexes'])}
+                    nextNodesAccessorField="parent"
+                    methodLookup={safeTraverse(this.props, ['tree', 'data', 'methodLookup'])}
+                    filterKey="cs_hm_filter"
+                    containerWidth={width}
+                  />
+                )}
+              </AutoSizer>
             </div>
           </div>
           <div>
-            <div>
-              Call Tree
-            </div>
-            <div>
-              <MethodTree
-                allNodes={safeTraverse(this.props, ['tree', 'data', 'allNodes'])}
-                nodeIndexes={safeTraverse(this.props, ['tree', 'data', 'treeRoot', 'children'])}
-                nextNodesAccessorField="children"
-                methodLookup={safeTraverse(this.props, ['tree', 'data', 'methodLookup'])}
-                filterKey="cs_ct_filter"
-              />
+            <div>Call Tree</div>
+            <div style={{display: "flex", flex: "1 1 auto"}}>
+              <AutoSizer disableHeight>
+                {({ width }) => (
+                  <MethodTree
+                    allNodes={safeTraverse(this.props, ['tree', 'data', 'allNodes'])}
+                    nodeIndexes={safeTraverse(this.props, ['tree', 'data', 'treeRoot', 'children'])}
+                    nextNodesAccessorField="children"
+                    methodLookup={safeTraverse(this.props, ['tree', 'data', 'methodLookup'])}
+                    filterKey="cs_ct_filter"
+                    containerWidth={width}
+                  />
+                )}
+              </AutoSizer>
             </div>
           </div>
         </Tabs>
@@ -158,6 +171,7 @@ CPUSamplingComponent.propTypes = {
       workType: PropTypes.string,
       profileStart: PropTypes.string,
       selectedWorkType: PropTypes.string,
+      profileDuration: PropTypes.number
     }),
   }),
 };

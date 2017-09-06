@@ -23,15 +23,13 @@ function createTree (input, methodLookup, terminalNodeIndexes = []) {
     if (!currentNode) return {};
     currentNode = new FrameNode(currentNode[0], currentNode[1], currentNode[2], currentNode[3][0], currentNode[3][1]);
     const currentNodeIndex = allNodes.push(currentNode) - 1;
-    let nextChildIndex = currentNodeIndex;
     if (currentNode.childCount !== 0) {
       for (let i = 0; i < currentNode.childCount; i++) {
-        if (!currentNode.children) currentNode.children = [];
         const returnValue = formTree(allNodes.length);
         if (returnValue && returnValue.index !== undefined) {
-          nextChildIndex = returnValue.index;
-          allNodes[returnValue.index].parent = currentNodeIndex;
-          currentNode.children.push(nextChildIndex);
+          const childIndex = returnValue.index;
+          allNodes[childIndex].parent = currentNodeIndex;
+          currentNode.children.push(childIndex);
         }
       }
     }

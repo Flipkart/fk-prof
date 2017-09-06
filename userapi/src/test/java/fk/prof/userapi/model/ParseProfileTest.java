@@ -7,7 +7,9 @@ import fk.prof.aggregation.serialize.Serializer;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.ObjectNotFoundException;
 import fk.prof.storage.S3AsyncStorage;
+import fk.prof.userapi.Configuration;
 import fk.prof.userapi.Deserializer;
+import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.model.json.ProtoSerializers;
@@ -47,6 +49,7 @@ public class ParseProfileTest {
 
     final String traceName1 = "print-trace-1";
     final String traceName2 = "doSome-trace-2";
+    private Configuration config;
 
     @Test
     public void testReadWriteForVariant() throws Exception {
@@ -62,10 +65,11 @@ public class ParseProfileTest {
     }
 
     @Before
-    public void testSetUp(TestContext context) {
+    public void testSetUp(TestContext context) throws Exception{
         vertx = Vertx.vertx();
         asyncStorage = mock(AsyncStorage.class);
-        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, 30);
+        config = UserapiConfigManager.loadConfig(ParseProfileTest.class.getClassLoader().getResource("userapi-conf.json").getFile());
+        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, 30, config.getProfileLoadTimeout(), config.getVertxWorkerPoolSize());
     }
 
     @After
@@ -73,7 +77,7 @@ public class ParseProfileTest {
         vertx.close(context.asyncAssertSuccess());
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void testAggregatedProfileStoreS3Impl(TestContext context) throws Exception {
         Async async = context.async();
 
@@ -88,7 +92,7 @@ public class ParseProfileTest {
             throw new ObjectNotFoundException("not found");
         }));
 
-        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, storage, 30);
+        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, storage, 30, config.getProfileLoadTimeout(), config.getVertxWorkerPoolSize());
 
         Future<AggregatedProfileInfo> future1 = Future.future();
         Future<AggregatedProfileInfo> future2 = Future.future();

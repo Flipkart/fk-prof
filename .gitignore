@@ -63,5 +63,8 @@ ui/public/*
 backend/logs/
 
 recorder/.vscode/c_cpp_properties.json
-
 recorder/.vscode/settings.json
+*.o
+*.so
+BtPrinter.h
+ui/.vscode

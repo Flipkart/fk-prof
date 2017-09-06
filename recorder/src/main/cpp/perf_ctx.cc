@@ -192,6 +192,14 @@ PerfCtx::Registry::Registry() :
 
 PerfCtx::Registry::~Registry() {}
 
+void PerfCtx::Registry::user_ctxs(std::vector<PerfCtx::TracePt>& trace_pts) {
+    trace_pts.reserve(name_to_pt.size());
+    auto l = name_to_pt.lock_table();
+    for (auto it = l.cbegin(); it != l.cend(); it++) {
+        trace_pts.push_back(it->second);
+    }
+}
+
 PerfCtx::TracePt PerfCtx::Registry::find_or_bind(const char* name, std::uint8_t coverage_pct, std::uint8_t merge_type) throw (PerfCtx::CtxCreationFailure) {
     TracePt pt;
     if (name_to_pt.find(name, pt)) {
@@ -294,9 +302,7 @@ PerfCtx::TracePt PerfCtx::Registry::merge_bind(const std::vector<ThreadCtx>& ctx
         buff << component_name;
     }
     auto name = buff.str();
-    if (name_to_pt.insert(std::ref(name), trace_pt)) {
-        auto inserted = pt_to_name.insert(trace_pt, name);
-        assert(inserted);
+    if (pt_to_name.insert(trace_pt, name)) {
         s_c_merge_new.inc();
     } else {
         logger->warn("Couldn't insert merge-generated ctx '{}' (0x{:x}), perhaps it was inserted concurrently", name, trace_pt);

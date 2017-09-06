@@ -2,16 +2,16 @@
   "ip.address": "vmnathost",
   "backend.version": 1,
   "backend.id": 1,
-  "backend.http.port": 2493,
-  "leader.http.port": 2498,
   "load.report.interval.secs": 10,
   "recorder.defunct.threshold.secs": 30,
   "slot.pool.capacity": 100,
   "backend.http.server": {
-    "idle.timeout.secs": 120
+    "port": 2491,
+    "idleTimeout": 120
   },
   "leader.http.server": {
-    "idle.timeout.secs": 120
+    "port": 2496,
+    "idleTimeout": 120
   },
   "http.client": {
     "connect.timeout.ms": 5000,
@@ -49,7 +49,7 @@
       "kill.behavior": "DO_NOTHING"
     }
   },
-  "leaderHttpOptions": {
+  "backendAssociations": {
     "backend.association.path": "/association",
     "load.miss.tolerance": 1
   },
@@ -79,12 +79,12 @@
       "maxsize": 50,
       "idletime.secs": 60,
       "queue.maxsize": 50
-    },
-    "base.dir": "profiles"
+    }
   },
   "bufferPoolOptions": {
     "max.total": 20,
     "max.idle": 20,
     "buffer.size": 10000000
-  }
+  },
+  "aggregatedProfiles.baseDir": "profiles"
 }

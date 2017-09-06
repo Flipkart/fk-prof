@@ -1,0 +1,42 @@
+.detailContainer:hover .stackline {
+    background-color: #f0f0f0;  
+}
+
+.nodeIcon {
+  font-size: 14px;
+  cursor: pointer;
+  cursor: hand;
+  flex: 0 0 auto;
+}
+
+.collapsedIcon {
+  -ms-transform: rotate(90deg); /* IE 9 */
+  -webkit-transform: rotate(90deg); /* Chrome, Safari, Opera */
+  transform: rotate(90deg);
+}
+
+.stackline {
+  border-bottom: 1px solid rgba(158, 158, 158, 0.28);  
+  height: 25px;
+  display: flex;
+  align-items: center;
+}
+
+.stacklineInner {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  cursor: pointer;
+  cursor: hand;
+  &:HOVER {
+    color: rgb(255,64,129);
+  }
+}
+
+.highlight, .highlight div {
+  color: #1bb500 !important;
+}
+
+.subdued {
+  color: rgba(0,0,0,0.6);
+}

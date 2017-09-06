@@ -5,6 +5,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import com.google.protobuf.util.JsonFormat;
 import fk.prof.backend.ConfigManager;
+import fk.prof.backend.Configuration;
 import fk.prof.backend.exception.HttpFailure;
 import fk.prof.backend.model.association.BackendAssociationStore;
 import fk.prof.backend.model.policy.PolicyStore;
@@ -29,16 +30,16 @@ import recording.Recorder;
 import java.io.IOException;
 
 public class LeaderHttpVerticle extends AbstractVerticle {
-  private final ConfigManager configManager;
+  private final Configuration config;
   private final BackendAssociationStore backendAssociationStore;
   private final PolicyStore policyStore;
 
   private final MetricRegistry metricRegistry = SharedMetricRegistries.getOrCreate(ConfigManager.METRIC_REGISTRY);
 
-  public LeaderHttpVerticle(ConfigManager configManager,
+  public LeaderHttpVerticle(Configuration config,
                             BackendAssociationStore backendAssociationStore,
                             PolicyStore policyStore) {
-    this.configManager = configManager;
+    this.config = config;
     this.backendAssociationStore = backendAssociationStore;
     this.policyStore = policyStore;
   }
@@ -46,9 +47,9 @@ public class LeaderHttpVerticle extends AbstractVerticle {
   @Override
   public void start(Future<Void> fut) {
     Router router = setupRouting();
-    vertx.createHttpServer(HttpHelper.getHttpServerOptions(configManager.getLeaderHttpServerConfig()))
+    vertx.createHttpServer(config.getLeaderHttpServerOpts())
         .requestHandler(router::accept)
-        .listen(configManager.getLeaderHttpPort(),
+        .listen(config.getLeaderHttpServerOpts().getPort(),
             http -> completeStartup(http, fut));
   }
 
@@ -62,6 +63,9 @@ public class LeaderHttpVerticle extends AbstractVerticle {
     HttpHelper.attachHandlersToRoute(router, HttpMethod.POST, ApiPathConstants.LEADER_POST_ASSOCIATION,
         BodyHandler.create().setBodyLimit(1024 * 10), this::handlePostAssociation);
 
+    HttpHelper.attachHandlersToRoute(router, HttpMethod.GET, ApiPathConstants.LEADER_GET_ASSOCIATIONS,
+        this::handleGetAssociations);
+
     String apiPathForGetWork = ApiPathConstants.LEADER_GET_WORK + "/:appId/:clusterId/:procName";
     HttpHelper.attachHandlersToRoute(router, HttpMethod.GET, apiPathForGetWork,
         BodyHandler.create().setBodyLimit(1024 * 100), this::handleGetWork);
@@ -70,6 +74,10 @@ public class LeaderHttpVerticle extends AbstractVerticle {
     String apiPathForUpdatingPolicy = ApiPathConstants.LEADER_POST_POLICY + "/:appId/:clusterId/:procName";
     HttpHelper.attachHandlersToRoute(router, HttpMethod.POST, apiPathForUpdatingPolicy,
             BodyHandler.create().setBodyLimit(1024 * 100), this::handlePostPolicy);
+
+    String apiPathForDeleteAssociation = ApiPathConstants.LEADER_ADMIN_DELETE_ASSOCIATION + "/:appId/:clusterId/:procName";
+    HttpHelper.attachHandlersToRoute(router, HttpMethod.DELETE, apiPathForDeleteAssociation,
+        BodyHandler.create().setBodyLimit(1024 * 10), this::handleDeleteAssociation);
 
     return router;
   }
@@ -185,7 +193,6 @@ public class LeaderHttpVerticle extends AbstractVerticle {
 
       // for now expecting a json payload
       String payload = context.getBodyAsString("utf-8");
-
       BackendDTO.RecordingPolicy.Builder builder = BackendDTO.RecordingPolicy.newBuilder();
       JsonFormat.parser().merge(payload, builder);
 
@@ -196,6 +203,35 @@ public class LeaderHttpVerticle extends AbstractVerticle {
       context.response().end();
     }
     catch (Exception ex) {
+      HttpFailure httpFailure = HttpFailure.failure(ex);
+      HttpHelper.handleFailure(context, httpFailure);
+    }
+  }
+
+  private void handleGetAssociations(RoutingContext context) {
+    try {
+      context.response().end(ProtoUtil.buildBufferFromProto(backendAssociationStore.getAssociations()));
+    } catch (Exception ex) {
+      HttpFailure httpFailure = HttpFailure.failure(ex);
+      HttpHelper.handleFailure(context, httpFailure);
+    }
+  }
+
+  private void handleDeleteAssociation(RoutingContext context) {
+    try {
+      String appId = context.request().getParam("appId");
+      String clusterId = context.request().getParam("clusterId");
+      String procName = context.request().getParam("procName");
+      Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId(appId).setCluster(clusterId).setProcName(procName).build();
+
+      Recorder.AssignedBackend assignedBackend = backendAssociationStore.removeAssociation(processGroup);
+      if(assignedBackend != null) {
+        context.response().putHeader("Content-Type", "application/json");
+        context.response().end(JsonFormat.printer().print(assignedBackend));
+      } else {
+        context.response().end();
+      }
+    } catch (Exception ex) {
       HttpFailure httpFailure = HttpFailure.failure(ex);
       HttpHelper.handleFailure(context, httpFailure);
     }

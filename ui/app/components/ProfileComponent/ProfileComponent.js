@@ -99,7 +99,7 @@ class ProfileComponent extends React.Component {
   }
 
   render () {
-    const tracesScore = this.props.tracesScore ? this.props.tracesScore : [];    
+    const tracesScore = this.props.tracesScore ? this.props.tracesScore : [];
     const isCollapsable = tracesScore.length > this.state.collapseCount;
     const isCollapsed = (isCollapsable && this.state.collapse);
 
@@ -137,14 +137,14 @@ class ProfileComponent extends React.Component {
             />
           </div>
         )}
-        
+
         {list && list.length > 0 && (
           <div style={{padding: "4px 16px"}}>
             {list.map(l => (
               <div className={`${styles.itemContainer} ${(l.name === selectedTraceName && this.props.profile.start === selectedProfile) && styles.highlighted}`}
               key={l.name}>
                 <Link
-                  to={loc => ({ pathname: `/profiler/profile-data/${l.name}`, query: { ...loc.query, profileStart: this.props.profile.start }})}>
+                  to={loc => ({ pathname: `/profiler/profile-data/${l.name}`, query: { ...loc.query, profileStart: this.props.profile.start, profileDuration: this.props.profile.duration }})}>
                   <span>(</span><span className="mdl-color-text--primary">{l.score}</span><span>)</span>
                   <span>&nbsp;</span>
                   <span>{l.name}</span>
@@ -222,7 +222,7 @@ class ProfileComponent extends React.Component {
       const p_end = new Date(p_start.getTime() + (p.duration * 1000));
       const ip = p.recorder_info ? p.recorder_info.ip : "No available recorder";
       const vm = p.recorder_info ? p.recorder_info.vm_id : "";
-      const tooltip = '<div style="padding: 4px;"><div style="font-size: 14px;" class="mdl-color-text--primary">' + ip + '</div>' 
+      const tooltip = '<div style="padding: 4px;"><div style="font-size: 14px;" class="mdl-color-text--primary">' + ip + '</div>'
         + '<div style="font-size: 10px;">' + moment(p_start).format("HH:mm:ss") + ' - ' + moment(p_end).format("HH:mm:ss") + '</div></div>';
       stat.basic = [p.status, ip, tooltip, p_start, p_end];
       stat.tcov = p.trace_coverage_map;

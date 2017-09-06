@@ -6,7 +6,6 @@
 #include "util.hh"
 #include <mutex>
 #include <cuckoohash_map.hh>
-#include <city_hasher.hh>
 #include <concurrentqueue.h>
 #include "prob_pct.hh"
 #include <unordered_map>
@@ -15,6 +14,12 @@
 
 #ifndef PERF_CTX_H
 #define PERF_CTX_H
+
+// special context IDs
+#define DEFAULT_CTX_ID 0
+#define DEFAULT_CTX_NAME "~ OTHERS ~"
+#define UNKNOWN_CTX_ID 1
+#define UNKNOWN_CTX_NAME "~ UNKNOWN ~"
 
 namespace PerfCtx {
     typedef std::uint64_t TracePt;
@@ -91,12 +96,12 @@ namespace PerfCtx {
     };
     
     class Registry {
-        typedef cuckoohash_map<std::string, TracePt, CityHasher<std::string> > NameToPt;
-        typedef cuckoohash_map<TracePt, std::string, CityHasher<TracePt> > PtToName;
+        typedef cuckoohash_map<std::string, TracePt, std::hash<std::string> > NameToPt;
+        typedef cuckoohash_map<TracePt, std::string, std::hash<TracePt> > PtToName;
 
         moodycamel::ConcurrentQueue<std::uint32_t> unused_prime_nos;
-        NameToPt name_to_pt;
-        PtToName pt_to_name;
+        NameToPt name_to_pt;    //contains only user-created trace-pts
+        PtToName pt_to_name;    //contains both user-created and generated trace-pts
 
         std::atomic<bool> exhausted;
 
@@ -118,6 +123,7 @@ namespace PerfCtx {
         TracePt merge_bind(const std::vector<ThreadCtx>& parent, bool strict = false);
         void name_for(TracePt pt, std::string& name) throw (UnknownCtx);
         void resolve(TracePt pt, std::string& name, bool& is_generated, std::uint8_t& coverage_pct, MergeSemantic& m_sem) throw (UnknownCtx);
+        void user_ctxs(std::vector<TracePt>& ctxs);
     };
 
     class IncorrectEnterExitPairing {

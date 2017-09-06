@@ -58,8 +58,10 @@ struct ThreadTargetProc {
 
     void await_stop() {
         std::unique_lock<std::mutex> l(m);
-        logger->trace("Will now wait for thread '{}' to be stopped, state as of now: {}", name, state);
-        v.wait(l, [&] { return state == State::stopped; });
+        if (state != State::stopped) {
+            logger->trace("Will now wait for thread '{}' to be stopped, state as of now: {}", name, state);
+            v.wait(l, [&] { return state == State::stopped; });
+        }
     }
 
     void mark_stopped() {

@@ -3,26 +3,11 @@
 #include "../../main/cpp/globals.hh"
 #include "../../main/cpp/profile_writer.hh"
 #include "../../main/cpp/thread_map.hh"
-#include "test_profile.hh"
 #include "test.hh"
 #include <jni.h>
 #include <iostream>
 #include <atomic>
 #include "test.hh"
-
-JNIEXPORT jboolean JNICALL Java_fk_prof_TestJni_generateCpusampleSimpleProfile(JNIEnv* jni, jobject self, jstring path) {
-    try {
-        auto file_path = jni->GetStringUTFChars(path, 0);
-        if (file_path != NULL) {
-            generate_cpusample_simple_profile(file_path);
-            jni->ReleaseStringUTFChars(path, file_path);
-            return JNI_TRUE;
-        }
-    } catch (...) {
-        std::cerr << "Profile creation failed\n";
-    }
-    return JNI_FALSE;
-}
 
 int perf_ctx_idx = 0, in_ctx = -1;
 
@@ -134,6 +119,10 @@ JNIEXPORT jboolean JNICALL Java_fk_prof_TestJni_isGenerated(JNIEnv* jni, jobject
     return static_cast<jboolean>(is_gen);
 }
 
-JNIEXPORT jstring JNICALL Java_fk_prof_TestJni_getNoCtxName(JNIEnv* jni, jobject self) {
-    return jni->NewStringUTF(NOCTX_NAME);
+JNIEXPORT jstring JNICALL Java_fk_prof_TestJni_getDefaultCtxName(JNIEnv* jni, jobject self) {
+    return jni->NewStringUTF(DEFAULT_CTX_NAME);
+}
+
+JNIEXPORT jstring JNICALL Java_fk_prof_TestJni_getUnknownCtxName(JNIEnv* jni, jobject self) {
+    return jni->NewStringUTF(UNKNOWN_CTX_NAME);
 }

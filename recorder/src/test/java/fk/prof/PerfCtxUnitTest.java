@@ -152,25 +152,21 @@ public class PerfCtxUnitTest {
     }
 
     @Test
-    public void shouldNotAllowContext_withNameSimilarTo_NOCTX_NAME() {
-        String noCtxName = testJni.getNoCtxName();
-        try {
-            new PerfCtx(noCtxName);
-            fail("Should not allow creation of perf-ctx with noctx-name");
-        } catch (IllegalArgumentException e) {
-            //ignore
-        }
+    public void shouldNotAllowContext_withNameSimilarTo_ImplicitlyAppliedContexts() {
+        String defaultCtxName = testJni.getDefaultCtxName();
+        String unknownCtxName = testJni.getUnknownCtxName();
+        assertExcepts(defaultCtxName);
+        assertExcepts(unknownCtxName);
+        assertExcepts(defaultCtxName.substring(0, defaultCtxName.length() / 2));
+        assertExcepts(unknownCtxName.substring(0, defaultCtxName.length() / 2));
+        assertExcepts(defaultCtxName.substring(defaultCtxName.length() / 2));
+        assertExcepts(unknownCtxName.substring(defaultCtxName.length() / 2));
+    }
 
+    public void assertExcepts(String name) {
         try {
-            new PerfCtx(noCtxName.substring(0, noCtxName.length() / 2));
-            fail("Should not allow creation of perf-ctx with first 1/2 of noctx-name");
-        } catch (IllegalArgumentException e) {
-            //ignore
-        }
-
-        try {
-            new PerfCtx(noCtxName.substring(noCtxName.length() / 2));
-            fail("Should not allow creation of perf-ctx with last 1/2 of noctx-name");
+            new PerfCtx(name);
+            fail("Should not allow creation of perf-ctx with name: " + name);
         } catch (IllegalArgumentException e) {
             //ignore
         }

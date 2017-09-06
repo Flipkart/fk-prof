@@ -2,15 +2,15 @@
   "ip.address": "127.0.0.1",
   "backend.version": 1,
   "backend.id": 2,
-  "backend.http.port": 2492,
-  "leader.http.port": 2497,
   "load.report.interval.secs": 10,
-  "recorder.defunct.threshold.secs": 120,
+  "recorder.defunct.threshold.secs": 60,
   "slot.pool.capacity": 100,
   "backend.http.server": {
+    "port": 2492,
     "idle.timeout.secs": 120
   },
   "leader.http.server": {
+    "port": 2497,
     "idle.timeout.secs": 120
   },
   "http.client": {
@@ -49,7 +49,7 @@
       "kill.behavior": "KILL"
     }
   },
-  "leaderHttpOptions": {
+  "backendAssociations": {
     "backend.association.path": "/association",
     "load.miss.tolerance": 1
   },
@@ -71,19 +71,20 @@
     "s3": {
       "endpoint": "http://127.0.0.1:13031",
       "access.key": "",
-      "secret.key": ""
+      "secret.key": "",
+      "list.objects.timeout.ms": 5000
     },
     "thread.pool": {
       "coresize": 2,
       "maxsize": 5,
       "idletime.secs": 60,
       "queue.maxsize": 50
-    },
-    "base.dir": "profiles"
+    }
   },
   "bufferPoolOptions" : {
     "max.total": 20,
     "max.idle": 20,
     "buffer.size": 10000000
-  }
+  },
+  "aggregatedProfiles.baseDir": "profiles"
 }

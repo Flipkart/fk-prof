@@ -6,7 +6,7 @@ CMD="$1"
  if [ -f /usr/share/$PAC/server.js ]; then
         # Stop the service
         cd /usr/share/$PAC
-        ./node_modules/.bin/forever stop server.js
+        ./node_modules/forever/bin/forever stop server.js
 fi
 
 exit 0

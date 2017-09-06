@@ -89,11 +89,19 @@ JNIEXPORT jboolean JNICALL Java_fk_prof_TestJni_isGenerated
 
 /*
  * Class:     fk_prof_TestJni
- * Method:    getNoCtxName
+ * Method:    getDefaultCtxName
  * Signature: ()Ljava/lang/String;
  */
-JNIEXPORT jstring JNICALL Java_fk_prof_TestJni_getNoCtxName
+JNIEXPORT jstring JNICALL Java_fk_prof_TestJni_getDefaultCtxName
   (JNIEnv *, jobject);
+
+/*
+ * Class:     fk_prof_TestJni
+ * Method:    getUnknownCtxName
+ * Signature: ()Ljava/lang/String;
+ */
+    JNIEXPORT jstring JNICALL Java_fk_prof_TestJni_getUnknownCtxName
+    (JNIEnv *, jobject);
 
 #ifdef __cplusplus
 }

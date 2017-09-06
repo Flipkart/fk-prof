@@ -13,4 +13,13 @@
   <artifactId>perfctx</artifactId>
   <packaging>jar</packaging>
   <name>PerfCtx java-code labeling-lib for fk-prof</name>
+
+  <build>
+    <plugins>
+    <plugin>
+      <artifactId>maven-compiler-plugin</artifactId>
+      <version>${maven.compiler.version}</version>
+    </plugin>
+    </plugins>
+  </build>
 </project>

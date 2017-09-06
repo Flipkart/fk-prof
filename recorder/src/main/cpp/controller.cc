@@ -485,37 +485,39 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                                 retire_work(work_id);
                             });
                     };
-                    if (w.work_size() > 0) {
+
+                    if (w.work_size() > 0) {//something actually needs to be done
                         std::uint32_t tx_timeout = cfg.slow_tx_tolerance * w.duration();
                         std::shared_ptr<HttpRawProfileWriter> raw_writer(new HttpRawProfileWriter(jvm, jvmti, host, port, raw_writer_ring, cancel_work, tx_timeout));
                         writer.reset(new ProfileWriter(raw_writer, buff));
                         recording::RecordingHeader rh;
                         populate_recording_header(rh, w, controller_id, controller_version);
                         writer->write_header(rh);
-                    }
-                    for (auto i = 0; i < w.work_size(); i++) {
-                        auto work = w.work(i);
-                        prep(work);
-                    }
 
-                    serializer.reset(new ProfileSerializingWriter(jvmti, *writer.get(), SiteResolver::method_info, SiteResolver::line_no, get_ctx_reg(), sft, tts, cfg.noctx_cov_pct));
+                        for (auto i = 0; i < w.work_size(); i++) {
+                            auto work = w.work(i);
+                            prep(work);
+                        }
 
-                    JNIEnv *env = getJNIEnv(jvm);
-                    Processes processes;
-                    for (auto i = 0; i < w.work_size(); i++) {
-                        auto work = w.work(i);
-                        issue(work, processes, env);
+                        serializer.reset(new ProfileSerializingWriter(jvmti, *writer.get(), SiteResolver::method_info, SiteResolver::line_no, get_ctx_reg(), sft, tts, cfg.noctx_cov_pct));
+
+                        JNIEnv *env = getJNIEnv(jvm);
+                        Processes processes;
+                        for (auto i = 0; i < w.work_size(); i++) {
+                            auto work = w.work(i);
+                            issue(work, processes, env);
+                        }
+
+                        processor.reset(new Processor(jvmti, std::move(processes)));
+                        processor->start(env);
                     }
-
-                    processor.reset(new Processor(jvmti, std::move(processes)));
-                    processor->start(env);
 
                     start_tm = Time::now();
                     auto stop_at = start_tm + Time::sec(w.duration());
                     scheduler.schedule(stop_at, [&, work_id]() {
                             retire_work(work_id);
                         });
-                    logger->info("Issuing work-id {}, it is slated for retire in {} seconds", w.work_id(), w.duration());
+                    logger->info("Issuing work-id {} (sz: {}), it is slated for retire in {} seconds", w.work_id(), w.work_size(), w.duration());
                     wst = recording::WorkResponse::running;
                 });
         });
@@ -532,17 +534,20 @@ void Controller::retire_work(const std::uint64_t work_id) {
                 return;
             }
 
-            processor->stop();
-            processor.reset();
+            if (w.work_size() > 0) {//something actually was being done
+                processor->stop();
+                processor.reset();
 
-            logger->info("Will now retire work {}", work_id);
-            for (auto i = 0; i < w.work_size(); i++) {
-                auto work = w.work(i);
-                retire(work);
+                logger->info("Will now retire work {}", work_id);
+
+                for (auto i = 0; i < w.work_size(); i++) {
+                    auto work = w.work(i);
+                    retire(work);
+                }
+
+                serializer.reset();
+                writer.reset();
             }
-
-            serializer.reset();
-            writer.reset();
 
             logger->info("Retiring work-id {}, status before retire {}", w.work_id(), wres);
             wst = recording::WorkResponse::complete;

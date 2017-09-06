@@ -1,0 +1,43 @@
+.statContainer {
+  border-bottom: 1px solid rgba(158, 158, 158, 0.28);
+}
+
+.statContainer:hover {
+    background-color: #f0f0f0;  
+}
+
+.pill {
+  display: flex;
+  width: 150px;
+  font-weight: bold;
+  height: 25px;
+  align-items: center;
+}
+
+.percentage {
+  text-align: center;
+  flex: 0 0 70%;
+  position: relative;
+  .shade {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgb(255,64,129);
+    opacity: 0.2;
+    height: inherit;
+  }
+}
+
+.number {
+  text-align: left;
+  flex: 0 0 30%;
+}
+
+.highlight, .highlight div {
+  color: #1bb500 !important;
+}
+
+.subdued {
+  color: rgba(0,0,0,0.6);
+}

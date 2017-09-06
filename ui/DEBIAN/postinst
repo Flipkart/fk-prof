@@ -31,13 +31,13 @@ if [ "$1" == "configure" ] ; then
       [ -d "$LOG_DIR" ] && chown -R $USER:$GROUP $LOG_DIR && chmod 777 $LOG_DIR
     fi
 
-	cd /usr/share
-	mkdir -p $PAC
-	tar xzf $PAC.tgz -C $PAC
+    mkdir -p /usr/share/$PAC
+    cd /usr/share/$PAC
 
-	echo "Starting $PAC service"
-	cd /usr/share/$PAC
-    NODE_ENV=production PORT={{PORT}} node_modules/.bin/forever start server.js
+    tar -xzf node_modules.tar.gz
+
+    echo "Starting $PAC service"
+    NODE_ENV=production PORT={{PORT}} node_modules/forever/bin/forever start server.js
 fi
 
 exit 0

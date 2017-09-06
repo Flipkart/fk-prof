@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 @RunWith(VertxUnitRunner.class)
 public class ProcessGroupDetailTest {
   private Vertx vertx;
-  private ConfigManager configManager;
+  private Configuration config;
   private Recorder.ProcessGroup mockPG;
   private List<Recorder.RecorderInfo.Builder> mockRIBuilders;
 
@@ -38,12 +38,12 @@ public class ProcessGroupDetailTest {
     );
 
     ConfigManager.setDefaultSystemProperties();
-    configManager = new ConfigManager(ProcessGroupDetailTest.class.getClassLoader().getResource("config.json").getFile());
-    vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
+    config = ConfigManager.loadConfig(ProcessGroupDetailTest.class.getClassLoader().getResource("config.json").getFile());
+    vertx = Vertx.vertx(new VertxOptions(config.getVertxOptions()));
   }
 
   @Test
-  public void testWorkAssignmentReturnedInReponseToVaryingPollRequests(TestContext context) {
+  public void testWorkAssignmentReturnedInResponseToVaryingPollRequests(TestContext context) {
     ProcessGroupDetail processGroupDetail = new ProcessGroupDetail(mockPG, 1);
     Recorder.WorkAssignment wa = Recorder.WorkAssignment.getDefaultInstance();
 //    when(wa.getWorkId()).thenReturn(1L);
@@ -126,10 +126,11 @@ public class ProcessGroupDetailTest {
         .build();
     processGroupDetail.getWorkAssignment(pollReq3);
 
-    context.assertEquals(2, processGroupDetail.getRecorderTargetCountToMeetCoverage(100));
-    context.assertEquals(1, processGroupDetail.getRecorderTargetCountToMeetCoverage(99));
-    context.assertEquals(0, processGroupDetail.getRecorderTargetCountToMeetCoverage(34));
-    context.assertEquals(0, processGroupDetail.getRecorderTargetCountToMeetCoverage(0));
+    context.assertEquals(2, processGroupDetail.getHealthyRecordersCount());
+    context.assertEquals(2, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 100));
+    context.assertEquals(1, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 99));
+    context.assertEquals(0, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 34));
+    context.assertEquals(0, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 0));
 
     //first recorder comes back up
     Recorder.PollReq pollReq4 = Recorder.PollReq.newBuilder()
@@ -141,10 +142,12 @@ public class ProcessGroupDetailTest {
             .setWorkState(Recorder.WorkResponse.WorkState.complete).build())
         .build();
     processGroupDetail.getWorkAssignment(pollReq4);
-    context.assertEquals(3, processGroupDetail.getRecorderTargetCountToMeetCoverage(100));
-    context.assertEquals(2, processGroupDetail.getRecorderTargetCountToMeetCoverage(99));
-    context.assertEquals(1, processGroupDetail.getRecorderTargetCountToMeetCoverage(34));
-    context.assertEquals(0, processGroupDetail.getRecorderTargetCountToMeetCoverage(0));
+
+    context.assertEquals(3, processGroupDetail.getHealthyRecordersCount());
+    context.assertEquals(3, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 100));
+    context.assertEquals(2, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 99));
+    context.assertEquals(1, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 34));
+    context.assertEquals(0, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 0));
   }
 
   @Test

@@ -1,2 +1,6 @@
 thd_targeted
 thd_untargeted
+bt
+*.o
+*.so
+*.class

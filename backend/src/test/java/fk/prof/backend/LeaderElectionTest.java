@@ -20,7 +20,6 @@ import fk.prof.backend.model.policy.PolicyStore;
 import fk.prof.backend.proto.BackendDTO;
 import io.vertx.core.*;
 import io.vertx.core.impl.CompositeFutureImpl;
-import io.vertx.core.json.JsonObject;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
 import org.apache.commons.lang3.mutable.MutableObject;
@@ -48,7 +47,7 @@ import java.util.concurrent.TimeUnit;
 public class LeaderElectionTest {
 
   private Vertx vertx;
-  private ConfigManager configManager;
+  private Configuration config;
 
   private TestingServer testingServer;
   private CuratorFramework curatorClient;
@@ -56,7 +55,7 @@ public class LeaderElectionTest {
   @Before
   public void setUp(TestContext context) throws Exception {
     ConfigManager.setDefaultSystemProperties();
-    configManager = new ConfigManager(LeaderElectionTest.class.getClassLoader().getResource("config.json").getFile());
+    config = ConfigManager.loadConfig(LeaderElectionTest.class.getClassLoader().getResource("config.json").getFile());
 
     testingServer = new TestingServer();
     curatorClient = CuratorFrameworkFactory.newClient(testingServer.getConnectString(), 500, 500, new RetryOneTime(1));
@@ -80,15 +79,15 @@ public class LeaderElectionTest {
 
   @Test(timeout = 20000)
   public void leaderTaskTriggerOnLeaderElection(TestContext testContext) throws InterruptedException {
-    vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
+    vertx = Vertx.vertx(new VertxOptions(config.getVertxOptions()));
     CountDownLatch latch = new CountDownLatch(1);
     Runnable leaderElectedTask = () -> {
       latch.countDown();
     };
-    LeaderWriteContext leaderWriteContext = new InMemoryLeaderStore(configManager.getIPAddress(), configManager.getLeaderHttpPort());
+    LeaderWriteContext leaderWriteContext = new InMemoryLeaderStore(config.getIpAddress(), config.getLeaderHttpServerOpts().getPort());
 
-    VerticleDeployer leaderParticipatorDeployer = new LeaderElectionParticipatorVerticleDeployer(vertx, configManager, curatorClient, leaderElectedTask);
-    VerticleDeployer leaderWatcherDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, configManager, curatorClient, leaderWriteContext);
+    VerticleDeployer leaderParticipatorDeployer = new LeaderElectionParticipatorVerticleDeployer(vertx, config, curatorClient, leaderElectedTask);
+    VerticleDeployer leaderWatcherDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, config, curatorClient, leaderWriteContext);
 
     leaderParticipatorDeployer.deploy();
     leaderWatcherDeployer.deploy();
@@ -101,13 +100,13 @@ public class LeaderElectionTest {
 
   @Test(timeout = 20000)
   public void leaderUpdateOnLeaderElection(TestContext testContext) throws InterruptedException {
-    vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
+    vertx = Vertx.vertx(new VertxOptions(config.getVertxOptions()));
     CountDownLatch latch = new CountDownLatch(1);
     Runnable leaderElectedTask = () -> {};
-    MockLeaderStores.TestLeaderStore leaderStore = new MockLeaderStores.TestLeaderStore(configManager.getIPAddress(), configManager.getLeaderHttpPort(), latch);
+    MockLeaderStores.TestLeaderStore leaderStore = new MockLeaderStores.TestLeaderStore(config.getIpAddress(), config.getLeaderHttpServerOpts().getPort(), latch);
 
-    VerticleDeployer leaderParticipatorDeployer = new LeaderElectionParticipatorVerticleDeployer(vertx, configManager, curatorClient, leaderElectedTask);
-    VerticleDeployer leaderWatcherDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, configManager, curatorClient, leaderStore);
+    VerticleDeployer leaderParticipatorDeployer = new LeaderElectionParticipatorVerticleDeployer(vertx, config, curatorClient, leaderElectedTask);
+    VerticleDeployer leaderWatcherDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, config, curatorClient, leaderStore);
 
     leaderParticipatorDeployer.deploy();
     leaderWatcherDeployer.deploy();
@@ -116,21 +115,21 @@ public class LeaderElectionTest {
     if (!released) {
       testContext.fail("Latch timed out but leader store was not updated with leader address");
     } else {
-      testContext.assertEquals(configManager.getIPAddress(), leaderStore.getLeader().getHost());
+      testContext.assertEquals(config.getIpAddress(), leaderStore.getLeader().getHost());
       testContext.assertTrue(leaderStore.isLeader());
     }
   }
 
   @Test(timeout = 20000)
   public void leaderElectionAssertionsWithDisablingOfBackendDuties(TestContext testContext) throws InterruptedException {
-    vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
+    vertx = Vertx.vertx(new VertxOptions(config.getVertxOptions()));
     ActiveAggregationWindows activeAggregationWindows = new ActiveAggregationWindowsImpl();
-    AssociatedProcessGroups associatedProcessGroups = new AssociatedProcessGroupsImpl(configManager.getRecorderDefunctThresholdInSeconds());
-    InMemoryLeaderStore leaderStore = new InMemoryLeaderStore(configManager.getIPAddress(), configManager.getLeaderHttpPort());
+    AssociatedProcessGroups associatedProcessGroups = new AssociatedProcessGroupsImpl(config.getRecorderDefunctThresholdSecs());
+    InMemoryLeaderStore leaderStore = new InMemoryLeaderStore(config.getIpAddress(), config.getLeaderHttpServerOpts().getPort());
     List<String> backendDeployments = new ArrayList<>();
     CountDownLatch aggDepLatch = new CountDownLatch(1);
 
-    VerticleDeployer backendVerticleDeployer = new BackendHttpVerticleDeployer(vertx, configManager, leaderStore, activeAggregationWindows, associatedProcessGroups);
+    VerticleDeployer backendVerticleDeployer = new BackendHttpVerticleDeployer(vertx, config, leaderStore, activeAggregationWindows, associatedProcessGroups);
     backendVerticleDeployer.deploy().setHandler(asyncResult -> {
       if (asyncResult.succeeded()) {
         backendDeployments.addAll(asyncResult.result().list());
@@ -156,8 +155,8 @@ public class LeaderElectionTest {
       };
       LeaderWriteContext leaderWriteContext = new MockLeaderStores.WrappedLeaderStore(leaderStore, leaderWatchedLatch);
 
-      VerticleDeployer leaderParticipatorDeployer = new LeaderElectionParticipatorVerticleDeployer(vertx, configManager, curatorClient, wrappedLeaderElectedTask);
-      VerticleDeployer leaderWatcherDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, configManager, curatorClient, leaderWriteContext);
+      VerticleDeployer leaderParticipatorDeployer = new LeaderElectionParticipatorVerticleDeployer(vertx, config, curatorClient, wrappedLeaderElectedTask);
+      VerticleDeployer leaderWatcherDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, config, curatorClient, leaderWriteContext);
       leaderParticipatorDeployer.deploy();
       leaderWatcherDeployer.deploy();
 
@@ -185,7 +184,7 @@ public class LeaderElectionTest {
 
   @Test(timeout = 3000)
   public void testBeckendAssociationAndPolicyStoreInitOnLeaderSelect(TestContext context) throws Exception {
-    vertx = Vertx.vertx(new VertxOptions(configManager.getVertxConfig()));
+    vertx = Vertx.vertx(new VertxOptions(config.getVertxOptions()));
 
     Recorder.ProcessGroup pg1 = Recorder.ProcessGroup.newBuilder().setAppId("a1").setCluster("c1").setProcName("p1").build();
     Recorder.ProcessGroup pg2 = Recorder.ProcessGroup.newBuilder().setAppId("a1").setCluster("c1").setProcName("p2").build();
@@ -202,7 +201,7 @@ public class LeaderElectionTest {
     CompositeFuture f = populateAssociationAndPolicies(pg1, pg2, policy);
     f.setHandler(res -> {
       if(res.failed()) {
-        context.fail("failed to populate policies and associations");
+        context.fail(res.cause());
       }
       else {
         CompositeFuture cf =  res.result();
@@ -213,7 +212,7 @@ public class LeaderElectionTest {
 
           // get the httpVerticleDeployedFuture for reference.
           MutableObject<Future> httpVerticleDeployedFuture = new MutableObject<>();
-          VerticleDeployer leaderHttpVerticleDeployer = spy(new LeaderHttpVerticleDeployer(vertx, configManager, backendAssociationStore, policyStore));
+          VerticleDeployer leaderHttpVerticleDeployer = spy(new LeaderHttpVerticleDeployer(vertx, config, backendAssociationStore, policyStore));
           when(leaderHttpVerticleDeployer.deploy()).thenAnswer(inv -> {
             httpVerticleDeployedFuture.setValue((Future) inv.callRealMethod());
             return httpVerticleDeployedFuture.getValue();
@@ -231,10 +230,10 @@ public class LeaderElectionTest {
             System.out.println("latch down");
           };
 
-          LeaderWriteContext leaderWriteContext = new InMemoryLeaderStore(configManager.getIPAddress(), configManager.getLeaderHttpPort());
+          LeaderWriteContext leaderWriteContext = new InMemoryLeaderStore(config.getIpAddress(), config.getLeaderHttpServerOpts().getPort());
 
-          VerticleDeployer leaderParticipatorDeployer = new LeaderElectionParticipatorVerticleDeployer(vertx, configManager, curatorClient, leaderElectedTaskWithLatch);
-          VerticleDeployer leaderWatcherDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, configManager, curatorClient, leaderWriteContext);
+          VerticleDeployer leaderParticipatorDeployer = new LeaderElectionParticipatorVerticleDeployer(vertx, config, curatorClient, leaderElectedTaskWithLatch);
+          VerticleDeployer leaderWatcherDeployer = new LeaderElectionWatcherVerticleDeployer(vertx, config, curatorClient, leaderWriteContext);
 
           leaderParticipatorDeployer.deploy();
           leaderWatcherDeployer.deploy();
@@ -266,7 +265,7 @@ public class LeaderElectionTest {
   private CompositeFuture populateAssociationAndPolicies(Recorder.ProcessGroup pg1, Recorder.ProcessGroup pg2, BackendDTO.RecordingPolicy policy) throws Exception {
     // make sure association node is present
     try {
-      curatorClient.create().forPath(configManager.getLeaderHttpDeploymentConfig().getString("backend.association.path", "/association"));
+      curatorClient.create().forPath(config.getAssociationsConfig().getAssociationPath());
     } catch (KeeperException.NodeExistsException ex) {
       // ignore
     }
@@ -280,8 +279,17 @@ public class LeaderElectionTest {
     backendAssociationStore.reportBackendLoad(BackendDTO.LoadReportRequest.newBuilder().setCurrTick(1).setIp("1").setLoad(0.5f).setPort(1234).build());
     backendAssociationStore.reportBackendLoad(BackendDTO.LoadReportRequest.newBuilder().setCurrTick(1).setIp("2").setLoad(0.5f).setPort(1234).build());
 
-    Future f1 = backendAssociationStore.associateAndGetBackend(pg1);
-    Future f2 = backendAssociationStore.associateAndGetBackend(pg2);
+    Future f1 = Future.future();
+    Future f2 = Future.future();
+    Future composition = Future.future();
+    backendAssociationStore.associateAndGetBackend(pg1)
+        .compose(res -> {
+          f1.complete(res);
+          backendAssociationStore.associateAndGetBackend(pg2).compose(res2 -> {
+            f2.complete(res2);
+            composition.complete();
+          }, composition);
+        }, composition);
 
     policyStore.put(pg1, policy);
 
@@ -291,10 +299,9 @@ public class LeaderElectionTest {
   private BackendAssociationStore createBackendAssociationStore(
           Vertx vertx, CuratorFramework curatorClient)
           throws Exception {
-    int loadReportIntervalInSeconds = configManager.getLoadReportIntervalInSeconds();
-    JsonObject leaderHttpDeploymentConfig = configManager.getLeaderHttpDeploymentConfig();
-    String backendAssociationPath = leaderHttpDeploymentConfig.getString("backend.association.path", "/association");
-    int loadMissTolerance = leaderHttpDeploymentConfig.getInteger("load.miss.tolerance", 2);
+    int loadReportIntervalInSeconds = config.getLoadReportItvlSecs();
+    String backendAssociationPath = config.getAssociationsConfig().getAssociationPath();
+    int loadMissTolerance = config.getAssociationsConfig().getLoadMissTolerance();
     return new ZookeeperBasedBackendAssociationStore(vertx, curatorClient, backendAssociationPath,
             loadReportIntervalInSeconds, loadMissTolerance, new ProcessGroupCountBasedBackendComparator());
   }

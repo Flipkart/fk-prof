@@ -14,7 +14,7 @@ const AppComponent = (props) => {
   const selectedCluster = props.location.query.cluster;
   const selectedProc = props.location.query.proc;
   const start = props.location.query.start;
-  const end = start ? (new Date(start).getTime() + ((24 * 3600 * 1000) - 1)) : '';
+  const end = start ? (new Date(start).getTime() + (24 * 3600 * 1000)) : '';
 
   const updateQueryParams = ({ pathname = '/', query }) => props.router.push({ pathname, query });
   const updateAppQueryParam = o => updateQueryParams({ query: { app: o.name } });

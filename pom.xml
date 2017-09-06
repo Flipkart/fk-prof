@@ -25,7 +25,10 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <vertx.version>3.3.3</vertx.version>
         <maven.compiler.version>3.3</maven.compiler.version>
+        <maven.deploy.version>2.8.2</maven.deploy.version>
+        <maven.jar.version>3.0.2</maven.jar.version>
         <jackson.version>2.7.4</jackson.version>
+        <hibernate.version>5.4.1.Final</hibernate.version>
     </properties>
 
     <dependencies>

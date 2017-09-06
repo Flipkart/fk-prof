@@ -2,6 +2,7 @@ package fk.prof.backend.deployer.impl;
 
 import com.google.common.base.Preconditions;
 import fk.prof.backend.ConfigManager;
+import fk.prof.backend.Configuration;
 import fk.prof.backend.deployer.VerticleDeployer;
 import fk.prof.backend.leader.election.LeaderElectionParticipator;
 import io.vertx.core.DeploymentOptions;
@@ -15,21 +16,21 @@ public class LeaderElectionParticipatorVerticleDeployer extends VerticleDeployer
   private final Runnable leaderElectedTask;
 
   public LeaderElectionParticipatorVerticleDeployer(Vertx vertx,
-                                                    ConfigManager configManager,
+                                                    Configuration config,
                                                     CuratorFramework curatorClient,
                                                     Runnable leaderElectedTask) {
-    super(vertx, configManager);
+    super(vertx, config);
     this.curatorClient = Preconditions.checkNotNull(curatorClient);
     this.leaderElectedTask = Preconditions.checkNotNull(leaderElectedTask);
   }
 
   @Override
   protected DeploymentOptions getDeploymentOptions() {
-    return new DeploymentOptions(getConfigManager().getLeaderElectionDeploymentConfig());
+    return getConfig().getLeaderElectionDeploymentOpts();
   }
 
   @Override
   protected Verticle buildVerticle() {
-    return new LeaderElectionParticipator(getConfigManager(), curatorClient, leaderElectedTask);
+    return new LeaderElectionParticipator(getConfig(), curatorClient, leaderElectedTask);
   }
 }

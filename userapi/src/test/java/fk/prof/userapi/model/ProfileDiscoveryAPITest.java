@@ -1,8 +1,9 @@
 package fk.prof.userapi.model;
 
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.storage.AsyncStorage;
+import fk.prof.userapi.Configuration;
+import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.model.json.ProtoSerializers;
@@ -22,7 +23,6 @@ import org.mockito.internal.util.collections.Sets;
 
 import java.time.ZonedDateTime;
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
@@ -58,6 +58,7 @@ public class ProfileDiscoveryAPITest {
     };
 
     AggregatedProfileNamingStrategy[] filenames = Stream.of(objects).map(AggregatedProfileNamingStrategy::fromFileName).toArray(AggregatedProfileNamingStrategy[]::new);
+    private Configuration config;
 
     private Set<String> getObjList(String prefix, boolean recursive) {
 
@@ -83,7 +84,8 @@ public class ProfileDiscoveryAPITest {
     public void setUp() throws Exception {
         vertx = Vertx.vertx();
         asyncStorage = mock(AsyncStorage.class);
-        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, 30);
+        config = UserapiConfigManager.loadConfig(ParseProfileTest.class.getClassLoader().getResource("userapi-conf.json").getFile());
+        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, 30, config.getProfileLoadTimeout(), config.getVertxWorkerPoolSize());
 
         when(asyncStorage.listAsync(anyString(), anyBoolean())).thenAnswer(invocation -> {
             String path1 = invocation.getArgument(0);
@@ -92,7 +94,7 @@ public class ProfileDiscoveryAPITest {
         });
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void TestGetAppIdsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<String, Collection<Object>> appIdTestPairs = new HashMap<String, Collection<Object>>() {
@@ -115,7 +117,7 @@ public class ProfileDiscoveryAPITest {
         f.setHandler(res -> completeTest(res, context, async));
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void TestGetClusterIdsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<List<String>, Collection<?>> appIdTestPairs = new HashMap<List<String>, Collection<?>>() {
@@ -142,7 +144,7 @@ public class ProfileDiscoveryAPITest {
         f.setHandler(res -> completeTest(res, context, async));
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void TestGetProcsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<List<String>, Collection<?>> appIdTestPairs = new HashMap<List<String>, Collection<?>>() {
@@ -169,7 +171,7 @@ public class ProfileDiscoveryAPITest {
         f.setHandler(res -> completeTest(res, context, async));
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void TestGetProfilesInTimeWindow(TestContext context) throws Exception {
         Async async = context.async();
         FilteredProfiles profile1 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("monitor_contention_work"));
