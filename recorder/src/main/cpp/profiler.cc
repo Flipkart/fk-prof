@@ -21,6 +21,7 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
     auto current_sampling_attempt = sampling_attempts.fetch_add(1, std::memory_order_relaxed);
     bool default_ctx = false;
     bool do_record = true;
+
     if (jniEnv != nullptr) {
         thread_info = thread_map.get(jniEnv);
         if (thread_info != nullptr) {//TODO: increment a counter here to monitor freq of this, it could be GC thd or compiler-broker etc
@@ -32,9 +33,11 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
                 default_ctx = true;
             }
         } else {
+            //This is most probably an internal JVM thread (GC/JIT compiler/etc) for which we do not have thread info
             do_record = capture_unknown_thd_bt ? get_prob_pct().on(current_sampling_attempt, noctx_cov_pct) : false;
         }
     } else {
+        //Native thread
         do_record = capture_native_bt ? get_prob_pct().on(current_sampling_attempt, noctx_cov_pct) : false;
     }
     if (! do_record) {
@@ -63,6 +66,10 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
         s_c_cpu_samp_err_no_jni.inc();
     }
 
+    // Will definitely land here if jnienv == null
+    // Can land here despite jnienv != null if asgct could not walk the stack of current thread.
+    // We want to be absolutely sure if native bt capture has been enabled before proceeding
+    if(!capture_native_bt) return;
     STATIC_ARRAY(native_trace, NativeFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
 
     auto bt_len = Stacktraces::fill_backtrace(native_trace, capture_stack_depth());
