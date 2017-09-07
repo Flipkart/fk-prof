@@ -20,9 +20,9 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
     PerfCtx::ThreadTracker* ctx_tracker = nullptr;
     auto current_sampling_attempt = sampling_attempts.fetch_add(1, std::memory_order_relaxed);
     bool default_ctx = false;
+    bool do_record = true;
     if (jniEnv != nullptr) {
         thread_info = thread_map.get(jniEnv);
-        bool do_record = true;
         if (thread_info != nullptr) {//TODO: increment a counter here to monitor freq of this, it could be GC thd or compiler-broker etc
             ctx_tracker = &(thread_info->ctx_tracker);
             if (ctx_tracker->in_ctx()) {
