@@ -108,9 +108,10 @@ public class LoadGenApp {
                         }
 
                         try {
-                            Thread.sleep(sleepFor);
+                            if(!Thread.currentThread().isInterrupted()) {
+                                Thread.sleep(sleepFor);
+                            }
                         } catch(InterruptedException e) {
-                            Thread.interrupted();
                         }
                     }
 
