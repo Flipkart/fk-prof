@@ -146,9 +146,9 @@ public class LoadGenApp {
             }
         });
 
-
-
-        execSvc.submit(() -> new ThreadSpawner(threadSpawnerCount, isDebug).doWork());
+        if(threadSpawnerCount > 0) {
+            execSvc.submit(() -> new ThreadSpawner(threadSpawnerCount, isDebug).doWork());
+        }
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
