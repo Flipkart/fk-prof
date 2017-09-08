@@ -471,6 +471,17 @@ void populate_recording_header(recording::RecordingHeader& rh, const recording::
     *wa = w;
 }
 
+std::uint32_t Controller::sampling_freq_to_itvl(std::uint32_t sampling_freq) {
+    auto mean_sampling_itvl_us = 1000000 / sampling_freq;
+    std::uint32_t itvl_10_pct_us = mean_sampling_itvl_us / 10;
+    auto min_itvl_us = mean_sampling_itvl_us - itvl_10_pct_us;
+
+    // TODO: replace cfg.processor_itvl_factor with some proper runtime value.
+    auto itvl_ms = Size * min_itvl_us / 1000 / cfg.processor_itvl_factor;
+
+    return itvl_ms;
+}
+
 void Controller::issue_work(const std::string& host, const std::uint32_t port, std::uint32_t controller_id, std::uint32_t controller_version) {
     auto at = Time::now() + Time::sec(current_work.delay());
     scheduler.schedule(at, [&, port, controller_id, controller_version]() {
@@ -487,6 +498,10 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                     };
 
                     if (w.work_size() > 0) {//something actually needs to be done
+
+                        // big TODO: right now CpuSampleProcess calculates the itvl from sampling freq. Refactor that calculation to a common place.
+                        auto sampling_freq = w.work(0).cpu_sample().frequency();
+
                         std::uint32_t tx_timeout = cfg.slow_tx_tolerance * w.duration();
                         std::shared_ptr<HttpRawProfileWriter> raw_writer(new HttpRawProfileWriter(jvm, jvmti, host, port, raw_writer_ring, cancel_work, tx_timeout));
                         writer.reset(new ProfileWriter(raw_writer, buff));
@@ -508,7 +523,7 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                             issue(work, processes, env);
                         }
 
-                        processor.reset(new Processor(jvmti, std::move(processes)));
+                        processor.reset(new Processor(jvmti, std::move(processes), sampling_freq_to_itvl(sampling_freq)));
                         processor->start(env);
                     }
 

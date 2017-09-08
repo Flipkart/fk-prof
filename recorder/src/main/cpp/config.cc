@@ -78,6 +78,7 @@ std::ostream& operator<<(std::ostream& os, const ConfigurationOptions* config) {
     PRINT_FIELD(rpc_timeout, false);
     PRINT_FIELD(slow_tx_tolerance, false);
     PRINT_FIELD(tx_ring_sz, false);
+    PRINT_FIELD(processor_itvl_factor, false);
     PRINT_FIELD(stats_syslog_tag, true);
     os << " }";
     return os;
@@ -161,6 +162,8 @@ void ConfigurationOptions::load(const char* options) {
                 tx_ring_sz = static_cast<std::uint32_t>(atoi(value));
             } else if (strstr(key, "stats_syslog_tag") == key) {
                 stats_syslog_tag = safe_copy_string(value, next);
+            } else if (strstr(key, "processor_itvl_factor") == key) {
+                processor_itvl_factor = static_cast<std::uint32_t>(atoi(value));
             } else {
                 logger->warn("Unknown configuration option: {}", key);
             }

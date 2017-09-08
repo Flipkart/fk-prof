@@ -57,6 +57,8 @@ struct ConfigurationOptions {
 
     char* stats_syslog_tag;
 
+    std::uint32_t processor_itvl_factor;
+
     ConfigurationOptions(const char* options) :
         service_endpoint(nullptr),
         ip(nullptr),
@@ -78,6 +80,7 @@ struct ConfigurationOptions {
         rpc_timeout(10),
         slow_tx_tolerance(1.5),
         tx_ring_sz(1024 * 1024),
+        processor_itvl_factor(2),
         stats_syslog_tag(nullptr) {
 
         load(options);
