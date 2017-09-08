@@ -38,18 +38,23 @@ public class MockBackendServer {
         }
 
         final String localIp = args[0];
+        final int freq = Integer.parseInt(args[1]);
+        final int duration = Integer.parseInt(args[2]);
 
         Vertx vertx = Vertx.vertx();
-        vertx.deployVerticle(new MockHttpVerticle(localIp));
+        vertx.deployVerticle(new MockHttpVerticle(localIp, freq, duration));
     }
 
     static class MockHttpVerticle extends AbstractVerticle {
 
         final String localIp;
+        final int freq, duration;
         final int port = 8080;
 
-        MockHttpVerticle(String localIp) {
+        MockHttpVerticle(String localIp, int freq, int duration) {
             this.localIp = localIp;
+            this.freq = freq;
+            this.duration = duration;
         }
 
         @Override
@@ -127,14 +132,14 @@ public class MockBackendServer {
                         Recorder.WorkAssignment.newBuilder()
                             .setDelay(30)
                             .setDescription("cpu sample")
-                            .setDuration(75)
+                            .setDuration(duration)
                             .setIssueTime(now)
                             .setWorkId(System.currentTimeMillis()/100)
                             .addWork(
                                 Recorder.Work.newBuilder()
                                     .setWType(Recorder.WorkType.cpu_sample_work)
                                     .setCpuSample(Recorder.CpuSampleWork.newBuilder()
-                                        .setFrequency(67)
+                                        .setFrequency(freq)
                                         .setMaxFrames(128))));
                 }
                 else {
