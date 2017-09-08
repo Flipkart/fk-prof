@@ -4,6 +4,7 @@ import fk.prof.ClosablePerfCtx;
 import fk.prof.PerfCtx;
 
 import java.lang.reflect.Array;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 /**
@@ -21,7 +22,9 @@ public class Inception {
     int perfCtxCount;
     int maxlevelDepth;
 
-    public Inception(int[] iterations, Runnable[] work, PerfCtx[][] perfctxs, RndGen rndGen, int maxFanOut, int maxlevelDepth) {
+    AtomicInteger[] counters;
+
+    public Inception(int[] iterations, Runnable[] work, PerfCtx[][] perfctxs, RndGen rndGen, int maxFanOut, int maxlevelDepth, AtomicInteger[] counters) {
         assert maxFanOut <= 20 : "fanout cannot be no more than 20";
         this.maxFanOut = maxFanOut;
         this.iterationCounts = iterations;
@@ -30,6 +33,8 @@ public class Inception {
         this.perfctxs = perfctxs;
         this.perfCtxCount = perfctxs[0].length;
         this.maxlevelDepth = Math.max(11, maxlevelDepth);
+
+        this.counters = counters;
 
         functions = (Consumer<Param>[]) Array.newInstance(Consumer.class, 20);
 
@@ -139,6 +144,7 @@ public class Inception {
             try (ClosablePerfCtx ctx = perfctxs[i][rndGen.getInt(perfCtxCount)].open()) {
                 for (int j = 0; j < iterationCounts[i]; ++j) {
                     work[i].run();
+                    counters[i].incrementAndGet();
                 }
             }
         }

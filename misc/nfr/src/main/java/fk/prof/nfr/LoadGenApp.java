@@ -6,10 +6,13 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import fk.prof.PerfCtx;
 
+import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 /**
@@ -41,6 +44,7 @@ public class LoadGenApp {
         int threadSpawnerCount = Integer.parseInt(args[9]);
 
         boolean isDebug = args.length > 10 ? "1".equals(args[10]) : false;
+        int counterPrintPeriodInSec = args.length > 11 ? Integer.parseInt(args[11]) : 5;
 
         // generate trace names and corresponding perf ctx
         PerfCtx[][] perfctxs = new PerfCtx[loadTypes][traceDuplicatesFactor];
@@ -57,9 +61,9 @@ public class LoadGenApp {
 
         long[] totalTimings = new long[loadTypes];
 
-        for(int i = 0; i < 12; ++i) {
+        for(int i = 0; i < 15; ++i) {
             long[] timings = findProportions();
-            if(i > 1) {
+            if(i > 4) {
                 totalTimings[0] += timings[0];
                 totalTimings[1] += timings[1];
                 totalTimings[2] += timings[2];
@@ -81,25 +85,30 @@ public class LoadGenApp {
 
         ExecutorService execSvc = Executors.newCachedThreadPool();
 
+        AtomicInteger[] counters = { new AtomicInteger(0), new AtomicInteger(0), new AtomicInteger(0) };
+
         for(int i = 0; i < totalThreadCounts; ++i) {
             final int tid = i;
             execSvc.submit(() -> {
                 RndGen rndGen = new RndGen();
                 Runnable[] work = getWork(rndGen);
-                Inception inception = new Inception(iterationCounts, work, perfctxs, rndGen, maxFanOut, stackLevelDepth);
+
+                Inception inception = new Inception(iterationCounts, work, perfctxs, rndGen, maxFanOut, stackLevelDepth, counters);
                 while (true) {
                     long start = System.currentTimeMillis();
                     inception.doWorkOnSomeLevel();
                     long end = System.currentTimeMillis();
 
-                    if(isDebug) {
-                        System.out.println("thread\t" + tid + "\t" + (end - start));
-                    }
-
                     long totalTimeShare = (long)(factor * 1000);
                     if(end - start < totalTimeShare) {
+
+                        long sleepFor = totalTimeShare - (end - start);
+                        if(isDebug) {
+                            System.out.print("thread " + tid + " sleeping for " + sleepFor);
+                        }
+
                         try {
-                            Thread.sleep(totalTimeShare - (end - start));
+                            Thread.sleep(sleepFor);
                         } catch(InterruptedException e) {
                             Thread.interrupted();
                         }
@@ -111,6 +120,32 @@ public class LoadGenApp {
                 }
             });
         }
+
+        execSvc.submit(() -> {
+            int c1 = counters[0].get(), c2 = counters[1].get(), c3 = counters[2].get();
+            while(true) {
+                int _c1 = counters[0].get(), _c2 = counters[1].get(), _c3 = counters[2].get();
+
+                LocalDateTime ldt = LocalDateTime.now();
+
+                System.out.println(ldt + "\t" + (_c1 - c1) + "\t" + (_c2 - c2) + "\t" + (_c3 - c3));
+                c1 = _c1;
+                c2 = _c2;
+                c3 = _c3;
+
+                try {
+                    Thread.sleep(counterPrintPeriodInSec * 1000);
+                } catch(InterruptedException e) {
+                    Thread.interrupted();
+                }
+
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+            }
+        });
+
+
 
         execSvc.submit(() -> new ThreadSpawner(threadSpawnerCount, isDebug).doWork());
 
@@ -134,7 +169,15 @@ public class LoadGenApp {
         final SortingLoad sorting = new SortingLoad(512, rndGen);
 
         return new Runnable[] {
-                () -> jsonGen.genJsonMap(8, 0.5f, 0.25f),
+                () -> {
+                     Map<String, Object> map = jsonGen.genJsonMap(6, 0.5f, 0.25f);
+                     try {
+                         String serialized = om.writeValueAsString(map);
+                         Map<String, Object> map_back = om.readValue(serialized, Map.class);
+                     } catch(Exception e) {
+                        // ifgnore
+                     }
+                },
                 () -> matMul.multiply(),
                 () -> sorting.doWork()
         };
