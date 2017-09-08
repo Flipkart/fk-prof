@@ -55,9 +55,9 @@ struct ConfigurationOptions {
     double slow_tx_tolerance;
     std::uint32_t tx_ring_sz;
 
-    char* stats_syslog_tag;
-
     std::uint32_t processor_itvl_factor;
+    
+    char* stats_syslog_tag;
 
     ConfigurationOptions(const char* options) :
         service_endpoint(nullptr),
