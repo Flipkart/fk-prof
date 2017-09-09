@@ -105,7 +105,7 @@ private:
     void issue(const recording::CpuSampleWork& csw, Processes& processes, JNIEnv* env);
     void retire(const recording::CpuSampleWork& csw);
 
-    static std::uint32_t sampling_freq_to_itvl(std::uint32_t sampling_freq);
+    static std::uint32_t sampling_freq_to_itvl(std::uint32_t sampling_freq, std::uint32_t processor_itvl_factor);
 };
 
 #endif

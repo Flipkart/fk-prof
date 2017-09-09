@@ -471,13 +471,13 @@ void populate_recording_header(recording::RecordingHeader& rh, const recording::
     *wa = w;
 }
 
-std::uint32_t Controller::sampling_freq_to_itvl(std::uint32_t sampling_freq) {
+std::uint32_t Controller::sampling_freq_to_itvl(std::uint32_t sampling_freq, std::uint32_t processor_itvl_factor) {
     auto mean_sampling_itvl_us = 1000000 / sampling_freq;
     auto itvl_10_pct_us = mean_sampling_itvl_us / 10;
     auto min_itvl_us = mean_sampling_itvl_us - itvl_10_pct_us;
 
     // TODO: replace cfg.processor_itvl_factor with some proper runtime value.
-    auto itvl_ms = Size * min_itvl_us / 1000 / cfg.processor_itvl_factor;
+    auto itvl_ms = Size * min_itvl_us / 1000 / processor_itvl_factor;
 
     return itvl_ms;
 }
@@ -523,7 +523,7 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                             issue(work, processes, env);
                         }
 
-                        auto processor_interval = sampling_freq_to_itvl(sampling_freq);
+                        auto processor_interval = sampling_freq_to_itvl(sampling_freq, cfg.processor_itvl_factor);
                         logger->warn("Processor is using processor-interval value: {}", processor_interval);
 
                         processor.reset(new Processor(jvmti, std::move(processes), processor_interval));

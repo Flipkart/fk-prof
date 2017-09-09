@@ -116,8 +116,8 @@ void Profiler::configure() {
     buffer = new CircularQueue(serializer, capture_stack_depth());
 
     handler = new SignalHandler(itvl_min, itvl_max);
-    int processor_interval = Size * itvl_min / 1000 / 2;
-    logger->debug("CpuSamplingProfiler is using processor-interval value: {}", processor_interval);
+    //int processor_interval = Size * itvl_min / 1000 / 2;
+    //logger->debug("CpuSamplingProfiler is using processor-interval value: {}", processor_interval);
 }
 
 #define METRIC_TYPE "cpu_samples"
