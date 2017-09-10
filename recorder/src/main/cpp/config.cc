@@ -108,6 +108,8 @@ void ConfigurationOptions::load(const char* options) {
                 cluster = safe_copy_string(value, next);
             } else if (strstr(key, "inst_id") == key) {
                 inst_id = safe_copy_string(value, next);
+            } else if (strstr(key, "processor_itvl_factor") == key) {
+                processor_itvl_factor = static_cast<std::uint32_t>(atoi(value));
             } else if (strstr(key, "proc") == key) {
                 proc = safe_copy_string(value, next);
             } else if (strstr(key, "vm_id") == key) {
@@ -162,8 +164,6 @@ void ConfigurationOptions::load(const char* options) {
                 tx_ring_sz = static_cast<std::uint32_t>(atoi(value));
             } else if (strstr(key, "stats_syslog_tag") == key) {
                 stats_syslog_tag = safe_copy_string(value, next);
-            } else if (strstr(key, "processor_itvl_factor") == key) {
-                processor_itvl_factor = static_cast<std::uint32_t>(atoi(value));
             } else {
                 logger->warn("Unknown configuration option: {}", key);
             }
