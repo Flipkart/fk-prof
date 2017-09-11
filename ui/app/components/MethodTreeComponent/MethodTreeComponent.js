@@ -284,8 +284,8 @@ class MethodTreeComponent extends Component {
     let rowData = this.renderData[rowIndex];
     let uniqueId = rowData[0];
 
-    const displayName =  this.treeStore[this.url].getName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
-
+    const displayName =  this.treeStore[this.url].getMethodName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
+    const displayNameWithArgs =  this.treeStore[this.url].getFullyQualifiedMethodName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
     const isHighlighted = Object.keys(this.highlighted)
       .filter(highlight => highlight.startsWith(uniqueId));
     return (
@@ -293,13 +293,13 @@ class MethodTreeComponent extends Component {
         key={uniqueId}
         style={{...style, height: stackEntryHeight, whiteSpace: 'nowrap'}}
         listIdx={rowIndex}
-        nodename={displayName}
+        nodename={displayNameWithArgs}
         stackline={displayName}
         indent={rowData[2]}
         nodestate={this.opened[this.url][uniqueId]}
         highlight={isHighlighted.length}
         subdued={rowData[3] === 1}
-        onHighlight={this.highlight.bind(this, uniqueId)}
+        onHighlight={this.highlight.bind(this, uniqueId, rowIndex)}
         onClick={this.toggle.bind(this, rowIndex)}>
       </StacklineDetail>
 
@@ -335,7 +335,7 @@ class MethodTreeComponent extends Component {
           ids.sort((a, b) => this.treeStore[this.url].getSampleCount(b) - this.treeStore[this.url].getSampleCount(a));
           const asyncIdsRenderData = ids.map((id) => new Promise(resolve => {
             const indent = parentIndent === -1 ? 0 : ((parentHasSiblings || ids.length > 1 ) ? parentIndent + 10 : parentIndent + 4);
-            const displayName = this.treeStore[this.url].getName(id, !(this.props.nextNodesAccessorField === 'parent' && indent === 0));
+            const displayName = this.treeStore[this.url].getMethodName(id, !(this.props.nextNodesAccessorField === 'parent' && indent === 0));
             const stackEntryWidth = getTextWidth(displayName, "14px Arial") + 28 + indent; //28 is space taken up by icons
             let renderDataList = [[id, null, indent, ids.length, stackEntryWidth]];
             if (filterText && indent === 0 && !displayName.match(new RegExp(filterText, 'i'))) {

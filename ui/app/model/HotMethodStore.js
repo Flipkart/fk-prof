@@ -28,7 +28,7 @@ export default class HotMethodStore {
     //output: {name/name:line: [data*, chld*, part]} where parts = [[k, v]...]], data contains aggregated data of same name:line nodes, chld is undefined to be populated later
   }
 
-  //handle new request prepare the data  use parent if needed
+  //handle new request prepare the data use parent if needed
   flatten(nodes, topLevel, bodyRoot) {
     const deDupNodes = this.deDup(nodes, topLevel);
     let curLayerIds = undefined;
@@ -113,8 +113,12 @@ export default class HotMethodStore {
     return postWithRetryOnAccept(this.url, body, 5).then((resp) => this.handleResponse(resp, uniqueId), (err) => Promise.reject(err.response.message || err.response.error));
   }
 
-  getName(uniqueId, showLineNo) {
+  getMethodName(uniqueId, showLineNo) {
     return this.methodLookup[this.nodes[uniqueId][0][0]][0] + ((showLineNo) ? ': ' + this.nodes[uniqueId][0][1] : '');
+  }
+
+  getFullyQualifiedMethodName(uniqueId, showLineNo) {
+    return this.methodLookup[this.nodes[uniqueId][0][0]].join(' ') + ((showLineNo) ? ': ' + this.nodes[uniqueId][0][1] : '');
   }
 
   getSampleCount(uniqueId) {
