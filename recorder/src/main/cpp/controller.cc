@@ -57,7 +57,7 @@ void Controller::start() {
 
 void Controller::stop() {
     cancel_work();
-    scheduler.schedule(Time::now(), [&]() {
+    scheduler.schedule(Time::now() + Time::sec(1), [&]() {
             //This is necessary because it wakes up the scheduler.poll and makes keep_running == false
             //  We can either schedule something or we'd need additional stop-control in scheduler.
             //  This hack (in a good way) simplifies scheduler.
