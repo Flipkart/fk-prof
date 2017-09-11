@@ -102,11 +102,11 @@ export default class HotMethodStore {
     }
     //else fetch from api
     const body = (uniqueId === -1) ? [] : this.nodes[uniqueId][2].map(([k, v]) => parseInt(k));    //body contains the parts of the aggregated node at uniqueId
-    return postWithRetryOnAccept(this.url, body, 5).then((resp) => this.handleResponse(resp, uniqueId), (err)=> Promise.reject(err.response.message||err.response.error));
+    return postWithRetryOnAccept(this.url, body, 5).then((resp) => this.handleResponse(resp, uniqueId), (err) => Promise.reject(err.response.message || err.response.error));
   }
 
-  getNameWithArgs(uniqueId) {
-    return uniqueId + ' ' + this.methodLookup[this.nodes[uniqueId][0][0]] + ' ' + this.nodes[uniqueId][0][1];
+  getName(uniqueId, showLineNo) {
+    return this.methodLookup[this.nodes[uniqueId][0][0]] + ((showLineNo) ? ': ' + this.nodes[uniqueId][0][1] : '');
   }
 
   getSampleCount(uniqueId) {

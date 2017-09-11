@@ -43,8 +43,8 @@ export default class CallTreeStore {
     return postWithRetryOnAccept(this.url, body, 5).then((resp) => this.handleResponse(resp, uniqueId), (err)=> Promise.reject(err.response.message));
   }
 
-  getNameWithArgs(uniqueId) {
-    return uniqueId + ' ' + this.methodLookup[this.nodes[uniqueId][0][0]] + ' ' + this.nodes[uniqueId][0][1];
+  getName(uniqueId, showLineNo) {
+    return this.methodLookup[this.nodes[uniqueId][0][0]] + ((showLineNo) ? ': ' + this.nodes[uniqueId][0][1] : '');
   }
 
   getSampleCount(uniqueId) {

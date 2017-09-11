@@ -284,7 +284,7 @@ class MethodTreeComponent extends Component {
     let rowData = this.renderData[rowIndex];
     let uniqueId = rowData[0];
 
-    const displayName = this.treeStore[this.url].getNameWithArgs(uniqueId);
+    const displayName =  this.treeStore[this.url].getName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
 
     const isHighlighted = Object.keys(this.highlighted)
       .filter(highlight => highlight.startsWith(uniqueId));
@@ -335,7 +335,7 @@ class MethodTreeComponent extends Component {
           ids.sort((a, b) => this.treeStore[this.url].getSampleCount(b) - this.treeStore[this.url].getSampleCount(a));
           const asyncIdsRenderData = ids.map((id) => new Promise(resolve => {
             const indent = parentIndent === -1 ? 0 : ((parentHasSiblings || ids.length > 1 ) ? parentIndent + 10 : parentIndent + 4);
-            const displayName = this.treeStore[this.url].getNameWithArgs(id);
+            const displayName = this.treeStore[this.url].getName(id, !(this.props.nextNodesAccessorField === 'parent' && indent === 0));
             const stackEntryWidth = getTextWidth(displayName, "14px Arial") + 28 + indent; //28 is space taken up by icons
             let renderDataList = [[id, null, indent, ids.length, stackEntryWidth]];
             if (filterText && indent === 0 && !displayName.match(new RegExp(filterText, 'i'))) {
