@@ -25,7 +25,7 @@ export default class HotMethodStore {
       }
       return accumNodes;
     }, {});
-    //output: {name/name:line: [data*, chld*, part]} where parts = [[k, v]...]], data contains aggregated data of same name:line nodes, chld is undefined to populated later
+    //output: {name/name:line: [data*, chld*, part]} where parts = [[k, v]...]], data contains aggregated data of same name:line nodes, chld is undefined to be populated later
   }
 
   //handle new request prepare the data  use parent if needed
@@ -80,7 +80,7 @@ export default class HotMethodStore {
           Object.values(v['chld'])[0]['data'][2] = d;
           Object.assign(nextLayerNodes, v['chld']);
         } else {
-          console.log('hotMethod node should never happen more than one child/hotMethod parent, this has : ', v['chld']);
+          console.error('hotMethod node should never happen more than one child/hotMethod parent, this has : ', v['chld']);
         }
       });
       this.nodes[uniqueId][1] = this.flatten(nextLayerNodes, uniqueId === -1, true);

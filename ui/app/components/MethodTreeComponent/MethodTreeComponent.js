@@ -75,7 +75,7 @@ class MethodTreeComponent extends Component {
   componentDidMount() {
     this.initTreeStore();
     this.setState({asyncStatus: 'PENDING'});
-    this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.filterKey, -1, false).then(subTreeRenderData => {
+    this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.location.query[this.props.filterKey], -1, false).then(subTreeRenderData => {
       this.renderData = subTreeRenderData;
       this.setState({
         itemCount: this.renderData.length,
@@ -90,7 +90,7 @@ class MethodTreeComponent extends Component {
     if(prevWorkType !== workType || prevSelectedWorkType !== selectedWorkType || prevProfileStart !== profileStart || prevProfileDuration !== profileDuration || prevProps.traceName !== this.props.traceName){
       this.initTreeStore();
       this.setState({asyncStatus: 'PENDING'});
-      this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.filterKey, -1, false).then(subTreeRenderData => {
+      this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.location.query[this.props.filterKey], -1, false).then(subTreeRenderData => {
         this.renderData = subTreeRenderData;
         this.setState({
           itemCount: this.renderData.length,
@@ -115,29 +115,9 @@ class MethodTreeComponent extends Component {
   }
 
   render () {
-    // console.log('this.containerWidth: ', this.containerWidth);
     if(this.containerWidth === 0) {
       return null;
     }
-
-    // if (!this.state.req.status) return null;
-    //
-    // if (this.state.asyncStatus === 'PENDING') {
-    //   return (
-    //     <div>
-    //       <h4 style={{textAlign: 'center'}}>Please wait, coming right up!</h4>
-    //       <Loader/>
-    //     </div>
-    //   );
-    // }
-    //
-    // if (this.state.req.status === 'ERROR') {
-    //   return (
-    //     <div>
-    //       <h2 style={{textAlign: 'center'}}>Failed to fetch the data. Please refresh or try again later</h2>
-    //     </div>
-    //   );
-    // }
 
     const filterText = this.props.location.query[this.props.filterKey];
     const { nextNodesAccessorField } = this.props;
@@ -358,7 +338,7 @@ class MethodTreeComponent extends Component {
             const displayName = this.treeStore[this.url].getNameWithArgs(id);
             const stackEntryWidth = getTextWidth(displayName, "14px Arial") + 28 + indent; //28 is space taken up by icons
             let renderDataList = [[id, null, indent, ids.length, stackEntryWidth]];
-            if (filterText && indent === -1 && !displayName.match(new RegExp(filterText, 'i'))) {
+            if (filterText && indent === 0 && !displayName.match(new RegExp(filterText, 'i'))) {
               renderDataList = [];
             }
             if (ids.length === 1 || this.opened[this.url][id]) {
