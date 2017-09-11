@@ -21,6 +21,14 @@ export default class CallTreeStore {
 
   handleResponse(resp, uniqueId) {
     this.flatten(resp, true);
+    Object.entries(resp['method_lookup']).forEach(([k,v])=>{
+      const splits = v.split(" ");
+      if (splits.length === 2) {
+        resp['method_lookup'][k] = splits;
+      } else {
+        resp['method_lookup'][k] = [v, ""];
+      }
+    });
     Object.assign(this.methodLookup, resp['method_lookup']);
     if (uniqueId === -1) {
       const rootKey = Object.keys(resp).filter(k => k !== 'method_lookup')[0]; // array should be of size 1
@@ -40,11 +48,11 @@ export default class CallTreeStore {
       return Promise.resolve(this.nodes[uniqueId][1]);
     }
     const body = (uniqueId === -1) ? [] : [uniqueId];
-    return postWithRetryOnAccept(this.url, body, 5).then((resp) => this.handleResponse(resp, uniqueId), (err)=> Promise.reject(err.response.message));
+    return postWithRetryOnAccept(this.url, body, 5).then((resp) => this.handleResponse(resp, uniqueId), (err) => Promise.reject(err.response.message));
   }
 
   getName(uniqueId, showLineNo) {
-    return this.methodLookup[this.nodes[uniqueId][0][0]] + ((showLineNo) ? ': ' + this.nodes[uniqueId][0][1] : '');
+    return this.methodLookup[this.nodes[uniqueId][0][0]][0] + ((showLineNo) ? ': ' + this.nodes[uniqueId][0][1] : '');
   }
 
   getSampleCount(uniqueId) {

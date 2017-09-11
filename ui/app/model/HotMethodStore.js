@@ -88,6 +88,14 @@ export default class HotMethodStore {
     if (this.nodes[uniqueId][1] && this.nodes[uniqueId].length === 3) {
       this.nodes[uniqueId].pop();        //if chld is populated then remove parts
     }
+    Object.entries(resp['method_lookup']).forEach(([k,v])=>{
+      const splits = v.split(" ");
+      if (splits.length === 2) {
+        resp['method_lookup'][k] = splits;
+      } else {
+        resp['method_lookup'][k] = [v, ""];
+      }
+    });
     Object.assign(this.methodLookup, resp['method_lookup']);
     return this.nodes[uniqueId][1];
   }
@@ -106,7 +114,7 @@ export default class HotMethodStore {
   }
 
   getName(uniqueId, showLineNo) {
-    return this.methodLookup[this.nodes[uniqueId][0][0]] + ((showLineNo) ? ': ' + this.nodes[uniqueId][0][1] : '');
+    return this.methodLookup[this.nodes[uniqueId][0][0]][0] + ((showLineNo) ? ': ' + this.nodes[uniqueId][0][1] : '');
   }
 
   getSampleCount(uniqueId) {
