@@ -354,11 +354,12 @@ class MethodTreeComponent extends Component {
           const asyncIdsRenderData = ids.map((id) => new Promise(resolve => {
             const indent = parentIndent === -1 ? 0 : ((parentHasSiblings || ids.length > 1 ) ? parentIndent + 10 : parentIndent + 4);
             const displayName = this.treeStore[this.url].getMethodName(id, !(this.props.nextNodesAccessorField === 'parent' && indent === 0));
+            if (filterText && indent === 0 && !displayName.match(new RegExp(filterText, 'i'))) {
+              resolve([]);
+              return;
+            }
             const stackEntryWidth = getTextWidth(displayName, "14px Arial") + 28 + indent; //28 is space taken up by icons
             let renderDataList = [[id, null, indent, ids.length, stackEntryWidth]];
-            if (filterText && indent === 0 && !displayName.match(new RegExp(filterText, 'i'))) {
-              renderDataList = [];
-            }
             if (ids.length === 1 || this.opened[this.url][id]) {
               this.opened[this.url][id] = true;
               this.getRenderData(this.treeStore[this.url].getChildrenAsync(id).catch(this.showPromptMsg), filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
