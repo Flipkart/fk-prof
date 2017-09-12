@@ -2,4 +2,3 @@ libbagent.a
 libtestbase.a
 *.tmp
 .idea
-.cbp

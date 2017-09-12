@@ -54,8 +54,6 @@ struct ConfigurationOptions {
     std::uint32_t rpc_timeout;
     double slow_tx_tolerance;
     std::uint32_t tx_ring_sz;
-
-    std::uint32_t processor_itvl_factor;
     
     char* stats_syslog_tag;
 
@@ -80,7 +78,6 @@ struct ConfigurationOptions {
         rpc_timeout(10),
         slow_tx_tolerance(1.5),
         tx_ring_sz(1024 * 1024),
-        processor_itvl_factor(2),
         stats_syslog_tag(nullptr) {
 
         load(options);
