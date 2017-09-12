@@ -7,20 +7,20 @@ export default class CallTreeStore {
     this.url = url;
   }
 
-  flatten(root, bodyRoot) {
+  flatten(respRoot, bodyRoot, parent) {
     //sorting logic on Object.entries if any
-    Object.entries(root).forEach(([k, v]) => {
+    Object.entries(respRoot).forEach(([k, v]) => {
       if (k !== 'method_lookup') {
-        this.nodes[parseInt(k)] = [v['data'], v['chld'] ? Object.keys(v['chld']).map(c => parseInt(c)) : (bodyRoot ? [] : undefined)];    //nodes at bodyRoot level are guaranteed to have their children in the response
+        this.nodes[parseInt(k)] = [v['data'], v['chld'] ? Object.keys(v['chld']).map(c => parseInt(c)) : (bodyRoot ? [] : undefined), parent];    //nodes at bodyRoot level are guaranteed to have their children in the response
         if (v['chld']) {
-          this.flatten(v['chld'], false);
+          this.flatten(v['chld'], false, parseInt(k));
         }
       }
     });
   }
 
   handleResponse(resp, uniqueId) {
-    this.flatten(resp, true);
+    this.flatten(resp, true, uniqueId === -1? uniqueId: this.nodes[uniqueId][2]);
     Object.entries(resp['method_lookup']).forEach(([k,v])=>{
       const splits = v.split(" ");
       if (splits.length === 2) {
@@ -35,7 +35,7 @@ export default class CallTreeStore {
       const rootChld = resp[rootKey]['chld'];
       delete resp[rootKey];
       Object.assign(resp, rootChld);
-      this.nodes[uniqueId] = [null, Object.keys(resp).filter((k) => k !== 'method_lookup').map(k => parseInt(k))];
+      this.nodes[uniqueId] = [null, Object.keys(resp).filter((k) => k !== 'method_lookup').map(k => parseInt(k)), undefined];
     }
     return this.nodes[uniqueId][1];
   }
@@ -69,5 +69,13 @@ export default class CallTreeStore {
     } else {
       return [];
     }
+  }
+
+  getParent(uniqueId) {
+    return this.nodes[uniqueId][2];
+  }
+
+  isRoot(uniqueId) {
+    return uniqueId === 0;
   }
 }

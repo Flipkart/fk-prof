@@ -69,6 +69,7 @@ class MethodTreeComponent extends Component {
     if(!this.treeStore[this.url]) {
       this.treeStore[this.url] = this.props.nextNodesAccessorField === 'parent' ? new HotMethodStore(this.url) : new CallTreeStore(this.url);
       this.opened[this.url] = {};
+      this.highlighted[this.url] = {};
     }
   }
 
@@ -235,32 +236,52 @@ class MethodTreeComponent extends Component {
     }
   }
 
-  highlight (path) {
-    if (path in this.highlighted) {
-      //highlighted node, remove highlight
-      delete this.highlighted[path];
+
+  //highlighted stores the value num of highlighted leaf nodes in subtree rooted at self
+  highlight (listIdx) {
+    const rowData = this.renderData[listIdx];
+    const uniqueId = rowData[0];
+
+    //===============Helper functions ================
+
+    const doHighlight = (uniqueId) => {
+      //increment numLeafHighlighted for ancestors, stopping if it is already highlighted and exactly one child (current child) is highlighted or if root is reached
+      this.highlighted[this.url][uniqueId] = this.highlighted[this.url][uniqueId]? this.highlighted[this.url][uniqueId] + 1: 1;
+      if (this.treeStore[this.url].isRoot(uniqueId)) return;
+      const parent = this.treeStore[this.url].getParent(uniqueId);
+      const siblings = this.treeStore[this.url].getChildren(parent);
+      if ( !this.highlighted[this.url][this.treeStore[this.url].getParent(uniqueId)] ||
+        (siblings && siblings.reduce((sum, id) => this.highlighted[this.url][id]? sum + this.highlighted[this.url][id]: sum, 0) !== 1)) {
+        doHighlight(this.treeStore[this.url].getParent(uniqueId));
+      }
+    };
+    const undoHighlight = (uniqueId) => {
+      //make zero numLeafHighlighted for each descendant, propagate (reduction of numLeafHighlighted - 1) to its ancestors
+      const highlightedChildren = this.treeStore[this.url].getChildren(uniqueId).filter(id => this.highlighted[this.url][id]);
+      if(highlightedChildren.length !== 0) //i.e. is not a highlighted leaf itself
+        highlightedChildren.map(id => removeHighlightOfSubTreeRootedAt(id));
+      reduceHighlightTillRootStartingAt(uniqueId, highlightedChildren.length === 0? 1: this.highlighted[this.url][uniqueId]-1)
+    };
+
+    const removeHighlightOfSubTreeRootedAt = (uniqueId) => {
+      delete this.highlighted[this.url][uniqueId];
+      this.treeStore[this.url].getChildren(uniqueId).filter(id => this.highlighted[this.url][id]).map(id => removeHighlightOfSubTreeRootedAt(id));
+    };
+
+    const reduceHighlightTillRootStartingAt = (uniqueId, reduceBy) => {
+      if (reduceBy === 0) return;
+      this.highlighted[this.url][uniqueId] -= reduceBy;
+      if (this.highlighted[this.url][uniqueId] <= 0 ) delete this.highlighted[this.url][uniqueId];
+      if (!this.treeStore[this.url].isRoot(uniqueId)) {
+        reduceHighlightTillRootStartingAt(this.treeStore[this.url].getParent(uniqueId), reduceBy)
+      }
+    };
+    //================================================
+
+    if(!this.highlighted[this.url][uniqueId]) {
+      doHighlight(uniqueId);
     } else {
-      // identifying already highlighted children of path
-      const highlightedChildren = Object.keys(this.highlighted)
-        .filter(highlight => highlight.startsWith(path));
-      if (highlightedChildren.length) {
-        // delete highlighted children
-        highlightedChildren.forEach((p) => {
-          delete this.highlighted[p];
-        });
-      }
-
-      // identifying already highlighted parents of path, this will always be 1 at max
-      const highlightedParents = Object.keys(this.highlighted)
-        .filter(highlight => path.startsWith(highlight));
-      if (highlightedParents.length) {
-        // delete highlighted parents
-        highlightedParents.forEach((p) => {
-          delete this.highlighted[p];
-        });
-      }
-
-      this.highlighted[path] = true;
+      undoHighlight(uniqueId);
     }
 
     if(this.stacklineDetailGrid && this.stacklineStatGrid) {
@@ -286,8 +307,7 @@ class MethodTreeComponent extends Component {
 
     const displayName =  this.treeStore[this.url].getMethodName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
     const displayNameWithArgs =  this.treeStore[this.url].getFullyQualifiedMethodName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
-    const isHighlighted = Object.keys(this.highlighted)
-      .filter(highlight => highlight.startsWith(uniqueId));
+
     return (
       <StacklineDetail
         key={uniqueId}
@@ -297,9 +317,9 @@ class MethodTreeComponent extends Component {
         stackline={displayName}
         indent={rowData[2]}
         nodestate={this.opened[this.url][uniqueId]}
-        highlight={isHighlighted.length}
+        highlight={this.highlighted[this.url][uniqueId]}
         subdued={rowData[3] === 1}
-        onHighlight={this.highlight.bind(this, uniqueId, rowIndex)}
+        onHighlight={this.highlight.bind(this, rowIndex)}
         onClick={this.toggle.bind(this, rowIndex)}>
       </StacklineDetail>
 
@@ -312,8 +332,6 @@ class MethodTreeComponent extends Component {
     const percentageDenominator = this.treeStore[this.url].getChildren(-1).reduce((sum, id) => sum + this.treeStore[this.url].getSampleCount(id), 0);
     const countToDisplay = this.treeStore[this.url].getSampleCount(uniqueId);
     const onStackPercentage = Number((countToDisplay * 100) / percentageDenominator).toFixed(2);
-    const isHighlighted = Object.keys(this.highlighted)
-      .filter(highlight => highlight.startsWith(uniqueId));
 
     return (
       <StacklineStats
@@ -322,7 +340,7 @@ class MethodTreeComponent extends Component {
         listIdx={rowIndex}
         samples={countToDisplay}
         samplesPct={onStackPercentage}
-        highlight={isHighlighted.length}
+        highlight={this.highlighted[this.url][uniqueId]}
         subdued={rowData[3] === 1}>
       </StacklineStats>
     );
