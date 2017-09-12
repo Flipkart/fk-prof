@@ -210,11 +210,16 @@ class MethodTreeComponent extends Component {
     //TODO: Pick a lock for the listIdx, i.e. if any toggle is pending on same uniqueId show a snackBar
     const rowData = this.renderData[listIdx];
     const uniqueId = rowData[0];
-    if (!this.opened[this.url][uniqueId]) {
+    if (!this.opened[this.url][uniqueId] || this.opened[this.url][uniqueId] === 0) {
+      //change state of the stackline to loading
+      this.opened[this.url][uniqueId] = 1;
+      if (this.stacklineDetailGrid) {
+        this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow change to loading state
+      }
       //expand
       this.getRenderData(this.treeStore[this.url].getChildrenAsync(uniqueId).catch(this.showPromptMsg), null, rowData[2], rowData[3] > 1).then(subTreeRenderData => {
         this.renderData.splice(listIdx + 1, 0, ...subTreeRenderData);
-        this.opened[this.url][uniqueId] = true;
+        this.opened[this.url][uniqueId] = 2;
         if (subTreeRenderData.length === 0 && this.stacklineDetailGrid) {
           this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow downwards
         }
@@ -223,19 +228,18 @@ class MethodTreeComponent extends Component {
           asyncStatus: 'SUCCESS'
         });
       });
-    } else {
-      //collapse
+    } else if(this.opened[this.url][uniqueId] === 2) {
+      //collapse   //no need to make opened = 1 (pending state) because the following methods are all sync
       const descendants = this.getRenderedDescendantCountForListItem(listIdx);
       if (descendants > 0) {
         this.renderData.splice(listIdx + 1, descendants);
-        this.opened[this.url][uniqueId] = false;
+        this.opened[this.url][uniqueId] = 0;
         this.setState({
           itemCount: this.renderData.length,
         });
       }
     }
   }
-
 
   //highlighted stores the value num of highlighted leaf nodes in subtree rooted at self
   highlight (listIdx) {
@@ -307,7 +311,6 @@ class MethodTreeComponent extends Component {
 
     const displayName =  this.treeStore[this.url].getMethodName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
     const displayNameWithArgs =  this.treeStore[this.url].getFullyQualifiedMethodName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
-
     return (
       <StacklineDetail
         key={uniqueId}
@@ -316,8 +319,8 @@ class MethodTreeComponent extends Component {
         nodename={displayNameWithArgs}
         stackline={displayName}
         indent={rowData[2]}
-        nodestate={this.opened[this.url][uniqueId]}
-        highlight={this.highlighted[this.url][uniqueId]}
+        nodestate={this.opened[this.url][uniqueId] || 0}
+        highlight={this.highlighted[this.url][uniqueId] || 0}
         subdued={rowData[3] === 1}
         onHighlight={this.highlight.bind(this, rowIndex)}
         onClick={this.toggle.bind(this, rowIndex)}>
@@ -360,9 +363,14 @@ class MethodTreeComponent extends Component {
             }
             const stackEntryWidth = getTextWidth(displayName, "14px Arial") + 28 + indent; //28 is space taken up by icons
             let renderDataList = [[id, null, indent, ids.length, stackEntryWidth]];
-            if (ids.length === 1 || this.opened[this.url][id]) {
-              this.opened[this.url][id] = true;
+            if (ids.length === 1 || this.opened[this.url][id] === 2) {
+              //change state of the stackline to loading (not required for current implementation because the current stackline is still not yet rendered)
+              this.opened[this.url][id] = 1;
+              if (this.stacklineDetailGrid) {
+                this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow change to loading state
+              }
               this.getRenderData(this.treeStore[this.url].getChildrenAsync(id).catch(this.showPromptMsg), filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
+                this.opened[this.url][id] = 2;
                 resolve(renderDataList.concat(subTreeRenderDataList));
               });
             } else {
@@ -394,7 +402,7 @@ class MethodTreeComponent extends Component {
     let rowData = this.renderData[listIdx];
     if(rowData) {
       const uniqueId = rowData[0];
-      if(this.opened[this.url][uniqueId]) {
+      if(this.opened[this.url][uniqueId] === 2) {
         if(this.isNodeHavingChildren(uniqueId)) {
           //At least one rendered child item is going to be present for this item
           //Cannot rely on childNodeIndexes(calculated in isNodeHavingChildren method) to get count of children because actual rendered children can be lesser after deduping of nodes for hot method tree

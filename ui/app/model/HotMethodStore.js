@@ -84,6 +84,9 @@ export default class HotMethodStore {
       });
       this.nodes[uniqueId][1] = this.flatten(nextLayerNodes, uniqueId === -1, true, uniqueId);
     }
+    if (!this.nodes[uniqueId][1]){     //because bodyRoot is true here, see flatten second last if block
+      this.nodes[uniqueId][1] = [];
+    }
     if (this.nodes[uniqueId][1] && this.nodes[uniqueId].length === 4) {
       this.nodes[uniqueId].pop();        //if chld is populated then remove parts
     }
