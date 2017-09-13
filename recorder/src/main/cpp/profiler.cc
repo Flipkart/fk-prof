@@ -4,18 +4,11 @@
 ASGCTType Asgct::asgct_;
 IsGCActiveType Asgct::is_gc_active_;
 
-static thread_local std::atomic<bool> in_handler{false};
-
 static void handle_profiling_signal(int signum, siginfo_t *info, void *context) {
-    if (in_handler.load(std::memory_order_seq_cst)) return;
-    in_handler.store(true, std::memory_order_seq_cst);
-    {
-        ReadsafePtr<Profiler> p(GlobalCtx::recording.cpu_profiler);
-        if (p.available()) {
-            p->handle(signum, info, context);
-        }
+    ReadsafePtr<Profiler> p(GlobalCtx::recording.cpu_profiler);
+    if (p.available()) {
+        p->handle(signum, info, context);
     }
-    in_handler.store(false, std::memory_order_seq_cst);
 }
 
 void Profiler::handle(int signum, siginfo_t *info, void *context) {
@@ -27,9 +20,10 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
     PerfCtx::ThreadTracker* ctx_tracker = nullptr;
     auto current_sampling_attempt = sampling_attempts.fetch_add(1, std::memory_order_relaxed);
     bool default_ctx = false;
+    bool do_record = true;
+
     if (jniEnv != nullptr) {
         thread_info = thread_map.get(jniEnv);
-        bool do_record = true;
         if (thread_info != nullptr) {//TODO: increment a counter here to monitor freq of this, it could be GC thd or compiler-broker etc
             ctx_tracker = &(thread_info->ctx_tracker);
             if (ctx_tracker->in_ctx()) {
@@ -38,10 +32,16 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
                 do_record = get_prob_pct().on(current_sampling_attempt, noctx_cov_pct);
                 default_ctx = true;
             }
+        } else {
+            //This is most probably an internal JVM thread (GC/JIT compiler/etc) for which we do not have thread info
+            do_record = capture_unknown_thd_bt ? get_prob_pct().on(current_sampling_attempt, noctx_cov_pct) : false;
         }
-        if (! do_record) {
-            return;
-        }
+    } else {
+        //Native thread
+        do_record = capture_native_bt ? get_prob_pct().on(current_sampling_attempt, noctx_cov_pct) : false;
+    }
+    if (! do_record) {
+        return;
     }
 
     BacktraceError err = BacktraceError::Fkp_no_error;
@@ -66,6 +66,10 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
         s_c_cpu_samp_err_no_jni.inc();
     }
 
+    // Will definitely land here if jnienv == null
+    // Can land here despite jnienv != null if asgct could not walk the stack of current thread.
+    // We want to be absolutely sure if native bt capture has been enabled before proceeding
+    if(!capture_native_bt) return;
     STATIC_ARRAY(native_trace, NativeFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
 
     auto bt_len = Stacktraces::fill_backtrace(native_trace, capture_stack_depth());
@@ -112,15 +116,15 @@ void Profiler::configure() {
     buffer = new CircularQueue(serializer, capture_stack_depth());
 
     handler = new SignalHandler(itvl_min, itvl_max);
-    int processor_interval = Size * itvl_min / 1000 / 2;
-    logger->debug("CpuSamplingProfiler is using processor-interval value: {}", processor_interval);
+    //int processor_interval = Size * itvl_min / 1000 / 2;
+    //logger->debug("CpuSamplingProfiler is using processor-interval value: {}", processor_interval);
 }
 
 #define METRIC_TYPE "cpu_samples"
 
-Profiler::Profiler(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap &_thread_map, ProfileSerializingWriter& _serializer, std::uint32_t _max_stack_depth, std::uint32_t _sampling_freq, ProbPct& _prob_pct, std::uint8_t _noctx_cov_pct)
+Profiler::Profiler(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap &_thread_map, ProfileSerializingWriter& _serializer, std::uint32_t _max_stack_depth, std::uint32_t _sampling_freq, ProbPct& _prob_pct, std::uint8_t _noctx_cov_pct, bool _capture_native_bt, bool _capture_unknown_thd_bt)
     : jvm(_jvm), jvmti(_jvmti), thread_map(_thread_map), max_stack_depth(_max_stack_depth), serializer(_serializer),
-      prob_pct(_prob_pct), sampling_attempts(0), noctx_cov_pct(_noctx_cov_pct), running(false), samples_handled(0),
+      prob_pct(_prob_pct), sampling_attempts(0), noctx_cov_pct(_noctx_cov_pct), capture_native_bt(_capture_native_bt), capture_unknown_thd_bt(_capture_unknown_thd_bt), running(false), samples_handled(0),
 
       s_c_cpu_samp_total(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "opportunities"})),
 
@@ -144,10 +148,10 @@ void Profiler::run() {
     {
         auto _ = s_t_pop_spree_tm.time_scope();
 
-        int poppped_before = samples_handled;
+        int popped_before = samples_handled;
         while (buffer->pop()) ++samples_handled;
 
-        s_h_pop_spree_len.update(samples_handled - poppped_before);
+        s_h_pop_spree_len.update(samples_handled - popped_before);
     }
 
     if (samples_handled > 200) {

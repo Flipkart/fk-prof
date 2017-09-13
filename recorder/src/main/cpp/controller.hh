@@ -25,6 +25,7 @@
 #include "ti_thd.hh"
 
 #define MAX_DATA_SIZE 100
+#define PROCESSOR_ITVL_FACTOR 2
 
 class Controller {
 public:
@@ -104,6 +105,8 @@ private:
     void prep(const recording::CpuSampleWork& csw);
     void issue(const recording::CpuSampleWork& csw, Processes& processes, JNIEnv* env);
     void retire(const recording::CpuSampleWork& csw);
+
+    static std::uint32_t sampling_freq_to_itvl(std::uint32_t sampling_freq);
 };
 
 #endif

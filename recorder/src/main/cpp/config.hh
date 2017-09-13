@@ -44,6 +44,8 @@ struct ConfigurationOptions {
     std::uint16_t metrics_dst_port;
 
     std::uint8_t noctx_cov_pct;
+    bool capture_native_bt;
+    bool capture_unknown_thd_bt;
 
     bool allow_sigprof;
 
@@ -52,7 +54,7 @@ struct ConfigurationOptions {
     std::uint32_t rpc_timeout;
     double slow_tx_tolerance;
     std::uint32_t tx_ring_sz;
-
+    
     char* stats_syslog_tag;
 
     ConfigurationOptions(const char* options) :
@@ -70,7 +72,7 @@ struct ConfigurationOptions {
         backoff_start(MIN_BACKOFF_START), backoff_multiplier(DEFAULT_BACKOFF_MULTIPLIER), backoff_max(DEFAULT_BACKOFF_MAX), max_retries(DEFAULT_MAX_RETRIES),
         poll_itvl(DEFAULT_POLLING_INTERVAL),
         log_level(spdlog::level::info), metrics_dst_port(DEFAULT_METRICS_DEST_PORT),
-        noctx_cov_pct(0),
+        noctx_cov_pct(0), capture_native_bt(false), capture_unknown_thd_bt(false),
         allow_sigprof(true),
         pctx_jar_path(nullptr),
         rpc_timeout(10),
