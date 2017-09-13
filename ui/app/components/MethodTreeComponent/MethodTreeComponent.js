@@ -41,7 +41,7 @@ class MethodTreeComponent extends Component {
     this.treeStore = {};
     this.renderData = [];
     this.state.itemCount = this.renderData.length;
-
+    this.toggleSourceTargetBufferMap = {};
 
     this.initTreeStore = this.initTreeStore.bind(this);
 
@@ -64,19 +64,20 @@ class MethodTreeComponent extends Component {
   initTreeStore() {
     const {app, cluster, proc, workType, selectedWorkType, profileStart, profileDuration} = this.props.location.query;
     const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true});
-    const treeType = this.props.nextNodesAccessorField === 'parent'? 'callees': 'callers';
+    const treeType = this.props.nextNodesAccessorField === 'parent' ? 'callees' : 'callers';
     this.url = `/api/${treeType}/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
-    if(!this.treeStore[this.url]) {
+    if (!this.treeStore[this.url]) {
       this.treeStore[this.url] = this.props.nextNodesAccessorField === 'parent' ? new HotMethodStore(this.url) : new CallTreeStore(this.url);
       this.opened[this.url] = {};
       this.highlighted[this.url] = {};
+      this.toggleSourceTargetBufferMap[this.url] = [];
     }
   }
 
   componentDidMount() {
     this.initTreeStore();
     this.setState({asyncStatus: 'PENDING'});
-    this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.location.query[this.props.filterKey], -1, false).then(subTreeRenderData => {
+    this.getRenderData(this.url, this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.location.query[this.props.filterKey], -1, false).then(subTreeRenderData => {
       this.renderData = subTreeRenderData;
       this.setState({
         itemCount: this.renderData.length,
@@ -88,16 +89,21 @@ class MethodTreeComponent extends Component {
   componentDidUpdate(prevProps) {
     const {workType, selectedWorkType, profileStart, profileDuration} = this.props.location.query;
     const {workType: prevWorkType, selectedWorkType: prevSelectedWorkType, profileStart: prevProfileStart, profileDuration: prevProfileDuration} = prevProps.location.query;
-    if(prevWorkType !== workType || prevSelectedWorkType !== selectedWorkType || prevProfileStart !== profileStart || prevProfileDuration !== profileDuration || prevProps.traceName !== this.props.traceName){
+    if (prevWorkType !== workType || prevSelectedWorkType !== selectedWorkType || prevProfileStart !== profileStart || prevProfileDuration !== profileDuration || prevProps.traceName !== this.props.traceName) {
       this.initTreeStore();
+      Object.entries(this.opened[this.url]).forEach(([k, v]) => {
+        if (v === 1) {
+          this.opened[this.url][k] = 0;
+        }
+      }); //Mark old pending incomplete open requests to be closed
       this.setState({asyncStatus: 'PENDING'});
-      this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.location.query[this.props.filterKey], -1, false).then(subTreeRenderData => {
+      this.getRenderData(this.url, this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.location.query[this.props.filterKey], -1, false).then(subTreeRenderData => {
         this.renderData = subTreeRenderData;
         this.setState({
           itemCount: this.renderData.length,
           asyncStatus: 'SUCCESS'
         });
-        if(this.stacklineDetailGrid && this.stacklineStatGrid) {
+        if (this.stacklineDetailGrid && this.stacklineStatGrid) {
           this.stacklineDetailGrid.forceUpdate();
           this.stacklineStatGrid.forceUpdate();
         }
@@ -110,7 +116,7 @@ class MethodTreeComponent extends Component {
   }
 
   setup(containerWidth) {
-    if(containerWidth > 0 && containerWidth !== this.containerWidth) {
+    if (containerWidth > 0 && containerWidth !== this.containerWidth) {
       this.containerWidth = containerWidth;
     }
   }
@@ -207,36 +213,61 @@ class MethodTreeComponent extends Component {
   }
 
   toggle(listIdx) {
-    //TODO: Pick a lock for the listIdx, i.e. if any toggle is pending on same uniqueId show a snackBar
     const rowData = this.renderData[listIdx];
     const uniqueId = rowData[0];
+    if (this.toggleSourceTargetBufferMap[this.url][listIdx]) return;
     if (!this.opened[this.url][uniqueId] || this.opened[this.url][uniqueId] === 0) {
-      //change state of the stackline to loading
-      this.opened[this.url][uniqueId] = 1;
+      //expand
+      this.toggleSourceTargetBufferMap[this.url][listIdx] = listIdx;
+      this.opened[this.url][uniqueId] = 1;        //change state of the stackline to loading
       if (this.stacklineDetailGrid) {
         this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow change to loading state
       }
-      //expand
-      this.getRenderData(this.treeStore[this.url].getChildrenAsync(uniqueId).catch(this.showPromptMsg), null, rowData[2], rowData[3] > 1).then(subTreeRenderData => {
-        this.renderData.splice(listIdx + 1, 0, ...subTreeRenderData);
-        this.opened[this.url][uniqueId] = 2;
-        if (subTreeRenderData.length === 0 && this.stacklineDetailGrid) {
-          this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow downwards
+      const currUrl = this.url;
+      this.getRenderData(currUrl, this.treeStore[this.url].getChildrenAsync(uniqueId).catch(this.showPromptMsg), null, rowData[2], rowData[3] > 1).then(subTreeRenderData => {
+        const latestTargetIdx = this.toggleSourceTargetBufferMap[currUrl][listIdx];
+        delete this.toggleSourceTargetBufferMap[currUrl][listIdx];
+        Object.entries(this.toggleSourceTargetBufferMap[currUrl]).forEach(([k, v]) => {
+          this.toggleSourceTargetBufferMap[this.url][k] = v > latestTargetIdx ? v + subTreeRenderData.length : v;
+        });
+        this.opened[currUrl][uniqueId] = 2;
+        if (this.url === currUrl && this.state.asyncStatus !== 'PENDING') { //update the render data only if it is the same one on which the toggle getRenderData got initiated and initial render is complete
+          this.renderData.splice(latestTargetIdx + 1, 0, ...subTreeRenderData);
+          if (subTreeRenderData.length > 0) {
+            this.setState({
+              itemCount: this.renderData.length,
+              asyncStatus: 'SUCCESS'
+            });
+          }
+        } else {
+          if (this.stacklineDetailGrid) {
+            this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow downwards
+          }
         }
-        this.setState({
-          itemCount: this.renderData.length,
-          asyncStatus: 'SUCCESS'
-        });
       });
-    } else if(this.opened[this.url][uniqueId] === 2) {
-      //collapse   //no need to make opened = 1 (pending state) because the following methods are all sync
-      const descendants = this.getRenderedDescendantCountForListItem(listIdx);
+    } else if (this.opened[this.url][uniqueId] === 2) {
+      //collapse
+      this.toggleSourceTargetBufferMap[this.url][listIdx] = listIdx;
+      this.opened[this.url][uniqueId] = 1;        //change state of the stackline to loading
+      if (this.stacklineDetailGrid) {
+        this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow change to loading state
+      }
+      const latestTargetIdx = this.toggleSourceTargetBufferMap[this.url][listIdx];
+      const descendants = this.getRenderedDescendantCountForListItem(latestTargetIdx);
+      delete this.toggleSourceTargetBufferMap[this.url][listIdx];
+      Object.entries(this.toggleSourceTargetBufferMap[this.url]).forEach(([k, v]) => {
+        this.toggleSourceTargetBufferMap[this.url][k] = v > latestTargetIdx ? v - descendants : v;
+      });
+      this.opened[this.url][uniqueId] = 0;
       if (descendants > 0) {
-        this.renderData.splice(listIdx + 1, descendants);
-        this.opened[this.url][uniqueId] = 0;
+        this.renderData.splice(latestTargetIdx + 1, descendants);
         this.setState({
           itemCount: this.renderData.length,
         });
+      } else {
+        if (this.stacklineDetailGrid) {
+          this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow change to loading state
+        }
       }
     }
   }
@@ -250,21 +281,21 @@ class MethodTreeComponent extends Component {
 
     const doHighlight = (uniqueId) => {
       //increment numLeafHighlighted for ancestors, stopping if it is already highlighted and exactly one child (current child) is highlighted or if root is reached
-      this.highlighted[this.url][uniqueId] = this.highlighted[this.url][uniqueId]? this.highlighted[this.url][uniqueId] + 1: 1;
+      this.highlighted[this.url][uniqueId] = this.highlighted[this.url][uniqueId] ? this.highlighted[this.url][uniqueId] + 1 : 1;
       if (this.treeStore[this.url].isRoot(uniqueId)) return;
       const parent = this.treeStore[this.url].getParent(uniqueId);
       const siblings = this.treeStore[this.url].getChildren(parent);
-      if ( !this.highlighted[this.url][this.treeStore[this.url].getParent(uniqueId)] ||
-        (siblings && siblings.reduce((sum, id) => this.highlighted[this.url][id]? sum + this.highlighted[this.url][id]: sum, 0) !== 1)) {
+      if (!this.highlighted[this.url][this.treeStore[this.url].getParent(uniqueId)] ||
+        (siblings && siblings.reduce((sum, id) => this.highlighted[this.url][id] ? sum + this.highlighted[this.url][id] : sum, 0) !== 1)) {
         doHighlight(this.treeStore[this.url].getParent(uniqueId));
       }
     };
     const undoHighlight = (uniqueId) => {
       //make zero numLeafHighlighted for each descendant, propagate (reduction of numLeafHighlighted - 1) to its ancestors
       const highlightedChildren = this.treeStore[this.url].getChildren(uniqueId).filter(id => this.highlighted[this.url][id]);
-      if(highlightedChildren.length !== 0) //i.e. is not a highlighted leaf itself
+      if (highlightedChildren.length !== 0) //i.e. is not a highlighted leaf itself
         highlightedChildren.map(id => removeHighlightOfSubTreeRootedAt(id));
-      reduceHighlightTillRootStartingAt(uniqueId, highlightedChildren.length === 0? 1: this.highlighted[this.url][uniqueId]-1)
+      reduceHighlightTillRootStartingAt(uniqueId, highlightedChildren.length === 0 ? 1 : this.highlighted[this.url][uniqueId] - 1)
     };
 
     const removeHighlightOfSubTreeRootedAt = (uniqueId) => {
@@ -275,20 +306,20 @@ class MethodTreeComponent extends Component {
     const reduceHighlightTillRootStartingAt = (uniqueId, reduceBy) => {
       if (reduceBy === 0) return;
       this.highlighted[this.url][uniqueId] -= reduceBy;
-      if (this.highlighted[this.url][uniqueId] <= 0 ) delete this.highlighted[this.url][uniqueId];
+      if (this.highlighted[this.url][uniqueId] <= 0) delete this.highlighted[this.url][uniqueId];
       if (!this.treeStore[this.url].isRoot(uniqueId)) {
         reduceHighlightTillRootStartingAt(this.treeStore[this.url].getParent(uniqueId), reduceBy)
       }
     };
     //================================================
 
-    if(!this.highlighted[this.url][uniqueId]) {
+    if (!this.highlighted[this.url][uniqueId]) {
       doHighlight(uniqueId);
     } else {
       undoHighlight(uniqueId);
     }
 
-    if(this.stacklineDetailGrid && this.stacklineStatGrid) {
+    if (this.stacklineDetailGrid && this.stacklineStatGrid) {
       this.stacklineDetailGrid.forceUpdate();
       this.stacklineStatGrid.forceUpdate();
     }
@@ -297,7 +328,7 @@ class MethodTreeComponent extends Component {
   handleFilterChange (e) {
     const { pathname, query } = this.props.location;
     this.props.router.push({ pathname, query: { ...query, [this.props.filterKey]: e.target.value } });
-    this.getRenderData(this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), e.target.value, -1, false).then(subTreeRenderData => {
+    this.getRenderData(this.url, this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), e.target.value, -1, false).then(subTreeRenderData => {
       this.renderData = subTreeRenderData;
       this.setState({
         itemCount: this.renderData.length
@@ -309,8 +340,8 @@ class MethodTreeComponent extends Component {
     let rowData = this.renderData[rowIndex];
     let uniqueId = rowData[0];
 
-    const displayName =  this.treeStore[this.url].getMethodName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
-    const displayNameWithArgs =  this.treeStore[this.url].getFullyQualifiedMethodName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
+    const displayName = this.treeStore[this.url].getMethodName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
+    const displayNameWithArgs = this.treeStore[this.url].getFullyQualifiedMethodName(uniqueId, !(this.props.nextNodesAccessorField === 'parent' && rowData[2] === 0));
     return (
       <StacklineDetail
         key={uniqueId}
@@ -349,28 +380,28 @@ class MethodTreeComponent extends Component {
     );
   }
 
-  getRenderData(asyncIds, filterText, parentIndent, parentHasSiblings) {
+  getRenderData(currUrl, asyncIds, filterText, parentIndent, parentHasSiblings) {
     return new Promise(resolve => {
       asyncIds.then(ids => {
         if (ids) {
-          ids.sort((a, b) => this.treeStore[this.url].getSampleCount(b) - this.treeStore[this.url].getSampleCount(a));
+          ids.sort((a, b) => this.treeStore[currUrl].getSampleCount(b) - this.treeStore[currUrl].getSampleCount(a));
           const asyncIdsRenderData = ids.map((id) => new Promise(resolve => {
             const indent = parentIndent === -1 ? 0 : ((parentHasSiblings || ids.length > 1 ) ? parentIndent + 10 : parentIndent + 4);
-            const displayName = this.treeStore[this.url].getMethodName(id, !(this.props.nextNodesAccessorField === 'parent' && indent === 0));
+            const displayName = this.treeStore[currUrl].getMethodName(id, !(this.props.nextNodesAccessorField === 'parent' && indent === 0));
             if (filterText && indent === 0 && !displayName.match(new RegExp(filterText, 'i'))) {
               resolve([]);
               return;
             }
             const stackEntryWidth = getTextWidth(displayName, "14px Arial") + 28 + indent; //28 is space taken up by icons
             let renderDataList = [[id, null, indent, ids.length, stackEntryWidth]];
-            if (ids.length === 1 || this.opened[this.url][id] === 2) {
+            if (ids.length === 1 || this.opened[currUrl][id] === 2) {
               //change state of the stackline to loading (not required for current implementation because the current stackline is still not yet rendered)
-              this.opened[this.url][id] = 1;
+              this.opened[currUrl][id] = 1;
               if (this.stacklineDetailGrid) {
                 this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow change to loading state
               }
-              this.getRenderData(this.treeStore[this.url].getChildrenAsync(id).catch(this.showPromptMsg), filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
-                this.opened[this.url][id] = 2;
+              this.getRenderData(currUrl, this.treeStore[currUrl].getChildrenAsync(id).catch(this.showPromptMsg), filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
+                this.opened[currUrl][id] = 2;
                 resolve(renderDataList.concat(subTreeRenderDataList));
               });
             } else {
@@ -402,8 +433,8 @@ class MethodTreeComponent extends Component {
     let rowData = this.renderData[listIdx];
     if(rowData) {
       const uniqueId = rowData[0];
-      if(this.opened[this.url][uniqueId] === 2) {
-        if(this.isNodeHavingChildren(uniqueId)) {
+      if (this.opened[this.url][uniqueId] === 1 || this.opened[this.url][uniqueId] === 2) {
+        if (this.isNodeHavingChildren(uniqueId)) {
           //At least one rendered child item is going to be present for this item
           //Cannot rely on childNodeIndexes(calculated in isNodeHavingChildren method) to get count of children because actual rendered children can be lesser after deduping of nodes for hot method tree
           let child_rowdata = this.renderData[listIdx + 1];
@@ -433,6 +464,7 @@ class MethodTreeComponent extends Component {
     const minGridWidth = this.containerWidth - rightColumnWidth - 15;
     return maxWidthOfRenderedStacklines < minGridWidth ? minGridWidth : maxWidthOfRenderedStacklines;
   }
+
   static workTypeMap = {
     cpu_sample_work: 'cpu-sampling',
   };
