@@ -48,7 +48,7 @@ export default class CallTreeStore {
       return Promise.resolve(this.nodes[uniqueId][1]);
     }
     const body = (uniqueId === -1) ? [] : [uniqueId];
-    return postWithRetryOnAccept(this.url, body, 5).then((resp) => this.handleResponse(resp, uniqueId), (err) => Promise.reject(err.response.message));
+    return postWithRetryOnAccept(this.url, body, 5).then((resp) => this.handleResponse(resp, uniqueId), (err) => Promise.reject((err.response && (err.response.message || err.response.error)) || err));
   }
 
   getMethodName(uniqueId, showLineNo) {

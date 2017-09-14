@@ -203,8 +203,10 @@ class MethodTreeComponent extends Component {
     const rowData = this.renderData[listIdx];
     const uniqueId = rowData[0];
     if (this.toggleSourceTargetBufferMap[this.url][listIdx]) return;
-    if (!this.opened[this.url][uniqueId] || this.opened[this.url][uniqueId] === 0) {
-      //expand
+
+
+    //===============Helper functions ================
+    const expand = () => {
       this.toggleSourceTargetBufferMap[this.url][listIdx] = listIdx;
       this.opened[this.url][uniqueId] = 1;        //change state of the stackline to loading
       if (this.stacklineDetailGrid) {
@@ -220,7 +222,7 @@ class MethodTreeComponent extends Component {
         this.opened[currUrl][uniqueId] = 2;
         if (this.url === currUrl) { //update the render data only if it is the same one on which the toggle getRenderData got initiated and initial render is complete
           this.renderData.splice(latestTargetIdx + 1, 0, ...subTreeRenderData);
-          }
+        }
         if (this.stacklineDetailGrid && this.stacklineStatGrid) {
           if(subTreeRenderData.length === 0) {
             this.stacklineDetailGrid.forceUpdate();
@@ -228,8 +230,9 @@ class MethodTreeComponent extends Component {
           this.forceUpdate();
         }
       });
-    } else if (this.opened[this.url][uniqueId] === 2) {
-      //collapse
+    };
+
+    const collapse = () => {
       this.toggleSourceTargetBufferMap[this.url][listIdx] = listIdx;
       this.opened[this.url][uniqueId] = 1;        //change state of the stackline to loading
       if (this.stacklineDetailGrid) {
@@ -248,6 +251,12 @@ class MethodTreeComponent extends Component {
           this.forceUpdate();
         }
       }
+    };
+    //================================================
+    if (!this.opened[this.url][uniqueId] || this.opened[this.url][uniqueId] === 0) {
+      expand();
+    } else if (this.opened[this.url][uniqueId] === 2) {
+      collapse();
     }
   }
 
@@ -257,7 +266,6 @@ class MethodTreeComponent extends Component {
     const uniqueId = rowData[0];
 
     //===============Helper functions ================
-
     const doHighlight = (uniqueId) => {
       //increment numLeafHighlighted for ancestors, stopping if it is already highlighted and exactly one child (current child) is highlighted or if root is reached
       this.highlighted[this.url][uniqueId] = this.highlighted[this.url][uniqueId] ? this.highlighted[this.url][uniqueId] + 1 : 1;
@@ -269,7 +277,7 @@ class MethodTreeComponent extends Component {
         doHighlight(this.treeStore[this.url].getParent(uniqueId));
       }
     };
-    const undoHighlight = (uniqueId) => {
+    const undoHighlight = () => {
       //make zero numLeafHighlighted for each descendant, propagate (reduction of numLeafHighlighted - 1) to its ancestors
       const highlightedChildren = this.treeStore[this.url].getChildren(uniqueId).filter(id => this.highlighted[this.url][id]);
       if (highlightedChildren.length !== 0) //i.e. is not a highlighted leaf itself
@@ -295,7 +303,7 @@ class MethodTreeComponent extends Component {
     if (!this.highlighted[this.url][uniqueId]) {
       doHighlight(uniqueId);
     } else {
-      undoHighlight(uniqueId);
+      undoHighlight();
     }
 
     if (this.stacklineDetailGrid && this.stacklineStatGrid) {
