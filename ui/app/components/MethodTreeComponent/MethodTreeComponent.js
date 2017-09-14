@@ -29,18 +29,12 @@ const getTextWidth = function(text, font) {
 class MethodTreeComponent extends Component {
   constructor (props) {
     super(props);
-    this.state = {
-      itemCount: 0,
-      req: {url: '', status: 'PENDING', err: ''},
-      asyncStatus: 'PENDING'
-    };
-
+    this.asyncStatus = 'PENDING';
     this.containerWidth = 0;
     this.opened = {}; // keeps track of all /closed nodes
     this.highlighted = {}; //keeps track of all highlighted nodes
     this.treeStore = {};
     this.renderData = [];
-    this.state.itemCount = this.renderData.length;
     this.toggleSourceTargetBufferMap = {};
 
     this.initTreeStore = this.initTreeStore.bind(this);
@@ -76,36 +70,30 @@ class MethodTreeComponent extends Component {
 
   componentDidMount() {
     this.initTreeStore();
-    this.setState({asyncStatus: 'PENDING'});
+    this.asyncStatus = 'PENDING';
+    const currUrl = this.url;
     this.getRenderData(this.url, this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.location.query[this.props.filterKey], -1, false).then(subTreeRenderData => {
-      this.renderData = subTreeRenderData;
-      this.setState({
-        itemCount: this.renderData.length,
-        asyncStatus: 'SUCCESS'
-      });
+      if (currUrl === this.url) {
+        this.renderData = subTreeRenderData;
+        this.asyncStatus = 'SUCCESS';
+        this.forceUpdate(); //Not adviced, but using to avoid a background async completion of a different traceName to update the current state
+      }
     });
   }
 
   componentDidUpdate(prevProps) {
     const {workType, selectedWorkType, profileStart, profileDuration} = this.props.location.query;
     const {workType: prevWorkType, selectedWorkType: prevSelectedWorkType, profileStart: prevProfileStart, profileDuration: prevProfileDuration} = prevProps.location.query;
+
     if (prevWorkType !== workType || prevSelectedWorkType !== selectedWorkType || prevProfileStart !== profileStart || prevProfileDuration !== profileDuration || prevProps.traceName !== this.props.traceName) {
       this.initTreeStore();
-      Object.entries(this.opened[this.url]).forEach(([k, v]) => {
-        if (v === 1) {
-          this.opened[this.url][k] = 0;
-        }
-      }); //Mark old pending incomplete open requests to be closed
-      this.setState({asyncStatus: 'PENDING'});
+      this.asyncStatus = 'PENDING';
+      const currUrl = this.url;
       this.getRenderData(this.url, this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), this.props.location.query[this.props.filterKey], -1, false).then(subTreeRenderData => {
-        this.renderData = subTreeRenderData;
-        this.setState({
-          itemCount: this.renderData.length,
-          asyncStatus: 'SUCCESS'
-        });
-        if (this.stacklineDetailGrid && this.stacklineStatGrid) {
-          this.stacklineDetailGrid.forceUpdate();
-          this.stacklineStatGrid.forceUpdate();
+        if (currUrl === this.url) {
+          this.renderData = subTreeRenderData;
+          this.asyncStatus = 'SUCCESS';
+          this.forceUpdate(); //Not adviced, but using to avoid a background async completion of a different traceName to update the current state
         }
       });
     }
@@ -125,7 +113,6 @@ class MethodTreeComponent extends Component {
     if(this.containerWidth === 0) {
       return null;
     }
-
     const filterText = this.props.location.query[this.props.filterKey];
     const { nextNodesAccessorField } = this.props;
     const containerHeight = window.innerHeight - everythingOnTopHeight; //subtracting height of everything above the container
@@ -134,7 +121,7 @@ class MethodTreeComponent extends Component {
     return (
       <div style={{display: "flex", flexDirection: "column", width: this.containerWidth}}>
         <div style={{flex: "1 1 auto", height: containerHeight + "px"}}>
-          {this.state.asyncStatus !== 'PENDING' && <ScrollSync>
+          {this.asyncStatus !== 'PENDING' && <ScrollSync>
             {({ clientHeight, clientWidth, onScroll, scrollHeight, scrollLeft, scrollTop, scrollWidth }) => (
               <div className={styles.GridRow}>
                 <div className={styles.LeftGridContainer}>
@@ -161,7 +148,7 @@ class MethodTreeComponent extends Component {
                           columnWidth={this.getMaxWidthOfRenderedStacklines()}
                           height={gridHeight}
                           width={width}
-                          rowCount={this.state.itemCount}
+                          rowCount={this.renderData.length}
                           rowHeight={stackEntryHeight}
                           cellRenderer={this.stacklineDetailCellRenderer}
                           className={styles.LeftGrid}
@@ -183,7 +170,7 @@ class MethodTreeComponent extends Component {
                       columnWidth={rightColumnWidth}
                       height={gridHeight}
                       width={rightColumnWidth}
-                      rowCount={this.state.itemCount}
+                      rowCount={this.renderData.length}
                       rowHeight={stackEntryHeight}
                       cellRenderer={this.stacklineStatCellRenderer}
                       className={styles.RightGrid}
@@ -196,12 +183,12 @@ class MethodTreeComponent extends Component {
               </div>
             )}
           </ScrollSync>
-          }{this.state.asyncStatus === 'PENDING' &&
+          }{this.asyncStatus === 'PENDING' &&
           (<div><h4 style={{textAlign: 'center'}}>Please wait, coming right up!</h4>
             <Loader/>
           </div>)}
         </div>
-        {this.state.asyncStatus !== 'PENDING' && !this.state.itemCount && (
+        {this.asyncStatus !== 'PENDING' && !this.renderData.length && !this.props.location.query[this.props.filterKey] && (
           <div style={{flex: "1 1 auto", marginTop: "-" + (gridHeight) + "px"}} className={styles.alert}>There was a problem loading the page, please try later.</div>
         )}
         <div id="policy-submit" className="mdl-js-snackbar mdl-snackbar">
@@ -231,18 +218,14 @@ class MethodTreeComponent extends Component {
           this.toggleSourceTargetBufferMap[this.url][k] = v > latestTargetIdx ? v + subTreeRenderData.length : v;
         });
         this.opened[currUrl][uniqueId] = 2;
-        if (this.url === currUrl && this.state.asyncStatus !== 'PENDING') { //update the render data only if it is the same one on which the toggle getRenderData got initiated and initial render is complete
+        if (this.url === currUrl) { //update the render data only if it is the same one on which the toggle getRenderData got initiated and initial render is complete
           this.renderData.splice(latestTargetIdx + 1, 0, ...subTreeRenderData);
-          if (subTreeRenderData.length > 0) {
-            this.setState({
-              itemCount: this.renderData.length,
-              asyncStatus: 'SUCCESS'
-            });
           }
-        } else {
-          if (this.stacklineDetailGrid) {
-            this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow downwards
+        if (this.stacklineDetailGrid && this.stacklineStatGrid) {
+          if(subTreeRenderData.length === 0) {
+            this.stacklineDetailGrid.forceUpdate();
           }
+          this.forceUpdate();
         }
       });
     } else if (this.opened[this.url][uniqueId] === 2) {
@@ -261,12 +244,8 @@ class MethodTreeComponent extends Component {
       this.opened[this.url][uniqueId] = 0;
       if (descendants > 0) {
         this.renderData.splice(latestTargetIdx + 1, descendants);
-        this.setState({
-          itemCount: this.renderData.length,
-        });
-      } else {
-        if (this.stacklineDetailGrid) {
-          this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow change to loading state
+        if (this.stacklineDetailGrid && this.stacklineStatGrid) {
+          this.forceUpdate();
         }
       }
     }
@@ -328,11 +307,12 @@ class MethodTreeComponent extends Component {
   handleFilterChange (e) {
     const { pathname, query } = this.props.location;
     this.props.router.push({ pathname, query: { ...query, [this.props.filterKey]: e.target.value } });
+    const currUrl = this.url;
     this.getRenderData(this.url, this.treeStore[this.url].getChildrenAsync(-1).catch(this.showPromptMsg), e.target.value, -1, false).then(subTreeRenderData => {
-      this.renderData = subTreeRenderData;
-      this.setState({
-        itemCount: this.renderData.length
-      });
+      if(currUrl === this.url) {
+        this.renderData = subTreeRenderData;
+        this.forceUpdate(); //Not adviced, but using to avoid a background async completion of a different traceName to update the current state
+      }
     });
   }
 
@@ -397,9 +377,6 @@ class MethodTreeComponent extends Component {
             if (ids.length === 1 || this.opened[currUrl][id] === 2) {
               //change state of the stackline to loading (not required for current implementation because the current stackline is still not yet rendered)
               this.opened[currUrl][id] = 1;
-              if (this.stacklineDetailGrid) {
-                this.stacklineDetailGrid.forceUpdate();     //only stacklineDetail is to updated in order to make the arrow change to loading state
-              }
               this.getRenderData(currUrl, this.treeStore[currUrl].getChildrenAsync(id).catch(this.showPromptMsg), filterText, indent, ids.length > 1).then(subTreeRenderDataList => {
                 this.opened[currUrl][id] = 2;
                 resolve(renderDataList.concat(subTreeRenderDataList));
