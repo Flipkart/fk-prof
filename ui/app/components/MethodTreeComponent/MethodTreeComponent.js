@@ -16,6 +16,7 @@ const rightColumnWidth = 150;
 const everythingOnTopHeight = 270;
 const filterBoxHeight = 87;
 const stackEntryHeight = 25;
+const MAX_TREESTORES_TO_CACHE = 20;
 
 const getTextWidth = function(text, font) {
   // re-use canvas object for better performance
@@ -36,7 +37,7 @@ class MethodTreeComponent extends Component {
     this.treeStore = {};
     this.renderData = [];
     this.toggleSourceTargetBufferMap = {};
-
+    this.recentUrls = [];
     this.initTreeStore = this.initTreeStore.bind(this);
 
     this.stacklineDetailCellRenderer = this.stacklineDetailCellRenderer.bind(this);
@@ -61,10 +62,17 @@ class MethodTreeComponent extends Component {
     const treeType = this.props.nextNodesAccessorField === 'parent' ? 'callees' : 'callers';
     this.url = `/api/${treeType}/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
     if (!this.treeStore[this.url]) {
-      this.treeStore[this.url] = this.props.nextNodesAccessorField === 'parent' ? new HotMethodStore(this.url) : new CallTreeStore(this.url);
+      if(this.recentUrls.length >= MAX_TREESTORES_TO_CACHE){
+        delete this.treeStore[this.recentUrls.shift()];   //remove from recent urls and treeStore
+      }
+      this.recentUrls.push(this.url);                                                                                                            // add to the recent urls
+      this.treeStore[this.url] = this.props.nextNodesAccessorField === 'parent' ? new HotMethodStore(this.url) : new CallTreeStore(this.url);   // and to the treeStore
       this.opened[this.url] = {};
       this.highlighted[this.url] = {};
       this.toggleSourceTargetBufferMap[this.url] = [];
+    } else {
+      this.recentUrls.splice(this.recentUrls.findIndex(url => url === this.url), 1); //remove the url from its index and
+      this.recentUrls.push(this.url);                                                 //move to the front
     }
   }
 
@@ -203,7 +211,6 @@ class MethodTreeComponent extends Component {
     const rowData = this.renderData[listIdx];
     const uniqueId = rowData[0];
     if (this.toggleSourceTargetBufferMap[this.url][listIdx]) return;
-
 
     //===============Helper functions ================
     const expand = () => {
