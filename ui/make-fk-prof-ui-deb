@@ -2,6 +2,7 @@
 set -x
 
 PORT=$1
+USERAPI_ELB_IP=$2
 DIST_DIR="./dist"
 DEBIAN_DIR="DEBIAN"
 PACKAGE_NAME="fk-prof-ui"
@@ -31,5 +32,6 @@ echo $VERSION
 find $DIST_DIR/$DEBIAN_DIR -type f | xargs sed -i "s/_VERSION_/$VERSION/g"
 find $DIST_DIR/$DEBIAN_DIR -type f | xargs sed -i "s/_PACKAGE_/$PACKAGE_NAME/g"
 sed -i "s/{{PORT}}/${PORT}/g" $DIST_DIR/$DEBIAN_DIR/postinst
+sed -i "s/{{USERAPI_ELB_IP}}/${USERAPI_ELB_IP}/g" $DIST_DIR/$DEBIAN_DIR/postinst
 
 echo 'Finished creating the Deb folder structure. Yayyy!'

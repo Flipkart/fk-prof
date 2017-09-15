@@ -10,7 +10,10 @@ const app = express();
 const publicPath = path.resolve(__dirname, 'public');
 const httpProxy = require('http-proxy');
 
-const proxy = httpProxy.createProxyServer({ target: 'http://localhost:8082' });
+const userapiElbTarget = isDevelopment ? 'http://localhost:8082' : 'http://' + process.env.USERAPI_ELB_IP;
+const userapiURLSpecificTarget = {};
+
+const proxy = httpProxy.createProxyServer({ target: userapiElbTarget });
 function logProxyError (e) { console.log('Error occured in ', e); }
 
 app.use(cookieParser());
@@ -46,9 +49,16 @@ if (isDevelopment) {
   }));
 }
 
+proxy.on('proxyRes', function (proxyRes, req, res) {
+  if (proxyRes.statusCode === 307) {
+    userapiURLSpecificTarget[req.url] = proxyRes.headers.location;
+    proxyRes.headers.location = '/api' + req.url;
+  }
+});
+
 app.all('/**api*', (req, res) => {
   req.url = req.url.replace('/api', '');
-  proxy.web(req, res, logProxyError);
+  proxy.web(req, res, {target: userapiURLSpecificTarget[req.url] || userapiElbTarget}, logProxyError);
 });
 
 app.get('*', (req, res) => {
