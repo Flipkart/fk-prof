@@ -68,7 +68,7 @@ struct ThreadTargetProc {
         std::lock_guard<std::mutex> g(m);
         state = State::stopped;
         v.notify_all();
-        logger->trace("Thread '{}' stopped", name);
+        logger->warn("Thread '{}' stopped", name);
         s_c_thds.dec();
     }
 
@@ -76,7 +76,7 @@ struct ThreadTargetProc {
         std::lock_guard<std::mutex> g(m);
         assert(state == State::pre_start);
         state = State::started;
-        logger->trace("Thread '{}' started", name);
+        logger->warn("Thread '{}' started", name);
         s_c_thds.inc();
     }
 };

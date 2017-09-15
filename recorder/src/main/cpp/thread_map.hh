@@ -108,8 +108,12 @@ private:
 
     void remove_and_release(ThreadBucket* b) {
         std::lock_guard<std::mutex> g(values_mutex);
-        if (b->links.next != nullptr) b->links.next->links.prev = b->links.prev;
-        if (b->links.prev != nullptr) b->links.prev->links.next = b->links.next;
+        if (b->links.next != nullptr) {
+            b->links.next->links.prev = b->links.prev;
+        }
+        if (b->links.prev != nullptr) {
+            b->links.prev->links.next = b->links.next;
+        }
         if (values == b) values = b->links.next;
         b->release();
     }
@@ -136,14 +140,17 @@ public:
 
 	void put(JNIEnv *jni_env, const char *name, int tid, jint priority, jboolean is_daemon) {
 		// constructor == call to acquire
-        logger->info("Thread started - '{}' (jniEnv: {}, tid: {}, priority: {}, is_daemon: {})", name, reinterpret_cast<std::uint64_t>(jni_env), tid, priority, is_daemon);
+        logger->warn("Thread started - '{}' (jniEnv: {}, tid: {}, priority: {}, is_daemon: {})", name, reinterpret_cast<std::uint64_t>(jni_env), tid, priority, is_daemon);
 		ThreadBucket *info = new ThreadBucket(tid, name, static_cast<std::uint32_t>(priority), static_cast<bool>(is_daemon));
         add_to_values(info);
         info->localEpoch = GCHelper::attach();
-		ThreadBucket *old = (ThreadBucket*)map.put((map::KeyType)jni_env, (map::ValueType)info);
-		if (old != nullptr)
-			remove_and_release(old);
-		GCHelper::safepoint(info->localEpoch); // each thread inserts once
+        ThreadBucket *old = (ThreadBucket*)map.put((map::KeyType)jni_env, (map::ValueType)info);
+        if (old != nullptr) {
+            logger->warn("Old thread to evict - {}, {}, {}", old->name, old->tid, reinterpret_cast<std::uint64_t>(jni_env));
+            remove_and_release(old);
+        }
+
+        GCHelper::safepoint(info->localEpoch); // each thread inserts once
 	}
 
 	ThreadBucket *get(JNIEnv *jni_env) {
@@ -156,7 +163,7 @@ public:
 	void remove(JNIEnv *jni_env) {
 		ThreadBucket *info = (ThreadBucket*)map.remove((map::KeyType)jni_env);
 		if (info != nullptr) {
-            logger->info("Thread stopped - '{}' (jniEnv: {}, tid: {}, priority: {}, is_daemon: {})", info->name, reinterpret_cast<std::uint64_t>(jni_env), info->tid, info->priority, info->is_daemon);
+            logger->warn("Thread stopped - '{}' (jniEnv: {}, tid: {}, priority: {}, is_daemon: {})", info->name, reinterpret_cast<std::uint64_t>(jni_env), info->tid, info->priority, info->is_daemon);
 			GCHelper::detach(info->localEpoch);
             remove_and_release(info);
 		}

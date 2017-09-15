@@ -26,6 +26,7 @@ pom.xml.versionsBackup
 *.ipr
 *.iws
 *.iml
+*.cbp
 
 logs/*
 !.gitkeep
