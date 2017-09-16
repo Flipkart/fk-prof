@@ -4,7 +4,8 @@
   "scripts": {
     "start": "node server.js",
     "lint": "./node_modules/.bin/eslint app/** webpack.config.js server.js",
-    "prod-build": "NODE_ENV=production node_modules/.bin/webpack"
+    "prod-build": "NODE_ENV=production node_modules/.bin/webpack",
+    "test": "mocha"
   },
   "devDependencies": {
     "autoprefixer": "^6.3.6",
@@ -37,6 +38,7 @@
     "html-webpack-plugin": "^2.21.0",
     "http-proxy": "^1.16.2",
     "json-loader": "^0.5.4",
+    "mocha": "^3.5.3",
     "postcss-loader": "^1.1.1",
     "precss": "^1.4.0",
     "react-transform-hmr": "^1.0.4",
