@@ -45,6 +45,7 @@ public class LoadGenApp {
 
         boolean isDebug = args.length > 10 ? "1".equals(args[10]) : false;
         int counterPrintPeriodInSec = args.length > 11 ? Integer.parseInt(args[11]) : 5;
+        int newThreadsSleepDurationInMs = args.length > 12 ? Integer.parseInt(args[12]) : 10_000;
 
         // generate trace names and corresponding perf ctx
         PerfCtx[][] perfctxs = new PerfCtx[loadTypes][traceDuplicatesFactor];
@@ -147,7 +148,7 @@ public class LoadGenApp {
         });
 
         if(threadSpawnerCount > 0) {
-            execSvc.submit(() -> new ThreadSpawner(threadSpawnerCount, isDebug).doWork());
+            execSvc.submit(() -> new ThreadSpawner(threadSpawnerCount, newThreadsSleepDurationInMs, isDebug).doWork());
         }
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -199,59 +200,5 @@ public class LoadGenApp {
         long end = System.currentTimeMillis();
 
         return end - start;
-    }
-
-    private static class ThreadSpawner {
-
-        int n;
-        boolean isDebug;
-
-        public ThreadSpawner(int n, boolean isDebug) {
-            this.n = n;
-            this.isDebug = isDebug;
-        }
-
-        public void doWork() {
-
-            Thread[] threads = new Thread[n];
-
-            while(true) {
-                for (int i = 0; i < n; ++i) {
-
-                    if(threads[i] != null) {
-                        while(true) {
-                            boolean joined = false;
-                            try {
-                                threads[i].join();
-                                joined = true;
-                            } catch (Exception e) {}
-
-                            if(joined) break;
-                        }
-                    }
-
-                    final int th_id = i;
-                    threads[i] = new Thread(() -> {
-                        try {
-                            if(isDebug) {
-                                System.out.println("Threadspawner: thd " + th_id + " started");
-                            }
-                            Thread.sleep(1000 * (new Random().nextInt() % 10));
-                            if(isDebug) {
-                                System.out.println("Threadspawner: thd " + th_id + " will now end");
-                            }
-                        }
-                        catch (Exception e) {
-                        }
-                    });
-
-                    threads[i].start();
-                }
-
-                if(Thread.currentThread().isInterrupted()) {
-                    return;
-                }
-            }
-        }
     }
 }
