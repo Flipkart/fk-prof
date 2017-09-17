@@ -8,7 +8,7 @@ module.exports = {
     this.valueMap = {};
     //Both put and get on a key refreshes it to be the most recently used key
     this.get = function (key) {
-      if (this.valueMap[key]) {
+      if (key in this.valueMap) {
         if (this.recentKeys[this.recentKeys.length - 1] !== key) {
           this.recentKeys.splice(this.recentKeys.findIndex(x => x === key), 1); //remove the key from its index and
           this.recentKeys.push(key);                                                 //move to the front
@@ -18,7 +18,7 @@ module.exports = {
       return null;
     };
     this.put = function (key, value) {
-      if (!this.valueMap[key]) {
+      if (! (key in this.valueMap)) {
         if (this.recentKeys.length >= this.cacheSize) {
           delete this.valueMap[this.recentKeys.shift()];   //evict oldest from recentKeys and valueMap
         }

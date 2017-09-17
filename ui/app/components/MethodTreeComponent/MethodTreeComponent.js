@@ -68,7 +68,7 @@ class MethodTreeComponent extends Component {
       this.cachedTreeStores.put(this.url, this.currTreeStore);
       this.opened[this.url] = {};
       this.highlighted[this.url] = {};
-      this.toggleSourceTargetBufferMap[this.url] = [];
+      this.toggleSourceTargetBufferMap[this.url] = {};
     }
   }
 
@@ -219,19 +219,21 @@ class MethodTreeComponent extends Component {
       const currUrl = this.url;
       this.getRenderData(currUrl, this.currTreeStore.getChildrenAsync(uniqueId).catch(this.showPromptMsg), null, rowData[2], rowData[3] > 1).then(subTreeRenderData => {
         const latestTargetIdx = this.toggleSourceTargetBufferMap[currUrl][listIdx];
-        delete this.toggleSourceTargetBufferMap[currUrl][listIdx];
-        Object.entries(this.toggleSourceTargetBufferMap[currUrl]).forEach(([k, v]) => {
-          this.toggleSourceTargetBufferMap[currUrl][k] = v > latestTargetIdx ? v + subTreeRenderData.length : v;
-        });
         this.opened[currUrl][uniqueId] = 2;
-        if (this.url === currUrl) { //update the render data only if it is the same one on which the toggle getRenderData got initiated and initial render is complete
-          this.renderData.splice(latestTargetIdx + 1, 0, ...subTreeRenderData);
-        }
-        if (this.stacklineDetailGrid && this.stacklineStatGrid) {
-          if(subTreeRenderData.length === 0) {
-            this.stacklineDetailGrid.forceUpdate();
+        if(listIdx in this.toggleSourceTargetBufferMap[currUrl]) {
+          delete this.toggleSourceTargetBufferMap[currUrl][listIdx];
+          Object.entries(this.toggleSourceTargetBufferMap[currUrl]).forEach(([k, v]) => {
+            this.toggleSourceTargetBufferMap[currUrl][k] = v > latestTargetIdx ? v + subTreeRenderData.length : v;
+          });
+          if (this.url === currUrl) { //update the render data only if it is the same one on which the toggle getRenderData got initiated and initial render is complete
+            this.renderData.splice(latestTargetIdx + 1, 0, ...subTreeRenderData);
+            if (this.stacklineDetailGrid && this.stacklineStatGrid) {
+              if (subTreeRenderData.length === 0) {
+                this.stacklineDetailGrid.forceUpdate();
+              }
+              this.forceUpdate();
+            }
           }
-          this.forceUpdate();
         }
       });
     };
@@ -246,7 +248,11 @@ class MethodTreeComponent extends Component {
       const descendants = this.getRenderedDescendantCountForListItem(latestTargetIdx);
       delete this.toggleSourceTargetBufferMap[this.url][listIdx];
       Object.entries(this.toggleSourceTargetBufferMap[this.url]).forEach(([k, v]) => {
-        this.toggleSourceTargetBufferMap[this.url][k] = v > latestTargetIdx ? v - descendants : v;
+        if(v > latestTargetIdx && v <= latestTargetIdx + descendants){
+          delete this.toggleSourceTargetBufferMap[this.url][k];     //need to remove any descendant which has a pending initialized to prevent its result getting appended to the renderList
+        } else {
+          this.toggleSourceTargetBufferMap[this.url][k] = v > latestTargetIdx ? v - descendants : v;
+        }
       });
       this.opened[this.url][uniqueId] = 0;
       if (descendants > 0) {
@@ -423,14 +429,12 @@ class MethodTreeComponent extends Component {
     if(rowData) {
       const uniqueId = rowData[0];
       if (this.opened[this.url][uniqueId] === 1 || this.opened[this.url][uniqueId] === 2) {
-        if (this.isNodeHavingChildren(uniqueId)) {
-          //At least one rendered child item is going to be present for this item
-          //Cannot rely on childNodeIndexes(calculated in isNodeHavingChildren method) to get count of children because actual rendered children can be lesser after deduping of nodes for hot method tree
-          let child_rowdata = this.renderData[listIdx + 1];
-          if(child_rowdata) {
-            return child_rowdata[3]; //this is siblings count of child node which implies children count for parent node
-          } else {
-            console.error("This should never happen. If list item is expanded and its childNodeIndexes > 0, then at least one more item should be present in renderData list")
+        const nodeChildren = this.currTreeStore.getChildren(uniqueId);
+        if (nodeChildren.length > 0) {
+          let nextRowData = this.renderData[listIdx + 1];
+          console.log(nodeChildren, nextRowData[0]);
+          if(nextRowData && nodeChildren.includes(nextRowData[0])) {
+            return nextRowData[3]; //this is siblings count of child node which implies children count for parent node
           }
         }
       }
