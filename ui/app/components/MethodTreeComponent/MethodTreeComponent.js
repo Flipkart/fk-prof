@@ -221,7 +221,7 @@ class MethodTreeComponent extends Component {
         const latestTargetIdx = this.toggleSourceTargetBufferMap[currUrl][listIdx];
         delete this.toggleSourceTargetBufferMap[currUrl][listIdx];
         Object.entries(this.toggleSourceTargetBufferMap[currUrl]).forEach(([k, v]) => {
-          this.toggleSourceTargetBufferMap[this.url][k] = v > latestTargetIdx ? v + subTreeRenderData.length : v;
+          this.toggleSourceTargetBufferMap[currUrl][k] = v > latestTargetIdx ? v + subTreeRenderData.length : v;
         });
         this.opened[currUrl][uniqueId] = 2;
         if (this.url === currUrl) { //update the render data only if it is the same one on which the toggle getRenderData got initiated and initial render is complete
