@@ -1,4 +1,3 @@
-const cache = require('./app/utils/cache');
 const express = require('express');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
@@ -13,6 +12,7 @@ const httpProxy = require('http-proxy');
 
 const userapiElbTarget = isDevelopment ? 'http://localhost:8082' : 'http://' + process.env.USERAPI_ELB_IP;
 const MAX_CACHE_SIZE = isDevelopment ? 3 : 10000;
+const cache = require(path.resolve(__dirname, 'utils/cache.js'));
 const cachedTargets = new cache.LRUBasedCache(MAX_CACHE_SIZE);
 
 const proxy = httpProxy.createProxyServer({ target: userapiElbTarget });
