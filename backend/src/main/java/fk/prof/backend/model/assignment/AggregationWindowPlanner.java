@@ -182,6 +182,7 @@ public class AggregationWindowPlanner {
               " because coverage is zero");
         } else {
           int healthyRecorders = processGroupContextForScheduling.getHealthyRecordersCount();
+
           if(latestRecordingPolicy.hasMinHealthy() && healthyRecorders < latestRecordingPolicy.getMinHealthy()) {
             mtrWindowSkipUnhealthy.mark();
             logger.info("Skipping aggregation window with index=" + currentAggregationWindowIndex +
@@ -189,6 +190,8 @@ public class AggregationWindowPlanner {
                 " because healthy recorders=" + healthyRecorders + " are less than min required=" + latestRecordingPolicy.getMinHealthy());
           } else {
             int targetRecordersCount = processGroupContextForScheduling.applyCoverage(healthyRecorders, latestRecordingPolicy.getCoveragePct());
+
+
             if (targetRecordersCount == 0) {
               mtrWindowSkipUnhealthy.mark();
               logger.info("Skipping aggregation window with index=" + currentAggregationWindowIndex +

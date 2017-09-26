@@ -1,18 +1,24 @@
 package fk.prof.userapi.verticles;
 
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.storage.StreamTransformer;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.api.ProfileStoreAPI;
-import fk.prof.userapi.http.UserapiApiPathConstants;
+import fk.prof.userapi.exception.UserapiHttpFailure;
+import fk.prof.userapi.http.ProfHttpClient;
+import fk.prof.userapi.http.UserapiHttpHelper;
 import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.AggregationWindowSummary;
+import fk.prof.userapi.util.ProtoUtil;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.buffer.Buffer;
+import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.impl.CompositeFutureImpl;
 import io.vertx.core.json.Json;
@@ -21,8 +27,10 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.LoggerHandler;
 import io.vertx.ext.web.handler.TimeoutHandler;
+import proto.PolicyDTO;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -31,24 +39,30 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import static fk.prof.userapi.http.UserapiApiPathConstants.*;
+
 /**
  * Routes requests to their respective handlers
  * Created by rohit.patiyal on 18/01/17.
  */
 public class HttpVerticle extends AbstractVerticle {
-
     private static Logger LOGGER = LoggerFactory.getLogger(HttpVerticle.class);
 
     private String baseDir;
     private final int maxListProfilesDurationInSecs;
     private Configuration.HttpConfig httpConfig;
+    private final Configuration.BackendConfig backendConfig;
     private ProfileStoreAPI profileStoreAPI;
+    private ProfHttpClient httpClient;
+    private Configuration.HttpClientConfig httpClientConfig;
 
-    public HttpVerticle(Configuration.HttpConfig httpConfig, ProfileStoreAPI profileStoreAPI, String baseDir, int maxListProfilesDurationInDays) {
+    public HttpVerticle(Configuration.HttpConfig httpConfig, Configuration.BackendConfig backendConfig, Configuration.HttpClientConfig httpClientConfig, ProfileStoreAPI profileStoreAPI, String baseDir, int maxListProfilesDurationInDays) {
         this.httpConfig = httpConfig;
+        this.backendConfig = backendConfig;
+        this.httpClientConfig = httpClientConfig;
         this.profileStoreAPI = profileStoreAPI;
         this.baseDir = baseDir;
-        this.maxListProfilesDurationInSecs = maxListProfilesDurationInDays*24*60*60;
+        this.maxListProfilesDurationInSecs = maxListProfilesDurationInDays * 24 * 60 * 60;
     }
 
     private Router configureRouter() {
@@ -56,12 +70,22 @@ public class HttpVerticle extends AbstractVerticle {
         router.route().handler(TimeoutHandler.create(httpConfig.getRequestTimeout()));
         router.route().handler(LoggerHandler.create());
 
-        router.get(UserapiApiPathConstants.APPS).handler(this::getAppIds);
-        router.get(UserapiApiPathConstants.CLUSTER_GIVEN_APPID).handler(this::getClusterIds);
-        router.get(UserapiApiPathConstants.PROC_GIVEN_APPID_CLUSTERID).handler(this::getProcId);
-        router.get(UserapiApiPathConstants.PROFILES_GIVEN_APPID_CLUSTERID_PROCID).handler(this::getProfiles);
-        router.get(UserapiApiPathConstants.PROFILE_GIVEN_APPID_CLUSTERID_PROCID_WORKTYPE_TRACENAME).handler(this::getCpuSamplingTraces);
-        router.get(UserapiApiPathConstants.HEALTHCHECK).handler(this::handleGetHealth);
+        router.get(PROFILES_APPS).handler(this::getAppIds);
+        router.get(PROFILES_CLUSTERS_FOR_APP).handler(this::getClusterIds);
+        router.get(PROFILES_PROCS_FOR_APP_CLUSTER).handler(this::getProcName);
+        router.get(PROFILES_FOR_APP_CLUSTER_PROC).handler(this::getProfiles);
+        router.get(CPU_SAMPLING_PROFILE_FOR_APP_CLUSTER_PROC_TRACE).handler(this::getCpuSamplingTraces);
+        router.get(HEALTH_CHECK).handler(this::handleGetHealth);
+
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, POLICIES_APPS, this::proxyListAPIToBackend);
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, POLICIES_CLUSTERS_FOR_APP, this::proxyListAPIToBackend);
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, POLICIES_PROCS_FOR_APP_CLUSTER, this::proxyListAPIToBackend);
+
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, GET_POLICY_FOR_APP_CLUSTER_PROC, this::proxyGetPolicyToBackend);
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.PUT, PUT_POLICY_FOR_APP_CLUSTER_PROC,
+                BodyHandler.create().setBodyLimit(1024 * 10), this::proxyPutPostPolicyToBackend);
+        UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.POST, POST_POLICY_FOR_APP_CLUSTER_PROC,
+                BodyHandler.create().setBodyLimit(1024 * 10), this::proxyPutPostPolicyToBackend);
 
         return router;
     }
@@ -69,6 +93,7 @@ public class HttpVerticle extends AbstractVerticle {
     @Override
     public void start(Future<Void> startFuture) throws Exception {
         httpConfig = config().mapTo(Configuration.HttpConfig.class);
+        httpClient = ProfHttpClient.newBuilder().setConfig(httpClientConfig).build(vertx);
 
         Router router = configureRouter();
         vertx.createHttpServer()
@@ -83,10 +108,7 @@ public class HttpVerticle extends AbstractVerticle {
     }
 
     private void getAppIds(RoutingContext routingContext) {
-        String prefix = routingContext.request().getParam("prefix");
-        if (prefix == null) {
-            prefix = "";
-        }
+        final String prefix = routingContext.request().getParam("prefix");
         Future<Set<String>> future = Future.future();
         profileStoreAPI.getAppIdsWithPrefix(future.setHandler(result -> setResponse(result, routingContext)),
             baseDir, prefix);
@@ -94,31 +116,25 @@ public class HttpVerticle extends AbstractVerticle {
 
     private void getClusterIds(RoutingContext routingContext) {
         final String appId = routingContext.request().getParam("appId");
-        String prefix = routingContext.request().getParam("prefix");
-        if (prefix == null) {
-            prefix = "";
-        }
+        final String prefix = routingContext.request().getParam("prefix");
         Future<Set<String>> future = Future.future();
         profileStoreAPI.getClusterIdsWithPrefix(future.setHandler(result -> setResponse(result, routingContext)),
             baseDir, appId, prefix);
     }
 
-    private void getProcId(RoutingContext routingContext) {
+    private void getProcName(RoutingContext routingContext) {
         final String appId = routingContext.request().getParam("appId");
         final String clusterId = routingContext.request().getParam("clusterId");
-        String prefix = routingContext.request().getParam("prefix");
-        if (prefix == null) {
-            prefix = "";
-        }
+        final String prefix = routingContext.request().getParam("prefix");
         Future<Set<String>> future = Future.future();
-        profileStoreAPI.getProcsWithPrefix(future.setHandler(result -> setResponse(result, routingContext)),
+        profileStoreAPI.getProcNamesWithPrefix(future.setHandler(result -> setResponse(result, routingContext)),
             baseDir, appId, clusterId, prefix);
     }
 
     private void getProfiles(RoutingContext routingContext) {
         final String appId = routingContext.request().getParam("appId");
         final String clusterId = routingContext.request().getParam("clusterId");
-        final String proc = routingContext.request().getParam("procId");
+        final String procName = routingContext.request().getParam("procName");
 
         ZonedDateTime startTime;
         int duration;
@@ -138,7 +154,7 @@ public class HttpVerticle extends AbstractVerticle {
         Future<List<AggregatedProfileNamingStrategy>> foundProfiles = Future.future();
         foundProfiles.setHandler(result -> {
             List<Future> profileSummaries = new ArrayList<>();
-            for (AggregatedProfileNamingStrategy filename: result.result()) {
+            for (AggregatedProfileNamingStrategy filename : result.result()) {
                 Future<AggregationWindowSummary> summary = Future.future();
 
                 profileStoreAPI.loadSummary(summary, filename);
@@ -150,26 +166,23 @@ public class HttpVerticle extends AbstractVerticle {
                 List<ErroredGetSummaryResponse> failed = new ArrayList<>();
 
                 // Can only get the underlying list of results of it is a CompositeFutureImpl
-                if(summaryResult instanceof CompositeFutureImpl) {
+                if (summaryResult instanceof CompositeFutureImpl) {
                     CompositeFutureImpl compositeFuture = (CompositeFutureImpl) summaryResult;
                     for (int i = 0; i < compositeFuture.size(); ++i) {
-                        if(compositeFuture.succeeded(i)) {
+                        if (compositeFuture.succeeded(i)) {
                             succeeded.add(compositeFuture.resultAt(i));
-                        }
-                        else {
+                        } else {
                             AggregatedProfileNamingStrategy failedFilename = result.result().get(i);
                             failed.add(new ErroredGetSummaryResponse(failedFilename.startTime, failedFilename.duration, compositeFuture.cause(i).getMessage()));
                         }
                     }
-                }
-                else {
-                    if(summaryResult.succeeded()) {
+                } else {
+                    if (summaryResult.succeeded()) {
                         CompositeFuture compositeFuture = summaryResult.result();
                         for (int i = 0; i < compositeFuture.size(); ++i) {
                             succeeded.add(compositeFuture.resultAt(i));
                         }
-                    }
-                    else {
+                    } else {
                         // composite future failed so set error in response.
                         setResponse(Future.failedFuture(summaryResult.cause()), routingContext);
                         return;
@@ -185,13 +198,13 @@ public class HttpVerticle extends AbstractVerticle {
         });
 
         profileStoreAPI.getProfilesInTimeWindow(foundProfiles,
-            baseDir, appId, clusterId, proc, startTime, duration);
+            baseDir, appId, clusterId, procName, startTime, duration);
     }
 
     private void getCpuSamplingTraces(RoutingContext routingContext) {
         String appId = routingContext.request().getParam("appId");
         String clusterId = routingContext.request().getParam("clusterId");
-        String procId = routingContext.request().getParam("procId");
+        String procName = routingContext.request().getParam("procName");
         AggregatedProfileModel.WorkType workType = AggregatedProfileModel.WorkType.cpu_sample_work;
         String traceName = routingContext.request().getParam("traceName");
 
@@ -208,7 +221,7 @@ public class HttpVerticle extends AbstractVerticle {
 
         AggregatedProfileNamingStrategy filename;
         try {
-            filename = new AggregatedProfileNamingStrategy(baseDir, 1, appId, clusterId, procId, startTime, duration, workType);
+            filename = new AggregatedProfileNamingStrategy(baseDir, 1, appId, clusterId, procName, startTime, duration, workType);
         } catch (Exception e) {
             setResponse(Future.failedFuture(new IllegalArgumentException(e)), routingContext);
             return;
@@ -229,53 +242,122 @@ public class HttpVerticle extends AbstractVerticle {
         routingContext.response().setStatusCode(200).end();
     }
 
+    private void proxyPutPostPolicyToBackend(RoutingContext routingContext) {
+        String payloadVersionedPolicyDetailsJsonString = routingContext.getBodyAsString("utf-8");
+        try {
+            PolicyDTO.VersionedPolicyDetails.Builder payloadVersionedPolicyDetailsBuilder = PolicyDTO.VersionedPolicyDetails.newBuilder();
+            JsonFormat.parser().merge(payloadVersionedPolicyDetailsJsonString, payloadVersionedPolicyDetailsBuilder);
+            PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = payloadVersionedPolicyDetailsBuilder.build();
+            makeRequestToBackend(routingContext.request().method(), routingContext.normalisedPath(), ProtoUtil.buildBufferFromProto(versionedPolicyDetails), false)
+                    .setHandler(ar -> proxyBufferedPolicyResponseFromBackend(routingContext, ar));
+        } catch (Exception ex) {
+            UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ex);
+            UserapiHttpHelper.handleFailure(routingContext, httpFailure);
+        }
+    }
+
+    private void proxyGetPolicyToBackend(RoutingContext routingContext) {
+        try {
+            makeRequestToBackend(routingContext.request().method(), routingContext.normalisedPath(), null, false)
+                    .setHandler(ar -> proxyBufferedPolicyResponseFromBackend(routingContext, ar));
+        } catch (Exception ex) {
+            UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ex);
+            UserapiHttpHelper.handleFailure(routingContext, httpFailure);
+        }
+    }
+
+    private void proxyListAPIToBackend(RoutingContext routingContext) {
+        final String path = routingContext.normalisedPath().substring((META_PREFIX + POLICIES_PREFIX).length()) + ((routingContext.request().query() != null)? "?" + routingContext.request().query(): "");
+        try {
+            makeRequestToBackend(routingContext.request().method(), path, routingContext.getBody(), false)
+                    .setHandler(ar -> proxyResponseFromBackend(routingContext, ar));
+        } catch (Exception ex) {
+            UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ex);
+            UserapiHttpHelper.handleFailure(routingContext, httpFailure);
+        }
+    }
+
+    private Future<ProfHttpClient.ResponseWithStatusTuple> makeRequestToBackend(HttpMethod method, String path, Buffer payloadAsBuffer, boolean withRetry) {
+        if (withRetry) {
+            return httpClient.requestAsyncWithRetry(method, backendConfig.getIp(), backendConfig.getPort(), path, payloadAsBuffer);
+        } else {
+            return httpClient.requestAsync(method, backendConfig.getIp(), backendConfig.getPort(), path, payloadAsBuffer);
+        }
+    }
+
+    private void proxyBufferedPolicyResponseFromBackend(RoutingContext context, AsyncResult<ProfHttpClient.ResponseWithStatusTuple> ar) {
+        if (ar.succeeded()) {
+            context.response().setStatusCode(ar.result().getStatusCode());
+            if (ar.result().getStatusCode() == 200 || ar.result().getStatusCode() == 201) {
+                try {
+                    PolicyDTO.VersionedPolicyDetails responseVersionedPolicyDetails = ProtoUtil.buildProtoFromBuffer(PolicyDTO.VersionedPolicyDetails.parser(), ar.result().getResponse());
+                    String jsonStr = JsonFormat.printer().print(responseVersionedPolicyDetails);
+                    context.response().end(jsonStr);
+                } catch (InvalidProtocolBufferException e) {
+                    UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(e);
+                    UserapiHttpHelper.handleFailure(context, httpFailure);
+                }
+            } else {
+                context.response().end(ar.result().getResponse());
+            }
+        } else {
+            UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ar.cause());
+            UserapiHttpHelper.handleFailure(context, httpFailure);
+        }
+    }
+
+    private void proxyResponseFromBackend(RoutingContext context, AsyncResult<ProfHttpClient.ResponseWithStatusTuple> ar) {
+        if (ar.succeeded()) {
+            context.response().setStatusCode(ar.result().getStatusCode());
+            context.response().end(ar.result().getResponse());
+        } else {
+            UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ar.cause());
+            UserapiHttpHelper.handleFailure(context, httpFailure);
+        }
+    }
+
     private <T> void setResponse(AsyncResult<T> result, RoutingContext routingContext) {
         setResponse(result, routingContext, false);
     }
 
     private <T> void setResponse(AsyncResult<T> result, RoutingContext routingContext, boolean gzipped) {
-        if(routingContext.response().ended()) {
+        if (routingContext.response().ended()) {
             return;
         }
-        if(result.failed()) {
+        if (result.failed()) {
             LOGGER.error(routingContext.request().uri(), result.cause());
 
-            if(result.cause() instanceof FileNotFoundException) {
+            if (result.cause() instanceof FileNotFoundException) {
                 endResponseWithError(routingContext.response(), result.cause(), 404);
-            }
-            else if(result.cause() instanceof IllegalArgumentException) {
+            } else if (result.cause() instanceof IllegalArgumentException) {
                 endResponseWithError(routingContext.response(), result.cause(), 400);
-            }
-            else {
+            } else {
                 endResponseWithError(routingContext.response(), result.cause(), 500);
             }
-        }
-        else {
+        } else {
             String encodedResponse = Json.encode(result.result());
             HttpServerResponse response = routingContext.response();
 
             response.putHeader("content-type", "application/json");
-            if(gzipped && safeContains(routingContext.request().getHeader("Accept-Encoding"), "gzip")) {
+            if (gzipped && safeContains(routingContext.request().getHeader("Accept-Encoding"), "gzip")) {
                 Buffer compressedBuf;
                 try {
                     compressedBuf = Buffer.buffer(StreamTransformer.compress(encodedResponse.getBytes(Charset.forName("utf-8"))));
-                }
-                catch(IOException e) {
+                } catch (IOException e) {
                     setResponse(Future.failedFuture(e), routingContext, false);
                     return;
                 }
 
                 response.putHeader("Content-Encoding", "gzip");
                 response.end(compressedBuf);
-            }
-            else {
+            } else {
                 response.end(encodedResponse);
             }
         }
     }
 
     private boolean safeContains(String str, String subStr) {
-        if(str == null || subStr == null) {
+        if (str == null || subStr == null) {
             return false;
         }
         return str.toLowerCase().contains(subStr.toLowerCase());
@@ -291,13 +373,17 @@ public class HttpVerticle extends AbstractVerticle {
                 .put("status", statusCode);
 
         switch (statusCode) {
-            case 400: error.put("error", "BAD_REQUEST");
+            case 400:
+                error.put("error", "BAD_REQUEST");
                 break;
-            case 404: error.put("error", "NOT_FOUND");
+            case 404:
+                error.put("error", "NOT_FOUND");
                 break;
-            case 500: error.put("error", "INTERNAL_SERVER_ERROR");
+            case 500:
+                error.put("error", "INTERNAL_SERVER_ERROR");
                 break;
-            default:  error.put("error", "SOMETHING_WENT_WRONG");
+            default:
+                error.put("error", "SOMETHING_WENT_WRONG");
         }
 
         if (msg != null) {
