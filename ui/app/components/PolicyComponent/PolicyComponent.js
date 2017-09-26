@@ -40,10 +40,10 @@ class PolicyComponent extends Component {
     const value = parseInt(target.value);
     const id = target.id;
     let schedule = {...this.props.versionedPolicyDetails.data.policyDetails.policy.schedule};
-    if(value){
-      schedule[id] = value;
-    } else{
+    if (isNaN(value)) {
       delete schedule[id];
+    } else {
+      schedule[id] = value;
     }
     this.props.policyScheduleChangeAction(schedule);
   }
