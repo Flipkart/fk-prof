@@ -1,7 +1,6 @@
 import React, {Component, PropTypes} from 'react';
 import {connect} from 'react-redux';
 import Loader from '../LoaderComponent/LoaderComponent';
-import NumericInput from 'react-numeric-input';
 
 import {
   policyAction,
@@ -36,9 +35,16 @@ class PolicyComponent extends Component {
     }
   }
 
-  handleScheduleChange(v,vs,e) {
+  handleScheduleChange(e) {
+    const target = e.target;
+    const value = parseInt(target.value);
+    const id = target.id;
     let schedule = {...this.props.versionedPolicyDetails.data.policyDetails.policy.schedule};
-    schedule[e.id] = e.required ? v: undefined;   //need to assign undefined to remove the field from the payload in redux store
+    if (isNaN(value)) {
+      delete schedule[id];
+    } else {
+      schedule[id] = value;
+    }
     this.props.policyScheduleChangeAction(schedule);
   }
 
@@ -184,13 +190,10 @@ class PolicyComponent extends Component {
       </div>
       <div className="mdl-grid mdl-cell--12-col">
         <div className="mdl-cell--4-col mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-          <NumericInput className="mdl-textfield__input" id="duration" min={60} max={960}
-                        onChange={this.handleScheduleChange}
-                        value={this.props.versionedPolicyDetails.data.policyDetails.policy.schedule.duration}
-                        style={false}
-                        parse={parseInt}
-                        onBlur={(e)=>{if(e.target.value===""){console.log('replacing',e.target.parentNode.parentNode.classList);e.target.parentNode.parentNode.classList.replace('is-dirty', 'is-invalid');console.log('replaced',e.target.parentNode.parentNode.classList);}}}
-                        required/>
+          <input className="mdl-textfield__input" type="number" min="60" max="960" id="duration"
+                 onChange={this.handleScheduleChange}
+                 value={this.props.versionedPolicyDetails.data.policyDetails.policy.schedule.duration}
+                 required/>
           <label className="mdl-textfield__label" htmlFor="duration">Duration (secs)</label>
           <span className="mdl-textfield__error">Duration must be between 60-960 secs</span>
           <div className="mdl-tooltip mdl-tooltip--large" htmlFor="duration">
@@ -217,7 +220,7 @@ class PolicyComponent extends Component {
                  onChange={this.handleScheduleChange}
                  value={this.props.versionedPolicyDetails.data.policyDetails.policy.schedule.minHealthy}/>
           <label className="mdl-textfield__label" htmlFor="minHealthy">Min Healthy (optional)</label>
-          <span className="mdl-textfield__error">Min healthy recorders must be between 0-10000</span>
+          <span className="mdl-textfield__error">Min healthy recorders must be greater than 0</span>
           <div className="mdl-tooltip mdl-tooltip--large" htmlFor="minHealthy">
             Profiling will stop if number of recorder-enabled healthy instances is less than this number. Not applicable if no value provided.
           </div>
