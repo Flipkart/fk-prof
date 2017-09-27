@@ -364,6 +364,9 @@ void ftrace::Server::setup_listener() {
     auto ret = bind(listener_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
     if (ret != 0) throw log_and_get_error("Couldn't bind server socket", errno);
 
+    ret = fchmod(listener_fd, S_IRWXU | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH | S_IWOTH | S_IXOTH);
+    if (ret != 0) throw log_and_get_error("Couldn't set permissions (chmod) on server socket", errno);
+
     ret = listen(listener_fd, 8);
     if (ret != 0) throw log_and_get_error("Couldn't start listening", errno);
  

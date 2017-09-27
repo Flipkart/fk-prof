@@ -23,6 +23,11 @@ class TestEnv {
 public:
     TestEnv();
     ~TestEnv();
+
+    const std::string& mk_tmp_dir();
+
+private:
+    std::string tmp_dir;
 };
 
 #endif //HONEST_PROFILER_TEST_H

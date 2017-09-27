@@ -726,9 +726,8 @@ void Controller::issue(const recording::CtxSwitchTraceWork& cstw, Processes& pro
 
     logger->info("Starting ctx-switch tracing for latency >= {}ns (tracing wakeup-lag: {}, using global clock: {}, tracking syscalls: {}) and for upto {} frames", latency_threshold_ns, track_wakeup_lag, use_global_clock, track_syscall, tts.cpu_samples_max_stack_sz);
 
-    GlobalCtx::recording.ctxsw_tracer.reset(new CtxSwitchTracer(thread_map, *serializer.get(), tts.ctx_sw_trace_max_stack_sz, get_prob_pct(), cfg.noctx_cov_pct, latency_threshold_ns, track_wakeup_lag, use_global_clock, track_syscall, cfg.tracer_listener, cfg.proc));
+    GlobalCtx::recording.ctxsw_tracer.reset(new CtxSwitchTracer(jvm, jvmti, thread_map, *serializer.get(), tts.ctx_sw_trace_max_stack_sz, get_prob_pct(), cfg.noctx_cov_pct, latency_threshold_ns, track_wakeup_lag, use_global_clock, track_syscall, cfg.tracer_listener, cfg.proc, cancel_work));
     ReadsafePtr<CtxSwitchTracer> p(GlobalCtx::recording.ctxsw_tracer);
-    p->start(env);
     processes.push_back(new ReadsafeProcess<CtxSwitchTracer>(GlobalCtx::recording.ctxsw_tracer));
     instr->engage_return_tracer(GlobalCtx::recording.ctxsw_tracer, env);
 }

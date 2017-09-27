@@ -44,3 +44,20 @@ TEST(Util_all_content) {
         "    logger.reset();\n    return ret;\n}\n";
     CHECK_EQUAL(expected, content);
 }
+
+TEST(Util_first_content_line_matching__when_nothing_matches) {
+    std::regex r("foo bar baz quux");
+    try {
+        auto content = Util::first_content_line_matching("src/test/cpp/main.cc", r);
+        CHECK(false); // should have thrown an exception
+    } catch (const std::exception& e) {
+        CHECK_EQUAL("No matching line found in file: src/test/cpp/main.cc", e.what());
+    }
+}
+
+TEST(Util_first_content_line_matching__when_multiple_matches_exist) {
+    std::regex r(".+\"Test.+");
+    auto content = Util::first_content_line_matching("src/test/cpp/main.cc", r);
+    auto expectd = "#include \"TestReporterStdout.h\"";
+    CHECK_EQUAL(expectd, content);
+}

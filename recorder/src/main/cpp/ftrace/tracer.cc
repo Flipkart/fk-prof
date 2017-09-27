@@ -74,10 +74,10 @@ ftrace::Tracer::Tracer(const std::string& tracing_dir, Listener& listener, std::
     }
     ctrl_fds.tracing_on = open_file(instance_path, TRACING_ON, O_WRONLY | O_TRUNC);
     ctrl_fds.trace_options = open_file(instance_path, TRACE_OPTIONS,  O_WRONLY | O_APPEND);
-    ctrl_fds.sched_switch_enable = open_file(instance_path, SCHED_SWITCH_DIR ENABLE_FILE,  O_WRONLY | O_APPEND);
-    ctrl_fds.sched_wakeup_enable = open_file(instance_path, SCHED_WAKEUP_DIR ENABLE_FILE,  O_WRONLY | O_APPEND);
-    ctrl_fds.syscall_enter_enable = open_file(instance_path, SYSCALL_ENTER_DIR ENABLE_FILE,  O_WRONLY | O_APPEND);
-    ctrl_fds.syscall_exit_enable = open_file(instance_path, SYSCALL_EXIT_DIR ENABLE_FILE,  O_WRONLY | O_APPEND);
+    ctrl_fds.sched_switch_enable = open_file(instance_path, EVENTS_DIR SCHED_SWITCH_DIR ENABLE_FILE,  O_WRONLY | O_APPEND);
+    ctrl_fds.sched_wakeup_enable = open_file(instance_path, EVENTS_DIR SCHED_WAKEUP_DIR ENABLE_FILE,  O_WRONLY | O_APPEND);
+    ctrl_fds.syscall_enter_enable = open_file(instance_path, EVENTS_DIR SYSCALL_ENTER_DIR ENABLE_FILE,  O_WRONLY | O_APPEND);
+    ctrl_fds.syscall_exit_enable = open_file(instance_path, EVENTS_DIR SYSCALL_EXIT_DIR ENABLE_FILE,  O_WRONLY | O_APPEND);
     
     populate_data_links(instance_path, dls, data_link_listener);
 

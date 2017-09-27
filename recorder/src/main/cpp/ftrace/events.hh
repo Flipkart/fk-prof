@@ -7,10 +7,10 @@
 #include <regex>
 
 #define EVENTS_DIR "/events"
-#define SCHED_SWITCH_DIR EVENTS_DIR "/sched/sched_switch"
-#define SCHED_WAKEUP_DIR EVENTS_DIR "/sched/sched_wakeup"
-#define SYSCALL_ENTER_DIR EVENTS_DIR "/raw_syscalls/sys_enter"
-#define SYSCALL_EXIT_DIR EVENTS_DIR "/raw_syscalls/sys_exit"
+#define SCHED_SWITCH_DIR "/sched/sched_switch"
+#define SCHED_WAKEUP_DIR "/sched/sched_wakeup"
+#define SYSCALL_ENTER_DIR "/raw_syscalls/sys_enter"
+#define SYSCALL_EXIT_DIR "/raw_syscalls/sys_exit"
 
 namespace ftrace {
     namespace event {
@@ -125,6 +125,8 @@ namespace ftrace {
         std::size_t read_payload(const std::uint8_t* buff, std::size_t remaining, std::uint64_t timestamp_ns, std::int32_t cpu) const;
 
         EventHandler& handler;
+
+        std::regex numeric;
 
         std::unique_ptr<CommonHeaderReader> common_header_rdr;
 

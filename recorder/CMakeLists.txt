@@ -213,6 +213,7 @@ set(TEST_FILES
     ${SRC_TEST}/test_site_resolver.cc
     ${SRC_TEST}/test_sched_switch_event_reporting.cc
     ${SRC_TEST}/test_util.cc
+    ${SRC_TEST}/test_ftrace_event_reading.cc
     ${SRC_TEST}/test.cc)
 
 set(TEST_UTIL_FILES

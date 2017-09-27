@@ -29,6 +29,18 @@ std::string Util::content(const std::string& path, const std::regex* after, cons
     return ss.str();
 }
 
+std::string Util::first_content_line_matching(const std::string& path, std::regex& r) {
+    std::ifstream f_in(path, std::ios_base::in);
+    std::string line;
+    while(! f_in.eof()) {
+        if (! f_in.good()) {
+            throw std::runtime_error("Encountered error while reading file");
+        }
+        std::getline(f_in, line);
+        if (std::regex_match(line, r)) return line;
+    }
+    throw std::runtime_error("No matching line found in file: " + path);
+}
 
 template <typename T> T Util::stoun(const std::string& str) {
      std::size_t end;
@@ -38,7 +50,7 @@ template <typename T> T Util::stoun(const std::string& str) {
          throw std::out_of_range("stoun");
      }
      return result;
- }
+}
 
 template std::uint16_t Util::stoun<std::uint16_t>(const std::string& str);
 

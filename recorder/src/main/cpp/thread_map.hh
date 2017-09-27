@@ -7,6 +7,9 @@
 #include "concurrent_map.hh"
 #include "perf_ctx.hh"
 #include "globals.hh"
+#include <functional>
+#include <cuckoohash_map.hh>
+#include <city_hasher.hh>
 
 int gettid();
 
@@ -59,7 +62,7 @@ struct ThreadBucket {
         ThreadBucket* prev;
     } links;
 
-	const int tid;
+	const pid_t tid;
 	char *name;
     std::uint32_t priority;
     bool is_daemon;
@@ -99,18 +102,27 @@ struct ThreadBucket {
 	}
 };
 
+enum class ThreadOp { created, retired };
+
 template <typename MapProvider>
 class ThreadMapBase {
 private:
 	MapProvider map;
     std::mutex values_mutex;
     ThreadBucket* values;
+    typedef std::function<void(const std::string&, const ThreadBucket&, ThreadOp)> ThdWatch;
+    typedef cuckoohash_map<std::string, ThdWatch, CityHasher<std::string> > ThreadWatchers;
+    ThreadWatchers thd_watchers;
 
     void remove_and_release(ThreadBucket* b) {
         std::lock_guard<std::mutex> g(values_mutex);
         if (b->links.next != nullptr) b->links.next->links.prev = b->links.prev;
         if (b->links.prev != nullptr) b->links.prev->links.next = b->links.next;
         if (values == b) values = b->links.next;
+        auto l = thd_watchers.lock_table();
+        for (auto it = l.begin(); it != l.end(); it++) {
+            it->second(it->first, *b, ThreadOp::retired);////TODO: test me! -jj
+        }
         b->release();
     }
 
@@ -120,6 +132,10 @@ private:
         b->links.next = values;
         if (values != nullptr) values->links.prev = b;
         values = b;
+        auto l = thd_watchers.lock_table();
+        for (auto it = l.begin(); it != l.end(); it++) {
+            it->second(it->first, *b, ThreadOp::created);////TODO: test me! -jj
+        }
     }
 
 public:
@@ -161,6 +177,21 @@ public:
             remove_and_release(info);
 		}
 	}
+
+    void add_watch(const std::string& watch_id, ThdWatch watch) {//TODO: test me! -jj
+        std::lock_guard<std::mutex> g(values_mutex);
+        auto inserted = thd_watchers.insert(watch_id, watch);
+        assert(inserted);
+        for (auto cur = values; cur != nullptr; cur++) {
+            watch(watch_id, *cur, ThreadOp::created);
+        }
+    }
+
+    void remove_watch(const std::string& watch_id) {//TODO: test me! -jj
+        std::lock_guard<std::mutex> g(values_mutex);
+        auto erased = thd_watchers.erase(watch_id);
+        assert(erased);
+    }
 };
 
 typedef ThreadMapBase<map::ConcurrentMapProvider<PointerHasher<JNIEnv>, true> > ThreadMap;

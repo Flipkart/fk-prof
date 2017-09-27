@@ -33,6 +33,8 @@ namespace Util {
 
     std::string content(const std::string& path, const std::regex* after, const std::regex* before);
 
+    std::string first_content_line_matching(const std::string& path, std::regex& pattern);
+
     template <typename T> T stoun(const std::string& str);
 
     extern template std::uint16_t stoun<std::uint16_t>(const std::string& str);

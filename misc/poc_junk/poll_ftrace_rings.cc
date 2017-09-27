@@ -101,8 +101,8 @@ std::int64_t r_i64(std::uint8_t** ev_buff) {
 
 #define ID_SYS_EXIT 16
 #define ID_SYS_ENTER 17
-#define ID_SCHED_SWITCH 232
-#define ID_SCHED_WAKEUP 234
+#define ID_SCHED_SWITCH 273
+#define ID_SCHED_WAKEUP 275
 
 template <typename T> T* read(std::uint8_t** ev_buff) {
     auto p = reinterpret_cast<T*>(*ev_buff);
@@ -167,7 +167,7 @@ void parse(std::uint8_t* ev_buff, const PgHeader& pg_hdr, int cpu) {
         if (fhp->type_len == 0) {
             auto arr_0 = r_u32(&ev_buff);
             ts += fhp->time_delta;
-            handle_event(&ev_buff, arr_0, ts, cpu);
+            handle_event(&ev_buff, arr_0 - sizeof(arr_0), ts, cpu);
         } else if (fhp->type_len <= RINGBUF_TYPE_DATA_TYPE_LEN_MAX) {
             std::uint32_t len = fhp->type_len;
             len <<= 2;
@@ -179,11 +179,14 @@ void parse(std::uint8_t* ev_buff, const PgHeader& pg_hdr, int cpu) {
                 return;
             }
             auto arr_0 = r_u32(&ev_buff);
-            ev_buff += arr_0;
+            ev_buff += (arr_0 - sizeof(arr_0));
             ts += fhp->time_delta;
+            std::cerr << "Padding ate: " << arr_0 << " bytes, curr pos: " << static_cast<void*>(ev_buff) << "\n";
         } else if (fhp->type_len == RINGBUF_TYPE_TIME_EXTEND) {
             auto arr_0 = r_u32(&ev_buff);
-            std::uint64_t time_delta = (arr_0 << 27) + fhp->time_delta;
+            std::uint64_t time_delta = arr_0;
+            time_delta = (time_delta << 27);
+            time_delta += fhp->time_delta;
             std::cerr << "Time δ: "  << time_delta << "\n";
             ts += time_delta;
         } else {
@@ -295,6 +298,7 @@ void add_cpu_rings(int efd, int cpu_count) {
 void read_a_page_and_print(int fd, std::uint8_t* buff, ssize_t sz, int cpu) {
     while (true) {
         ssize_t rd = read(fd, buff, sz);
+        if (rd == 0) return;
         std::cerr << "Read sz: " << rd << "\n";
         std::uint64_t pg_tm;
         if (rd > 0) {
@@ -314,194 +318,204 @@ void read_a_page_and_print(int fd, std::uint8_t* buff, ssize_t sz, int cpu) {
     }
 }
 
-int
-main (int argc, char *argv[])
-{
-    int sfd, s;
-    int efd;
-    struct epoll_event event;
-    struct epoll_event events[MAXEVENTS];
+int main(int argc, char** argv) {
+    if (argc < 2) throw std::runtime_error("too few args, need raw file name too");
 
-    size_t pg_sz = getpagesize();
-    std::unique_ptr<std::uint8_t[]> buff { new std::uint8_t[pg_sz] };
-
-    if (argc != 3)
-    {
-        fprintf (stderr, "Usage: %s [port] [cpu-count]\n", argv[0]);
-        exit (EXIT_FAILURE);
-    }
-
-    sfd = create_and_bind (argv[1]);
-    auto cpu_count = std::stoi(argv[2]);
-    if (sfd == -1)
-        abort ();
-
-    s = make_socket_non_blocking (sfd);
-    if (s == -1)
-        abort ();
-
-    s = listen (sfd, SOMAXCONN);
-    if (s == -1)
-    {
-        perror ("listen");
-        abort ();
-    }
-
-    efd = epoll_create1 (0);
-    if (efd == -1)
-    {
-        perror ("epoll_create");
-        abort ();
-    }
-
-    event.data.fd = sfd;
-    event.events = EPOLLIN | EPOLLET;
-    s = epoll_ctl (efd, EPOLL_CTL_ADD, sfd, &event);
-
-    if (s == -1)
-    {
-        perror ("epoll_ctl");
-        abort ();
-    }
-
-    add_cpu_rings(efd, cpu_count);
-
-    /* The event loop */
-    while (1)
-    {
-        int n, i;
-
-        n = epoll_wait (efd, events, MAXEVENTS, -1);
-        for (i = 0; i < n; i++)
-        {
-            if ((events[i].events & EPOLLERR) ||
-                (events[i].events & EPOLLHUP) ||
-                (!(events[i].events & EPOLLIN)))
-            {
-                /* An error has occured on this fd, or the socket is not
-                   ready for reading (why were we notified then?) */
-                fprintf (stderr, "epoll error\n");
-                close (events[i].data.fd);
-                continue;
-            }
-
-            else if (sfd == events[i].data.fd)
-            {
-                /* We have a notification on the listening socket, which
-                   means one or more incoming connections. */
-                while (1)
-                {
-                    struct sockaddr in_addr;
-                    socklen_t in_len;
-                    int infd;
-                    char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-
-                    in_len = sizeof in_addr;
-                    infd = accept (sfd, &in_addr, &in_len);
-                    if (infd == -1)
-                    {
-                        if ((errno == EAGAIN) ||
-                            (errno == EWOULDBLOCK))
-                        {
-                            /* We have processed all incoming
-                               connections. */
-                            break;
-                        }
-                        else
-                        {
-                            perror ("accept");
-                            break;
-                        }
-                    }
-
-                    s = getnameinfo (&in_addr, in_len,
-                                     hbuf, sizeof hbuf,
-                                     sbuf, sizeof sbuf,
-                                     NI_NUMERICHOST | NI_NUMERICSERV);
-                    if (s == 0)
-                    {
-                        printf("Accepted connection on descriptor %d "
-                               "(host=%s, port=%s)\n", infd, hbuf, sbuf);
-                    }
-
-                    /* Make the incoming socket non-blocking and add it to the
-                       list of fds to monitor. */
-                    s = make_socket_non_blocking (infd);
-                    if (s == -1)
-                        abort ();
-
-                    event.data.fd = infd;
-                    event.events = EPOLLIN | EPOLLET;
-                    s = epoll_ctl (efd, EPOLL_CTL_ADD, infd, &event);
-                    if (s == -1)
-                    {
-                        perror ("epoll_ctl");
-                        abort ();
-                    }
-                }
-                continue;
-            } else if (ft_rings.find(events[i].data.fd) != std::end(ft_rings))
-            {
-                auto it = ft_rings.find(events[i].data.fd);
-                read_a_page_and_print(events[i].data.fd, buff.get(), pg_sz, it->second.cpu);
-            }
-            else
-            {
-                /* We have data on the fd waiting to be read. Read and
-                   display it. We must read whatever data is available
-                   completely, as we are running in edge-triggered mode
-                   and won't get a notification again for the same
-                   data. */
-                int done = 0;
-
-                while (1)
-                {
-                    ssize_t count;
-                    char buf[512];
-
-                    count = read (events[i].data.fd, buf, sizeof buf);
-                    if (count == -1)
-                    {
-                        /* If errno == EAGAIN, that means we have read all
-                           data. So go back to the main loop. */
-                        if (errno != EAGAIN)
-                        {
-                            perror ("read");
-                            done = 1;
-                        }
-                        break;
-                    }
-                    else if (count == 0)
-                    {
-                        /* End of file. The remote has closed the
-                           connection. */
-                        done = 1;
-                        break;
-                    }
-
-                    /* Write the buffer to standard output */
-                    s = write (1, buf, count);
-                    if (s == -1)
-                    {
-                        perror ("write");
-                        abort ();
-                    }
-                }
-
-                if (done)
-                {
-                    printf ("Closed connection on descriptor %d\n",
-                            events[i].data.fd);
-
-                    /* Closing the descriptor will make epoll remove it
-                       from the set of descriptors which are monitored. */
-                    close (events[i].data.fd);
-                }
-            }
-        }
-    }
-
-    close (sfd);
-
-    return EXIT_SUCCESS;
+    std::uint8_t buff[4096];
+    
+    int fd = open(argv[1], O_RDONLY);
+    read_a_page_and_print(fd, buff, sizeof(buff), 1);
+    close(fd);
 }
+
+// int
+// main (int argc, char *argv[])
+// {
+//     int sfd, s;
+//     int efd;
+//     struct epoll_event event;
+//     struct epoll_event events[MAXEVENTS];
+
+//     size_t pg_sz = getpagesize();
+//     std::unique_ptr<std::uint8_t[]> buff { new std::uint8_t[pg_sz] };
+
+//     if (argc != 3)
+//     {
+//         fprintf (stderr, "Usage: %s [port] [cpu-count]\n", argv[0]);
+//         exit (EXIT_FAILURE);
+//     }
+
+//     sfd = create_and_bind (argv[1]);
+//     auto cpu_count = std::stoi(argv[2]);
+//     if (sfd == -1)
+//         abort ();
+
+//     s = make_socket_non_blocking (sfd);
+//     if (s == -1)
+//         abort ();
+
+//     s = listen (sfd, SOMAXCONN);
+//     if (s == -1)
+//     {
+//         perror ("listen");
+//         abort ();
+//     }
+
+//     efd = epoll_create1 (0);
+//     if (efd == -1)
+//     {
+//         perror ("epoll_create");
+//         abort ();
+//     }
+
+//     event.data.fd = sfd;
+//     event.events = EPOLLIN | EPOLLET;
+//     s = epoll_ctl (efd, EPOLL_CTL_ADD, sfd, &event);
+
+//     if (s == -1)
+//     {
+//         perror ("epoll_ctl");
+//         abort ();
+//     }
+
+//     add_cpu_rings(efd, cpu_count);
+
+//     /* The event loop */
+//     while (1)
+//     {
+//         int n, i;
+
+//         n = epoll_wait (efd, events, MAXEVENTS, -1);
+//         for (i = 0; i < n; i++)
+//         {
+//             if ((events[i].events & EPOLLERR) ||
+//                 (events[i].events & EPOLLHUP) ||
+//                 (!(events[i].events & EPOLLIN)))
+//             {
+//                 /* An error has occured on this fd, or the socket is not
+//                    ready for reading (why were we notified then?) */
+//                 fprintf (stderr, "epoll error\n");
+//                 close (events[i].data.fd);
+//                 continue;
+//             }
+
+//             else if (sfd == events[i].data.fd)
+//             {
+//                 /* We have a notification on the listening socket, which
+//                    means one or more incoming connections. */
+//                 while (1)
+//                 {
+//                     struct sockaddr in_addr;
+//                     socklen_t in_len;
+//                     int infd;
+//                     char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+
+//                     in_len = sizeof in_addr;
+//                     infd = accept (sfd, &in_addr, &in_len);
+//                     if (infd == -1)
+//                     {
+//                         if ((errno == EAGAIN) ||
+//                             (errno == EWOULDBLOCK))
+//                         {
+//                             /* We have processed all incoming
+//                                connections. */
+//                             break;
+//                         }
+//                         else
+//                         {
+//                             perror ("accept");
+//                             break;
+//                         }
+//                     }
+
+//                     s = getnameinfo (&in_addr, in_len,
+//                                      hbuf, sizeof hbuf,
+//                                      sbuf, sizeof sbuf,
+//                                      NI_NUMERICHOST | NI_NUMERICSERV);
+//                     if (s == 0)
+//                     {
+//                         printf("Accepted connection on descriptor %d "
+//                                "(host=%s, port=%s)\n", infd, hbuf, sbuf);
+//                     }
+
+//                     /* Make the incoming socket non-blocking and add it to the
+//                        list of fds to monitor. */
+//                     s = make_socket_non_blocking (infd);
+//                     if (s == -1)
+//                         abort ();
+
+//                     event.data.fd = infd;
+//                     event.events = EPOLLIN | EPOLLET;
+//                     s = epoll_ctl (efd, EPOLL_CTL_ADD, infd, &event);
+//                     if (s == -1)
+//                     {
+//                         perror ("epoll_ctl");
+//                         abort ();
+//                     }
+//                 }
+//                 continue;
+//             } else if (ft_rings.find(events[i].data.fd) != std::end(ft_rings))
+//             {
+//                 auto it = ft_rings.find(events[i].data.fd);
+//                 read_a_page_and_print(events[i].data.fd, buff.get(), pg_sz, it->second.cpu);
+//             }
+//             else
+//             {
+//                 /* We have data on the fd waiting to be read. Read and
+//                    display it. We must read whatever data is available
+//                    completely, as we are running in edge-triggered mode
+//                    and won't get a notification again for the same
+//                    data. */
+//                 int done = 0;
+
+//                 while (1)
+//                 {
+//                     ssize_t count;
+//                     char buf[512];
+
+//                     count = read (events[i].data.fd, buf, sizeof buf);
+//                     if (count == -1)
+//                     {
+//                         /* If errno == EAGAIN, that means we have read all
+//                            data. So go back to the main loop. */
+//                         if (errno != EAGAIN)
+//                         {
+//                             perror ("read");
+//                             done = 1;
+//                         }
+//                         break;
+//                     }
+//                     else if (count == 0)
+//                     {
+//                         /* End of file. The remote has closed the
+//                            connection. */
+//                         done = 1;
+//                         break;
+//                     }
+
+//                     /* Write the buffer to standard output */
+//                     s = write (1, buf, count);
+//                     if (s == -1)
+//                     {
+//                         perror ("write");
+//                         abort ();
+//                     }
+//                 }
+
+//                 if (done)
+//                 {
+//                     printf ("Closed connection on descriptor %d\n",
+//                             events[i].data.fd);
+
+//                     /* Closing the descriptor will make epoll remove it
+//                        from the set of descriptors which are monitored. */
+//                     close (events[i].data.fd);
+//                 }
+//             }
+//         }
+//     }
+
+//     close (sfd);
+
+//     return EXIT_SUCCESS;
+// }
