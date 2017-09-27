@@ -37,14 +37,9 @@ class PolicyComponent extends Component {
 
   handleScheduleChange(e) {
     const target = e.target;
-    const value = parseInt(target.value);
     const id = target.id;
     let schedule = {...this.props.versionedPolicyDetails.data.policyDetails.policy.schedule};
-    if (isNaN(value)) {
-      delete schedule[id];
-    } else {
-      schedule[id] = value;
-    }
+    schedule[id] = target.required ? target.value : (target.value === ''? undefined : target.value);   //assigning undefined removes the field from the payload in redux store for optional input
     this.props.policyScheduleChangeAction(schedule);
   }
 
@@ -56,8 +51,7 @@ class PolicyComponent extends Component {
   handleWorkChange(e) {
     const prevWorks = this.props.versionedPolicyDetails.data.policyDetails.policy.work;
     const target = e.target;
-    const value = parseInt(target.value);
-
+    const value = target.value;
     const wType = target.name;
     const [wKey, attribute] = target.id.split('_');
 
@@ -82,9 +76,7 @@ class PolicyComponent extends Component {
     const works = [...prevWorks.filter((w) => {
       return w.wType !== wType
     })];
-    if (!Object.values(w[wKey]).every((el) => isNaN(el))) { //Add work type element from work array if any of the attributes are non empty
-      works.push(w);
-    }
+    works.push(w);
     this.props.policyWorkChangeAction(works);
   }
 
@@ -190,7 +182,7 @@ class PolicyComponent extends Component {
       </div>
       <div className="mdl-grid mdl-cell--12-col">
         <div className="mdl-cell--4-col mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-          <input className="mdl-textfield__input" type="number" min="60" max="960" id="duration"
+          <input className="mdl-textfield__input" type="text" pattern="^0*([6-8][0-9]|9[0-9]|[1-8][0-9]{2}|9[0-5][0-9]|960)$" id="duration"
                  onChange={this.handleScheduleChange}
                  value={this.props.versionedPolicyDetails.data.policyDetails.policy.schedule.duration}
                  required/>
@@ -202,7 +194,7 @@ class PolicyComponent extends Component {
         </div>
         <div className="mdl-layout-spacer"/>
         <div className="mdl-cell--4-col mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-          <input className="mdl-textfield__input" type="number" min="0" max="100" id="pgCovPct"
+          <input className="mdl-textfield__input" type="text" pattern="^0*(\d{1,2}|100)$" id="pgCovPct"
                  onChange={this.handleScheduleChange}
                  value={this.props.versionedPolicyDetails.data.policyDetails.policy.schedule.pgCovPct}
                  required/>
@@ -216,11 +208,11 @@ class PolicyComponent extends Component {
         </div>
         <div className="mdl-layout-spacer"/>
         <div className="mdl-cell--4-col mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-          <input className="mdl-textfield__input" type="number" min="1" max="10000" id="minHealthy"
+          <input className="mdl-textfield__input" type="text" pattern="^0*([1-9]|\d{2,4}|10000)$" id="minHealthy"
                  onChange={this.handleScheduleChange}
                  value={this.props.versionedPolicyDetails.data.policyDetails.policy.schedule.minHealthy}/>
           <label className="mdl-textfield__label" htmlFor="minHealthy">Min Healthy (optional)</label>
-          <span className="mdl-textfield__error">Min healthy recorders must be greater than 0</span>
+          <span className="mdl-textfield__error">Min healthy recorders must be between 1-10000</span>
           <div className="mdl-tooltip mdl-tooltip--large" htmlFor="minHealthy">
             Profiling will stop if number of recorder-enabled healthy instances is less than this number. Not applicable if no value provided.
           </div>
@@ -271,7 +263,7 @@ class PolicyComponent extends Component {
           <div className="mdl-layout-spacer"/>
           <div
             className="mdl-cell--4-col mdl-cell--7-col-tablet mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-            <input name="cpu_sample_work" className="mdl-textfield__input" type="number" min="50" max="100"
+            <input name="cpu_sample_work" className="mdl-textfield__input" type="text" pattern="^0*([5-8][0-9]|9[0-9]|100)$"
                    id={"cpuSample_frequency"}
                    onChange={this.handleWorkChange} value={cpu_sample_work.frequency} required/>
             <label className="mdl-textfield__label" htmlFor="cpuSample_frequency">Frequency (Hz)</label>
@@ -284,7 +276,7 @@ class PolicyComponent extends Component {
           <div className="mdl-layout-spacer"/>
           <div
             className="mdl-cell--4-col mdl-cell--7-col-tablet mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
-            <input name="cpu_sample_work" className="mdl-textfield__input" type="number" min="1" max="999"
+            <input name="cpu_sample_work" className="mdl-textfield__input" type="text" pattern="^0*([1-9]|\d{2,3})$"
                    id={"cpuSample_maxFrames"}
                    onChange={this.handleWorkChange} value={cpu_sample_work.maxFrames} required/>
             <label className="mdl-textfield__label" htmlFor="cpuSample_maxFrames">Max Frames</label>
