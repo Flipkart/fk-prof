@@ -143,6 +143,14 @@ public class Configuration {
     @JsonProperty("aggregatedProfiles.baseDir")
     private String profilesBaseDir;
 
+    @NotNull
+    @JsonProperty("policy.baseDir")
+    private String policyBaseDir;
+
+    @NotNull
+    @JsonProperty("policy.version")
+    private String policyVersion;
+
     public String getIpAddress() {
         return ipAddress;
     }
@@ -233,6 +241,14 @@ public class Configuration {
 
     public String getProfilesBaseDir() {
         return profilesBaseDir;
+    }
+
+    public String getPolicyBaseDir() {
+        return policyBaseDir;
+    }
+
+    public String getPolicyVersion() {
+        return policyVersion;
     }
 
     public static class HttpClientConfig {

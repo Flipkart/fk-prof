@@ -96,12 +96,13 @@ public class ProfileDiscoveryAPITest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetAppIdsWithPrefix(TestContext context) throws Exception {
+    public void testGetAppIdsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<String, Collection<Object>> appIdTestPairs = new HashMap<String, Collection<Object>>() {
             {
                 put("app", Sets.newSet("app1"));
                 put("", Sets.newSet("app1", "foo"));
+                put(null, Sets.newSet("app1", "foo"));
             }
         };
 
@@ -119,7 +120,7 @@ public class ProfileDiscoveryAPITest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetClusterIdsWithPrefix(TestContext context) throws Exception {
+    public void testGetClusterIdsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<List<String>, Collection<?>> appIdTestPairs = new HashMap<List<String>, Collection<?>>() {
             {
@@ -129,6 +130,7 @@ public class ProfileDiscoveryAPITest {
                 put(Arrays.asList("np", "np"), Sets.newSet());
                 put(Arrays.asList("app1", "b"), Sets.newSet());
                 put(Arrays.asList("", ""), Sets.newSet());
+                put(Arrays.asList("app1", null), Sets.newSet("cluster1"));
             }
         };
 
@@ -146,11 +148,12 @@ public class ProfileDiscoveryAPITest {
     }
 
     @Test(timeout = 10000)
-    public void TestGetProcsWithPrefix(TestContext context) throws Exception {
+    public void testGetProcsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<List<String>, Collection<?>> appIdTestPairs = new HashMap<List<String>, Collection<?>>() {
             {
                 put(Arrays.asList("app1", "cluster1", "pr"), Sets.newSet("process1"));
+                put(Arrays.asList("app1", "cluster1", null), Sets.newSet("process1"));
                 put(Arrays.asList("app1", "", ""), Sets.newSet());
                 put(Arrays.asList("foo", "bar", ""), Sets.newSet("main"));
                 put(Arrays.asList("", "", ""), Sets.newSet());
@@ -165,15 +168,15 @@ public class ProfileDiscoveryAPITest {
             f.setHandler(res -> {
                 context.assertEquals(entry.getValue(), res.result());
             });
-            profileDiscoveryAPI.getProcsWithPrefix(f, BASE_DIR, entry.getKey().get(0), entry.getKey().get(1), entry.getKey().get(2));
+            profileDiscoveryAPI.getProcNamesWithPrefix(f, BASE_DIR, entry.getKey().get(0), entry.getKey().get(1), entry.getKey().get(2));
         }
 
         CompositeFuture f = CompositeFuture.all(futures);
         f.setHandler(res -> completeTest(res, context, async));
     }
 
-    @Test
-    public void TestGetProfilesInTimeWindow(TestContext context) throws Exception {
+    @Test(timeout = 10000)
+    public void testGetProfilesInTimeWindow(TestContext context) throws Exception {
         Async async = context.async();
         Map<List<Object>, Collection<?>> appIdTestPairs = new HashMap<List<Object>, Collection<?>>() {
             {
