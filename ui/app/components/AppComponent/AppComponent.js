@@ -8,6 +8,7 @@ import ProcSelect from 'components/ProcSelectComponent';
 import ProfileList from 'components/ProfileListComponent';
 
 import styles from './AppComponent.css';
+import PolicyComponent from "../PolicyComponent/PolicyComponent";
 
 const AppComponent = (props) => {
   const selectedApp = props.location.query.app;
@@ -16,16 +17,28 @@ const AppComponent = (props) => {
   const start = props.location.query.start;
   const end = start ? (new Date(start).getTime() + (24 * 3600 * 1000)) : '';
 
-  const updateQueryParams = ({ pathname = '/', query }) => props.router.push({ pathname, query });
-  const updateAppQueryParam = o => updateQueryParams({ query: { app: o.name } });
-  const updateClusterQueryParam = (o) => {
-    updateQueryParams({ query: { app: selectedApp, cluster: o.name } });
+  const updateProfilesQueryParams = ({ pathname = '/profiles', query }) => props.router.push({ pathname, query });
+  const updatePoliciesQueryParams = ({pathname = '/policies', query}) => props.router.push({pathname, query});
+
+  const updateProfilesAppQueryParam = o => updateProfilesQueryParams({ query: { app: o.name } });
+  const updatePoliciesAppQueryParam = o => updatePoliciesQueryParams({query: {app: o.name}});
+
+  const updateProfilesClusterQueryParam = (o) => {
+    updateProfilesQueryParams({ query: { app: selectedApp, cluster: o.name } });
   };
-  const updateProcQueryParam = (o) => {
-    updateQueryParams({ query: { app: selectedApp, cluster: selectedCluster, proc: o.name } });
+  const updatePoliciesClusterQueryParam = (o) => {
+    updatePoliciesQueryParams({query: {app: selectedApp, cluster: o.name}});
   };
+
+  const updateProfilesProcQueryParam = (o) => {
+    updateProfilesQueryParams({ query: { app: selectedApp, cluster: selectedCluster, proc: o.name } });
+  };
+  const updatePoliciesProcQueryParam = (o) => {
+    updatePoliciesQueryParams({query: {app: selectedApp, cluster: selectedCluster, proc: o.name}});
+  };
+
   const updateStartTime = (dateTimeObject) => {
-    updateQueryParams({
+    updateProfilesQueryParams({
       query: {
         app: selectedApp,
         cluster: selectedCluster,
@@ -34,37 +47,41 @@ const AppComponent = (props) => {
       },
     });
   };
-
+  const isPoliciesPage = props.location.pathname.startsWith('/policies');
+  const columnWidth = isPoliciesPage ? 4 : 3;
   return (
     <div>
-      <div className="mdl-grid">
-        <div className="mdl-cell mdl-cell--3-col">
-          <AppSelect
-            onChange={updateAppQueryParam}
-            value={selectedApp}
-          />
-        </div>
-        <div className="mdl-cell mdl-cell--3-col">
-          {selectedApp && (
-            <ClusterSelect
-              app={selectedApp}
-              onChange={updateClusterQueryParam}
-              value={selectedCluster}
+      <div>
+        <div className="mdl-grid">
+          <div className={`mdl-cell mdl-cell--${columnWidth}-col`}>
+            <AppSelect
+              onChange={isPoliciesPage ? updatePoliciesAppQueryParam : updateProfilesAppQueryParam}
+              value={selectedApp}
+              isPoliciesPage={isPoliciesPage}
             />
-          )}
-        </div>
-        <div className="mdl-cell mdl-cell--3-col">
-          {selectedApp && selectedCluster && (
-            <ProcSelect
-              app={selectedApp}
-              cluster={selectedCluster}
-              onChange={updateProcQueryParam}
-              value={selectedProc}
-            />
-          )}
-        </div>
-        {
-          selectedApp && selectedCluster && selectedProc && (
+          </div>
+          <div className={`mdl-cell mdl-cell--${columnWidth}-col`}>
+            {selectedApp && (
+              <ClusterSelect
+                app={selectedApp}
+                onChange={isPoliciesPage ? updatePoliciesClusterQueryParam : updateProfilesClusterQueryParam}
+                value={selectedCluster}
+                isPoliciesPage={isPoliciesPage}
+              />
+            )}
+          </div>
+          <div className={`mdl-cell mdl-cell--${columnWidth}-col`}>
+            {selectedApp && selectedCluster && (
+              <ProcSelect
+                app={selectedApp}
+                cluster={selectedCluster}
+                onChange={isPoliciesPage ? updatePoliciesProcQueryParam : updateProfilesProcQueryParam}
+                value={selectedProc}
+                isPoliciesPage={isPoliciesPage}
+              />
+            )}
+          </div>
+          {!isPoliciesPage && selectedApp && selectedCluster && selectedProc && (
             <div className="mdl-cell mdl-cell--3-col">
               <label className={styles['label']} htmlFor="startTime">Date</label>
               <div>
@@ -78,10 +95,9 @@ const AppComponent = (props) => {
               </div>
             </div>
           )
-        }
-      </div>
-      {
-        selectedProc && start && end && (
+          }
+        </div>
+        {!isPoliciesPage && selectedProc && start && end && (
           <div className="mdl-grid">
             <div className="mdl-cell mdl-cell--3-col">
               <ProfileList
@@ -93,10 +109,23 @@ const AppComponent = (props) => {
               />
             </div>
             <div className="mdl-cell mdl-cell--9-col">
-              {props.children || <h2 className={styles.ingrained}>Select a Trace</h2>}
+              { props.children || <h2 className={styles.ingrained}>Select a Trace</h2>}
             </div>
           </div>
         )}
+        {isPoliciesPage && selectedProc && (
+          <div className="mdl-grid">
+            <div className="mdl-layout-spacer"/>
+            <PolicyComponent
+              app={selectedApp}
+              cluster={selectedCluster}
+              proc={selectedProc}
+            />
+            <div className="mdl-layout-spacer"/>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 };
