@@ -20,6 +20,7 @@ import java.util.Set;
 public interface ProfileStoreAPI {
     /**
      * Returns completable future which returns set of appIds from the DataStore filtered by the specified prefix
+     * Returns future with all appIds if prefix is null, else filters based on prefix
      *
      * @param appIdPrefix prefix to filter the appIds
      * @return completable future which returns set containing app ids
@@ -28,6 +29,7 @@ public interface ProfileStoreAPI {
 
     /**
      * Returns set of clusterIds of specified appId from the DataStore filtered by the specified prefix
+     * Returns future with all clusterIds if prefix is null, else filters based on prefix
      *
      * @param appId           appId of which the clusterIds are required
      * @param clusterIdPrefix prefix to filter the clusterIds
@@ -36,14 +38,15 @@ public interface ProfileStoreAPI {
     void getClusterIdsWithPrefix(Future<Set<String>> clusterIds, String baseDir, String appId, String clusterIdPrefix);
 
     /**
-     * Returns set of processes of specified appId and clusterId from the DataStore filtered by the specified prefix
+     * Returns set of procNames of specified appId and clusterId from the DataStore filtered by the specified prefix
+     * Returns future with all procNames if prefix is null, else filters based on prefix
      *
      * @param appId      appId of which the processes are required
      * @param clusterId  clusterId of which the processes are required
      * @param procPrefix prefix to filter the processes
      * @return completable future which returns set containing process names
      */
-    void getProcsWithPrefix(Future<Set<String>> procIds, String baseDir, String appId, String clusterId, String procPrefix);
+    void getProcNamesWithPrefix(Future<Set<String>> procNames, String baseDir, String appId, String clusterId, String procPrefix);
 
     /**
      * Returns set of profiles of specified appId, clusterId and process from the DataStore filtered by the specified time interval and duration
@@ -59,6 +62,7 @@ public interface ProfileStoreAPI {
 
     /**
      * Returns aggregated profile for the provided header
+     *
      * @param future
      * @param filename
      */
@@ -66,6 +70,7 @@ public interface ProfileStoreAPI {
 
     /**
      * Returns aggregated profile for the provided header
+     *
      * @param future
      * @param filename
      */

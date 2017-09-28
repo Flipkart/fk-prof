@@ -9,7 +9,6 @@ import fk.prof.backend.model.policy.PolicyStore;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Verticle;
 import io.vertx.core.Vertx;
-import io.vertx.core.json.JsonObject;
 
 public class LeaderHttpVerticleDeployer extends VerticleDeployer {
 

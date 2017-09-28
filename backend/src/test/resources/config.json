@@ -86,5 +86,7 @@
     "max.idle": 20,
     "buffer.size": 10000000
   },
-  "aggregatedProfiles.baseDir": "profiles"
+  "aggregatedProfiles.baseDir": "profiles",
+  "policy.baseDir": "policy",
+  "policy.version": "v0001"
 }

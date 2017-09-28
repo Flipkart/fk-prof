@@ -48,7 +48,7 @@ export class CPUSamplingComponent extends Component {
   }
 
   render () {
-    const { app, cluster, proc, fullScreen, profileStart } = this.props.location.query;
+    const { app, cluster, proc, fullScreen, profileStart, profileDuration } = this.props.location.query;
     const { traceName } = this.props.params;
 
     if (!this.props.tree.asyncStatus) return null;
@@ -75,7 +75,7 @@ export class CPUSamplingComponent extends Component {
         {!fullScreen && (
           <div style={{ position: 'relative' }}>
             <a
-              href={`/work-type/cpu_sample_work/${traceName}?app=${app}&cluster=${cluster}&proc=${proc}&profileStart=${profileStart}&workType=cpu_sample_work&fullScreen=true`}
+              href={`/work-type/cpu_sample_work/${traceName}?app=${app}&cluster=${cluster}&proc=${proc}&profileStart=${profileStart}&&profileDuration=${profileDuration}&workType=cpu_sample_work&fullScreen=true`}
               target="_blank"
               rel="noopener noreferrer"
               style={{ position: 'absolute', right: 10, top: 20, zIndex: 1 }}
@@ -171,7 +171,7 @@ CPUSamplingComponent.propTypes = {
       workType: PropTypes.string,
       profileStart: PropTypes.string,
       selectedWorkType: PropTypes.string,
-      profileDuration: PropTypes.number
+      profileDuration: PropTypes.string
     }),
   }),
 };

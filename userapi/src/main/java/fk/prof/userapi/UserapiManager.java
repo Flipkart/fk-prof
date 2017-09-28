@@ -20,7 +20,6 @@ import fk.prof.userapi.api.ProfileViewCreator;
 import fk.prof.userapi.api.cache.ClusterAwareCache;
 import fk.prof.userapi.deployer.VerticleDeployer;
 import fk.prof.userapi.deployer.impl.UserapiHttpVerticleDeployer;
-import fk.prof.userapi.http.UserapiApiPathConstants;
 import fk.prof.userapi.model.json.CustomSerializers;
 import fk.prof.userapi.model.json.ProtoSerializers;
 import io.vertx.core.Future;
@@ -38,6 +37,8 @@ import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 
 import java.util.concurrent.*;
+
+import static fk.prof.userapi.http.UserapiApiPathConstants.*;
 
 public class UserapiManager {
     private static Logger logger = LoggerFactory.getLogger(UserapiManager.class);
@@ -156,13 +157,18 @@ public class UserapiManager {
             .setEnabled(true)
             .setJmxEnabled(true)
             .setRegistryName(UserapiConfigManager.METRIC_REGISTRY)
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.APPS + ".*").setAlias(UserapiApiPathConstants.APPS).setType(MatchType.REGEX))
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.CLUSTER_GIVEN_APPID + ".*").setAlias(UserapiApiPathConstants.CLUSTER_GIVEN_APPID).setType(MatchType.REGEX))
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.PROC_GIVEN_APPID_CLUSTERID + ".*").setAlias(UserapiApiPathConstants.PROC_GIVEN_APPID_CLUSTERID).setType(MatchType.REGEX))
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.PROFILES_GIVEN_APPID_CLUSTERID_PROCID).setAlias(UserapiApiPathConstants.PROFILE_GIVEN_APPID_CLUSTERID_PROCID_WORKTYPE_TRACENAME).setType(MatchType.REGEX))
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.PROFILE_GIVEN_APPID_CLUSTERID_PROCID_WORKTYPE_TRACENAME).setAlias(UserapiApiPathConstants.PROFILE_GIVEN_APPID_CLUSTERID_PROCID_WORKTYPE_TRACENAME).setType(MatchType.REGEX))
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.CALLEES_VIEW_FOR_CPU_SAMPLING).setAlias(UserapiApiPathConstants.CALLEES_VIEW_FOR_CPU_SAMPLING).setType(MatchType.REGEX))
-            .addMonitoredHttpServerUri(new Match().setValue(UserapiApiPathConstants.CALLERS_VIEW_FOR_CPU_SAMPLING).setAlias(UserapiApiPathConstants.CALLERS_VIEW_FOR_CPU_SAMPLING).setType(MatchType.REGEX));
+            .addMonitoredHttpServerUri(new Match().setValue(META_PREFIX + PROFILES_PREFIX + APPS_PREFIX + ".*").setAlias(META_PREFIX + PROFILES_PREFIX + APPS_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(META_PREFIX + PROFILES_PREFIX + CLUSTERS_PREFIX + ".*").setAlias(META_PREFIX + PROFILES_PREFIX + CLUSTERS_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(META_PREFIX + PROFILES_PREFIX + PROCS_PREFIX + ".*").setAlias(META_PREFIX + PROFILES_PREFIX + PROCS_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(PROFILES_PREFIX + ".*").setAlias(PROFILES_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(PROFILE_PREFIX + ".*").setAlias(PROFILE_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(CALLEES_PREFIX + ".*").setAlias(CALLEES_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(CALLERS_PREFIX + ".*").setAlias(CALLERS_PREFIX).setType(MatchType.REGEX))
+
+            .addMonitoredHttpServerUri(new Match().setValue(META_PREFIX + POLICIES_PREFIX + APPS_PREFIX + ".*").setAlias(META_PREFIX + POLICIES_PREFIX + APPS_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(META_PREFIX + POLICIES_PREFIX + CLUSTERS_PREFIX + ".*").setAlias(META_PREFIX + POLICIES_PREFIX + CLUSTERS_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(META_PREFIX + POLICIES_PREFIX + PROCS_PREFIX + ".*").setAlias(META_PREFIX + POLICIES_PREFIX + PROCS_PREFIX).setType(MatchType.REGEX))
+            .addMonitoredHttpServerUri(new Match().setValue(POLICY_PREFIX + ".*").setAlias(POLICY_PREFIX).setType(MatchType.REGEX));
     }
 
     public static class AbortPolicy implements RejectedExecutionHandler {
