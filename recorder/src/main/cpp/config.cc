@@ -71,8 +71,6 @@ std::ostream& operator<<(std::ostream& os, const ConfigurationOptions* config) {
     PRINT_FIELD(poll_itvl, false);
     PRINT_FIELD(metrics_dst_port, false);
     PRINT_FIELD_VALUE(noctx_cov_pct, static_cast<int>(config->noctx_cov_pct), false);
-    PRINT_FIELD(capture_native_bt, false);
-    PRINT_FIELD(capture_unknown_thd_bt, false);
     PRINT_FIELD(allow_sigprof, false);
     PRINT_FIELD(pctx_jar_path, false);
     PRINT_FIELD(rpc_timeout, false);
@@ -142,12 +140,6 @@ void ConfigurationOptions::load(const char* options) {
                     logger->warn("NoCtx coverage pct is too high at {}, re-setting it to 100", noctx_cov_pct);
                     noctx_cov_pct = 100;
                 }
-            } else if (strstr(key, "capture_native_bt") == key) {
-                capture_native_bt = ((strlen(value) == 1) || (value[1] == ',')) &&
-                                ((value[0] == 'y') || (value[0] == 'Y'));
-            } else if (strstr(key, "capture_unknown_thd_bt") == key) {
-                capture_unknown_thd_bt = ((strlen(value) == 1) || (value[1] == ',')) &&
-                                ((value[0] == 'y') || (value[0] == 'Y'));
             } else if (strstr(key, "allow_sigprof") == key) {
                 allow_sigprof = ((strlen(value) == 1) || (value[1] == ',')) &&
                     ((value[0] == 'y') || (value[0] == 'Y'));

@@ -78,11 +78,11 @@ public class ProcessGroupDetail implements ProcessGroupContextForScheduling, Pro
 
   //Called by backend daemon thread
   @Override
-  public int getHealthyRecordersCount() {
+  public int getRecorderTargetCountToMeetCoverage(int coveragePct) {
     final List<RecorderDetail> availableRecorders = this.recorderLookup.values().stream()
         .filter(recorderDetail -> !recorderDetail.isDefunct())
         .collect(Collectors.toList());
-    return availableRecorders.size();
+    return (int)((coveragePct * availableRecorders.size()) / 100.0f);
   }
 
   @Override

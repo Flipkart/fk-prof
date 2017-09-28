@@ -4,8 +4,8 @@ import com.amazonaws.auth.AnonymousAWSCredentials;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.mashape.unirest.http.HttpResponse;
-import fk.prof.backend.ConfigManager;
-import fk.prof.backend.Configuration;
+import com.mashape.unirest.http.Unirest;
+import fk.prof.backend.model.policy.PolicyStore;
 import fk.prof.backend.proto.BackendDTO;
 import fk.prof.recorder.main.Burn20And80PctCpu;
 import fk.prof.recorder.main.Burn50And50PctCpu;
@@ -27,7 +27,6 @@ import org.junit.*;
 import recording.Recorder;
 
 import java.io.ByteArrayOutputStream;
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -37,10 +36,10 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.core.Is.*;
+import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.Assert.*;
 import static fk.prof.recorder.utils.Util.*;
-import static org.hamcrest.core.Is.is;
 
 /**
  * Created by gaurav.ashok on 06/03/17.
@@ -409,9 +408,6 @@ public class E2EIntegrationTest {
     }
 
     private static void ensureZkRootnodeAndData() throws Exception {
-        Path configFilePath = FileResolver.resourceFile("/conf/backend.json");
-        Configuration configuration = ConfigManager.loadConfig(configFilePath.toAbsolutePath().toString());
-        String policyStorePath = "/" + configuration.getPolicyBaseDir();
         try {
             curator.create().forPath("/" + zkNamespace);
         } catch (KeeperException.NodeExistsException ex) {
@@ -419,7 +415,7 @@ public class E2EIntegrationTest {
         }
 
         try {
-            curator.create().forPath("/" + zkNamespace + policyStorePath);
+            curator.create().forPath("/" + zkNamespace + PolicyStore.policyStorePath);
         } catch (KeeperException.NodeExistsException ex) {
             // ignore
         }
@@ -450,7 +446,7 @@ public class E2EIntegrationTest {
         pgBuilder.build().writeDelimitedTo(bout);
         policy.writeDelimitedTo(bout);
 
-        curator.setData().forPath("/" + zkNamespace + policyStorePath, bout.toByteArray());
+        curator.setData().forPath("/" + zkNamespace + PolicyStore.policyStorePath, bout.toByteArray());
     }
 
     private static void buildDefaultRecorderParams() {

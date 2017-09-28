@@ -5,7 +5,6 @@ import {
   Router,
   IndexRedirect,
   browserHistory,
-  Redirect,
 } from 'react-router';
 import { Provider } from 'react-redux';
 
@@ -25,13 +24,10 @@ import './assets/styles/global.css';
 
 const routes = (
   <Route path="/" component={Root}>
-    <IndexRedirect to="/profiles" />
-    <Redirect from="/profiler/profile-data/:traceName" to="/profile/profile-data/:traceName"/>    //To stay backward compatible for old urls
-    <Redirect from="/profiler" to="/profiles"/>                  //To stay backward compatible for old urls
-    <Route path="/profiles" component={App}>
-      <Route path="/profile/profile-data/:traceName" component={AggregatedProfileDataContainer} />
+    <IndexRedirect to="/profiler" />
+    <Route path="/profiler" component={App}>
+      <Route path="/profiler/profile-data/:traceName" component={AggregatedProfileDataContainer} />
     </Route>
-    <Route path="/policies" component={App}/>
     <Route path="/work-type/cpu_sample_work/:traceName" component={CPUSampling} />
   </Route>
 );

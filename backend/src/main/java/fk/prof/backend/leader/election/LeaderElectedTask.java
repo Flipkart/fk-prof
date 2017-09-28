@@ -17,6 +17,7 @@ import io.vertx.core.logging.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.FutureTask;
 import java.util.function.Supplier;
 
 /**
@@ -72,7 +73,6 @@ public class LeaderElectedTask implements Runnable {
     logger.info("Beginning leader elected task");
     runTask().setHandler(ar -> {
       if(ar.failed()) {
-        logger.error("Failed to create leader elected task, error : {}", ar.cause());
         ctrFailure.inc();
       } else {
         logger.info("Successfully completed leader elected task");

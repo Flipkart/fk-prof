@@ -27,8 +27,6 @@ TEST(ParsesAllOptions) {
                     "poll_itvl=30,"
                     "metrics_dst_port=10203,"
                     "noctx_cov_pct=25,"
-                    "capture_native_bt=y,"
-                    "capture_unknown_thd_bt=y,"
                     "allow_sigprof=n,"
                     "pctx_jar_path=/tmp/foo.jar,"
                     "rpc_timeout=7,"
@@ -56,8 +54,6 @@ TEST(ParsesAllOptions) {
     CHECK_EQUAL(30, options.poll_itvl);
     CHECK_EQUAL(10203, options.metrics_dst_port);
     CHECK_EQUAL(25, options.noctx_cov_pct);
-    CHECK_EQUAL(true, options.capture_native_bt);
-    CHECK_EQUAL(true, options.capture_unknown_thd_bt);
     CHECK_EQUAL(false, options.allow_sigprof);
     CHECK_EQUAL("/tmp/foo.jar", options.pctx_jar_path);
     CHECK_EQUAL(7, options.rpc_timeout);
@@ -155,8 +151,6 @@ TEST(DefaultAppropriately) {
     CHECK_EQUAL(60, options.poll_itvl);
     CHECK_EQUAL(11514, options.metrics_dst_port);
     CHECK_EQUAL(0, options.noctx_cov_pct);
-    CHECK_EQUAL(false, options.capture_native_bt);
-    CHECK_EQUAL(false, options.capture_unknown_thd_bt);
     CHECK_EQUAL(true, options.allow_sigprof);
     CHECK_EQUAL(10, options.rpc_timeout);
     CHECK_EQUAL(1.5, options.slow_tx_tolerance);

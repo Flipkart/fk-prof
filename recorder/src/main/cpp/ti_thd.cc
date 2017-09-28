@@ -66,6 +66,7 @@ struct ThreadTargetProc {
 
     void mark_stopped() {
         std::lock_guard<std::mutex> g(m);
+        assert(state == State::started);
         state = State::stopped;
         v.notify_all();
         logger->trace("Thread '{}' stopped", name);
@@ -123,7 +124,6 @@ ThdProcP start_new_thd(JNIEnv *env, jvmtiEnv *jvmti, const char* thd_name, jvmti
         logger->info("Started thread named '{}'", thd_name);
     } else {
         logger->error("Failed to start thread named '{}' failed with: {}", thd_name, result);
-        ttp->mark_stopped();
     }
     return ttp;
 }

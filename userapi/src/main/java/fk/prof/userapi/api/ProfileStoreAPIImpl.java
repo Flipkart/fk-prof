@@ -77,8 +77,7 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
     @Override
     public void getAppIdsWithPrefix(Future<Set<String>> appIds, String baseDir, String appIdPrefix) {
         /* TODO: move this prefix creation to {@link AggregatedProfileNamingStrategy} */
-        String filterPrefix = (appIdPrefix == null) ? "" : appIdPrefix;
-        getListingAtLevelWithPrefix(appIds, baseDir + DELIMITER + VERSION + DELIMITER, filterPrefix, true);
+        getListingAtLevelWithPrefix(appIds, baseDir + DELIMITER + VERSION + DELIMITER, appIdPrefix, true);
     }
 
     private void getListingAtLevelWithPrefix(Future<Set<String>> listings, String level, String objPrefix, boolean encoded) {
@@ -99,16 +98,14 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
 
     @Override
     public void getClusterIdsWithPrefix(Future<Set<String>> clusterIds, String baseDir, String appId, String clusterIdPrefix) {
-        String filterPrefix = (clusterIdPrefix == null) ? "" : clusterIdPrefix;
         getListingAtLevelWithPrefix(clusterIds, baseDir + DELIMITER + VERSION + DELIMITER + encode(appId) + DELIMITER,
-                filterPrefix, true);
+                clusterIdPrefix, true);
     }
 
     @Override
-    public void getProcNamesWithPrefix(Future<Set<String>> procNames, String baseDir, String appId, String clusterId, String procPrefix) {
-        String filterPrefix = (procPrefix == null) ? "" : procPrefix;
-        getListingAtLevelWithPrefix(procNames, baseDir + DELIMITER + VERSION + DELIMITER + encode(appId) + DELIMITER + encode(clusterId) + DELIMITER,
-                filterPrefix, true);
+    public void getProcsWithPrefix(Future<Set<String>> procIds, String baseDir, String appId, String clusterId, String procPrefix) {
+        getListingAtLevelWithPrefix(procIds, baseDir + DELIMITER + VERSION + DELIMITER + encode(appId) + DELIMITER + encode(clusterId) + DELIMITER,
+                procPrefix, true);
     }
 
     @Override

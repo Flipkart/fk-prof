@@ -1,8 +1,6 @@
 package fk.prof.backend.exception;
 
 
-import com.google.protobuf.InvalidProtocolBufferException;
-
 public class HttpFailure extends RuntimeException {
   private int statusCode = 500;
 
@@ -64,9 +62,6 @@ public class HttpFailure extends RuntimeException {
     }
     if(throwable instanceof IllegalStateException) {
       return new HttpFailure(throwable.getMessage());
-    }
-    if (throwable instanceof InvalidProtocolBufferException) {
-      return new HttpFailure(throwable.getMessage(), 400);
     }
     if (throwable.getMessage() == null) {
       return new HttpFailure("No message provided", throwable.getCause());

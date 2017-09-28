@@ -6,6 +6,7 @@ import fk.prof.userapi.Configuration;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
+import fk.prof.userapi.api.cache.ClusterAwareCache;
 import fk.prof.userapi.model.json.ProtoSerializers;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;
@@ -85,7 +86,7 @@ public class ProfileDiscoveryAPITest {
         vertx = Vertx.vertx();
         asyncStorage = mock(AsyncStorage.class);
         config = UserapiConfigManager.loadConfig(ParseProfileTest.class.getClassLoader().getResource("userapi-conf.json").getFile());
-        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, 30, config.getProfileLoadTimeout(), config.getVertxWorkerPoolSize());
+        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, mock(ClusterAwareCache.class), config);
 
         when(asyncStorage.listAsync(anyString(), anyBoolean())).thenAnswer(invocation -> {
             String path1 = invocation.getArgument(0);
@@ -95,13 +96,12 @@ public class ProfileDiscoveryAPITest {
     }
 
     @Test(timeout = 10000)
-    public void testGetAppIdsWithPrefix(TestContext context) throws Exception {
+    public void TestGetAppIdsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<String, Collection<Object>> appIdTestPairs = new HashMap<String, Collection<Object>>() {
             {
                 put("app", Sets.newSet("app1"));
                 put("", Sets.newSet("app1", "foo"));
-                put(null, Sets.newSet("app1", "foo"));
             }
         };
 
@@ -119,7 +119,7 @@ public class ProfileDiscoveryAPITest {
     }
 
     @Test(timeout = 10000)
-    public void testGetClusterIdsWithPrefix(TestContext context) throws Exception {
+    public void TestGetClusterIdsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<List<String>, Collection<?>> appIdTestPairs = new HashMap<List<String>, Collection<?>>() {
             {
@@ -129,7 +129,6 @@ public class ProfileDiscoveryAPITest {
                 put(Arrays.asList("np", "np"), Sets.newSet());
                 put(Arrays.asList("app1", "b"), Sets.newSet());
                 put(Arrays.asList("", ""), Sets.newSet());
-                put(Arrays.asList("app1", null), Sets.newSet("cluster1"));
             }
         };
 
@@ -147,12 +146,11 @@ public class ProfileDiscoveryAPITest {
     }
 
     @Test(timeout = 10000)
-    public void testGetProcsWithPrefix(TestContext context) throws Exception {
+    public void TestGetProcsWithPrefix(TestContext context) throws Exception {
         Async async = context.async();
         Map<List<String>, Collection<?>> appIdTestPairs = new HashMap<List<String>, Collection<?>>() {
             {
                 put(Arrays.asList("app1", "cluster1", "pr"), Sets.newSet("process1"));
-                put(Arrays.asList("app1", "cluster1", null), Sets.newSet("process1"));
                 put(Arrays.asList("app1", "", ""), Sets.newSet());
                 put(Arrays.asList("foo", "bar", ""), Sets.newSet("main"));
                 put(Arrays.asList("", "", ""), Sets.newSet());
@@ -167,20 +165,16 @@ public class ProfileDiscoveryAPITest {
             f.setHandler(res -> {
                 context.assertEquals(entry.getValue(), res.result());
             });
-            profileDiscoveryAPI.getProcNamesWithPrefix(f, BASE_DIR, entry.getKey().get(0), entry.getKey().get(1), entry.getKey().get(2));
+            profileDiscoveryAPI.getProcsWithPrefix(f, BASE_DIR, entry.getKey().get(0), entry.getKey().get(1), entry.getKey().get(2));
         }
 
         CompositeFuture f = CompositeFuture.all(futures);
         f.setHandler(res -> completeTest(res, context, async));
     }
 
-    @Test(timeout = 10000)
-    public void testGetProfilesInTimeWindow(TestContext context) throws Exception {
+    @Test
+    public void TestGetProfilesInTimeWindow(TestContext context) throws Exception {
         Async async = context.async();
-        FilteredProfiles profile1 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("monitor_contention_work"));
-        FilteredProfiles profile2 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1800), Sets.newSet("monitor_wait_work"));
-        FilteredProfiles profile3 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("thread_sample_work", "cpu_sample_work"));
-
         Map<List<Object>, Collection<?>> appIdTestPairs = new HashMap<List<Object>, Collection<?>>() {
             {
                 put(Arrays.asList("app1", "cluster1", "process1", ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), 1600),

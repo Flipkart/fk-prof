@@ -10,18 +10,20 @@
 
 #endif
 
-const uint MICROS_IN_MILLI = 1000;
+const uint MILLIS_IN_MICRO = 1000;
 
 void sleep_for_millis(uint period) {
 #ifdef WINDOWS
     Sleep(period);
 #else
-    usleep(period * MICROS_IN_MILLI);
+    usleep(period * MILLIS_IN_MICRO);
 #endif
 }
 
-Processor::Processor(jvmtiEnv* _jvmti, Processes&& _processes, std::uint32_t _interval)
-    : jvmti(_jvmti), running(false), processes(_processes), interval(_interval) {}
+Processor::Processor(jvmtiEnv* _jvmti, Processes&& _processes)
+    : jvmti(_jvmti), running(false), processes(_processes),
+
+      s_t_yield_tm(get_metrics_registry().new_timer({METRICS_DOMAIN, "processor", "sched_yield", "time"})) {}
 
 Processor::~Processor() {
     for (auto& p : processes) {
@@ -39,7 +41,10 @@ void Processor::run() {
             break;
         }
 
-        sleep_for_millis(interval);
+        {
+            auto _ = s_t_yield_tm.time_scope();
+            sched_yield();
+        }
     }
 
     for (auto& p : processes) {

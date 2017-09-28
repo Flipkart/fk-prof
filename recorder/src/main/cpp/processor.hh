@@ -20,7 +20,7 @@ typedef std::vector<Process*> Processes;
 class Processor {
 
 public:
-    explicit Processor(jvmtiEnv* _jvmti, Processes&& _tasks, std::uint32_t _interval);
+    explicit Processor(jvmtiEnv* _jvmti, Processes&& _tasks);
 
     ~Processor();
 
@@ -39,9 +39,9 @@ private:
 
     Processes processes;
 
-    std::uint32_t interval;
-
     ThdProcP thd_proc;
+
+    metrics::Timer& s_t_yield_tm;
 
     void startCallback(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg);
 

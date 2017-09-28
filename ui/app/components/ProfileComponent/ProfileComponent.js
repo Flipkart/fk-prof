@@ -144,7 +144,7 @@ class ProfileComponent extends React.Component {
               <div className={`${styles.itemContainer} ${(l.name === selectedTraceName && this.props.profile.start === selectedProfile) && styles.highlighted}`}
               key={l.name}>
                 <Link
-                  to={loc => ({ pathname: `/profile/profile-data/${l.name}`, query: { ...loc.query, profileStart: this.props.profile.start, profileDuration: this.props.profile.duration }})}>
+                  to={loc => ({ pathname: `/profiler/profile-data/${l.name}`, query: { ...loc.query, profileStart: this.props.profile.start, profileDuration: this.props.profile.duration }})}>
                   <span>(</span><span className="mdl-color-text--primary">{l.score}</span><span>)</span>
                   <span>&nbsp;</span>
                   <span>{l.name}</span>

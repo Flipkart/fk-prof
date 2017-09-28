@@ -173,7 +173,6 @@ public class AggregationWindowPlanner {
             ", process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup) +
             ", recording_policy=" + BackendDTOProtoUtil.recordingPolicyCompactRepr(latestRecordingPolicy));
       }
-
       try {
         if(latestRecordingPolicy.getCoveragePct() == 0) {
           mtrWindowSkipZeroCoverage.mark();
@@ -181,31 +180,35 @@ public class AggregationWindowPlanner {
               " for process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup) +
               " because coverage is zero");
         } else {
-          int healthyRecorders = processGroupContextForScheduling.getHealthyRecordersCount();
-
-          if(latestRecordingPolicy.hasMinHealthy() && healthyRecorders < latestRecordingPolicy.getMinHealthy()) {
+          int targetRecordersCount = processGroupContextForScheduling.getRecorderTargetCountToMeetCoverage(latestRecordingPolicy.getCoveragePct());
+          if (targetRecordersCount == 0) {
             mtrWindowSkipUnhealthy.mark();
             logger.info("Skipping aggregation window with index=" + currentAggregationWindowIndex +
                 " for process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup) +
-                " because healthy recorders=" + healthyRecorders + " are less than min required=" + latestRecordingPolicy.getMinHealthy());
+                " because no healthy recorders are known");
           } else {
-            int targetRecordersCount = processGroupContextForScheduling.applyCoverage(healthyRecorders, latestRecordingPolicy.getCoveragePct());
+            Recorder.WorkAssignment.Builder[] workAssignmentBuilders = new Recorder.WorkAssignment.Builder[targetRecordersCount];
+            long workIds[] = new long[targetRecordersCount];
+            for (int i = 0; i < workIds.length; i++) {
+              Recorder.WorkAssignment.Builder workAssignmentBuilder = Recorder.WorkAssignment.newBuilder()
+                  .setWorkId(BitOperationUtil.constructLongFromInts(backendId, workIdCounter++))
+                  .addAllWork(latestRecordingPolicy.getWorkList().stream()
+                      .map(RecorderProtoUtil::translateWorkFromBackendDTO)
+                      .collect(Collectors.toList()))
+                  .setDescription(latestRecordingPolicy.getDescription())
+                  .setDuration(latestRecordingPolicy.getDuration());
 
-
-            if (targetRecordersCount == 0) {
-              mtrWindowSkipUnhealthy.mark();
-              logger.info("Skipping aggregation window with index=" + currentAggregationWindowIndex +
-                  " for process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup) +
-                  " because healthy recorders=" + healthyRecorders + " are not enough to meet coverage=" + latestRecordingPolicy.getCoveragePct());
-            } else {
-              setupAggregationWindow(targetRecordersCount);
-              mtrWindowInitSuccess.mark();
-              ctrActiveWindows.inc();
-              logger.info("Initialized aggregation window with index=" + currentAggregationWindowIndex +
-                  ", process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup) +
-                  ", recording_policy=" + BackendDTOProtoUtil.recordingPolicyCompactRepr(latestRecordingPolicy) +
-                  ", work_count=" + targetRecordersCount);
+              workAssignmentBuilders[i] = workAssignmentBuilder;
+              workIds[i] = workAssignmentBuilder.getWorkId();
             }
+
+            setupAggregationWindow(workAssignmentBuilders, workIds);
+            mtrWindowInitSuccess.mark();
+            ctrActiveWindows.inc();
+            logger.info("Initialized aggregation window with index=" + currentAggregationWindowIndex +
+                ", process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup) +
+                ", recording_policy=" + BackendDTOProtoUtil.recordingPolicyCompactRepr(latestRecordingPolicy) +
+                ", work_count=" + targetRecordersCount);
           }
         }
       } catch (Exception ex) {
@@ -232,23 +235,8 @@ public class AggregationWindowPlanner {
     });
   }
 
-  private void setupAggregationWindow(int targetRecordersCount)
+  private void setupAggregationWindow(Recorder.WorkAssignment.Builder[] workAssignmentBuilders, long[] workIds)
       throws Exception {
-    Recorder.WorkAssignment.Builder[] workAssignmentBuilders = new Recorder.WorkAssignment.Builder[targetRecordersCount];
-    long workIds[] = new long[targetRecordersCount];
-    for (int i = 0; i < workIds.length; i++) {
-      Recorder.WorkAssignment.Builder workAssignmentBuilder = Recorder.WorkAssignment.newBuilder()
-          .setWorkId(BitOperationUtil.constructLongFromInts(backendId, workIdCounter++))
-          .addAllWork(latestRecordingPolicy.getWorkList().stream()
-              .map(RecorderProtoUtil::translateWorkFromBackendDTO)
-              .collect(Collectors.toList()))
-          .setDescription(latestRecordingPolicy.getDescription())
-          .setDuration(latestRecordingPolicy.getDuration());
-
-      workAssignmentBuilders[i] = workAssignmentBuilder;
-      workIds[i] = workAssignmentBuilder.getWorkId();
-    }
-
     LocalDateTime windowStart = LocalDateTime.now(Clock.systemUTC());
     WorkAssignmentSchedule workAssignmentSchedule = new WorkAssignmentSchedule(workAssignmentScheduleBootstrapConfig, workAssignmentBuilders, latestRecordingPolicy.getDuration(), processGroupTag);
     int requiredSlots = workAssignmentSchedule.getMaxOverlap() * WorkSlotWeightCalculator.weight(latestRecordingPolicy);

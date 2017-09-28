@@ -1,6 +1,7 @@
 #include "perf_ctx_jni.hh"
 #include "perf_ctx.hh"
 #include "globals.hh"
+#include <sstream>
 #include "thread_map.hh"
 
 PerfCtx::MergeSemantic PerfCtx::merge_semantic(PerfCtx::TracePt pt) {

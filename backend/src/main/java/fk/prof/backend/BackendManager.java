@@ -1,9 +1,6 @@
 package fk.prof.backend;
 
-import com.codahale.metrics.InstrumentedExecutorService;
-import com.codahale.metrics.Meter;
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.SharedMetricRegistries;
+import com.codahale.metrics.*;
 import com.google.common.base.Preconditions;
 import fk.prof.aggregation.model.AggregationWindowStorage;
 import fk.prof.backend.deployer.VerticleDeployer;
@@ -11,25 +8,22 @@ import fk.prof.backend.deployer.impl.*;
 import fk.prof.backend.http.ApiPathConstants;
 import fk.prof.backend.leader.election.LeaderElectedTask;
 import fk.prof.backend.model.aggregation.ActiveAggregationWindows;
-import fk.prof.backend.model.aggregation.impl.ActiveAggregationWindowsImpl;
 import fk.prof.backend.model.assignment.AssociatedProcessGroups;
 import fk.prof.backend.model.assignment.impl.AssociatedProcessGroupsImpl;
+import fk.prof.backend.model.slot.WorkSlotPool;
 import fk.prof.backend.model.association.BackendAssociationStore;
 import fk.prof.backend.model.association.ProcessGroupCountBasedBackendComparator;
 import fk.prof.backend.model.association.impl.ZookeeperBasedBackendAssociationStore;
 import fk.prof.backend.model.election.impl.InMemoryLeaderStore;
+import fk.prof.backend.model.aggregation.impl.ActiveAggregationWindowsImpl;
 import fk.prof.backend.model.policy.PolicyStore;
-import fk.prof.backend.model.policy.ZookeeperBasedPolicyStore;
-import fk.prof.backend.model.slot.WorkSlotPool;
 import fk.prof.metrics.MetricName;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.S3AsyncStorage;
 import fk.prof.storage.S3ClientFactory;
 import fk.prof.storage.buffer.ByteBufferPoolFactory;
-import io.vertx.core.CompositeFuture;
+import io.vertx.core.*;
 import io.vertx.core.Future;
-import io.vertx.core.Vertx;
-import io.vertx.core.VertxOptions;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.metrics.MetricsOptions;
@@ -47,8 +41,6 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
-
-import static fk.prof.backend.util.ZookeeperUtil.DELIMITER;
 
 public class BackendManager {
   private static Logger logger = LoggerFactory.getLogger(BackendManager.class);
@@ -117,8 +109,8 @@ public class BackendManager {
               .collect(Collectors.toList());
 
           BackendAssociationStore backendAssociationStore = createBackendAssociationStore(vertx, curatorClient);
+          PolicyStore policyStore = new PolicyStore(curatorClient);
 
-          PolicyStore policyStore = createPolicyStore(vertx, curatorClient);
           VerticleDeployer leaderHttpVerticleDeployer = new LeaderHttpVerticleDeployer(vertx, config, backendAssociationStore, policyStore);
           Runnable leaderElectedTask = createLeaderElectedTask(vertx, leaderHttpVerticleDeployer, backendDeployments, backendAssociationStore, policyStore);
 
@@ -187,11 +179,6 @@ public class BackendManager {
     } catch (KeeperException.NodeExistsException ex) {
       logger.warn(ex);
     }
-    try {
-      curatorClient.create().creatingParentsIfNeeded().forPath(DELIMITER + config.getPolicyBaseDir() + DELIMITER + config.getPolicyVersion());
-    } catch (KeeperException.NodeExistsException ex) {
-      logger.warn(ex);
-    }
   }
 
   private BackendAssociationStore createBackendAssociationStore(
@@ -202,10 +189,6 @@ public class BackendManager {
     int loadMissTolerance = config.getAssociationsConfig().getLoadMissTolerance();
     return new ZookeeperBasedBackendAssociationStore(vertx, curatorClient, backendAssociationPath,
         loadReportIntervalInSeconds, loadMissTolerance, new ProcessGroupCountBasedBackendComparator());
-  }
-
-  private PolicyStore createPolicyStore(Vertx vertx, CuratorFramework curatorClient) {
-    return new ZookeeperBasedPolicyStore(vertx, curatorClient, config.getPolicyBaseDir(), config.getPolicyVersion());
   }
 
   public static Runnable createLeaderElectedTask(Vertx vertx, VerticleDeployer leaderHttpVerticleDeployer, List<String> backendDeployments,
@@ -224,18 +207,9 @@ public class BackendManager {
         .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.AGGREGATOR_POST_PROFILE).setType(MatchType.EQUALS))
         .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.BACKEND_POST_POLL).setType(MatchType.EQUALS))
         .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.BACKEND_POST_ASSOCIATION).setType(MatchType.EQUALS))
-        .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.APPS_PREFIX + ".*").setAlias(ApiPathConstants.APPS_PREFIX).setType(MatchType.REGEX))
-        .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.CLUSTERS_PREFIX + ".*").setAlias(ApiPathConstants.CLUSTERS_PREFIX).setType(MatchType.REGEX))
-        .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.PROCS_PREFIX + ".*").setAlias(ApiPathConstants.PROCS_PREFIX).setType(MatchType.REGEX))
-        .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.POLICY_PREFIX + ".*").setAlias(ApiPathConstants.POLICY_PREFIX).setType(MatchType.REGEX))
-
         .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.LEADER_POST_ASSOCIATION).setType(MatchType.EQUALS))
         .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.LEADER_POST_LOAD).setType(MatchType.EQUALS))
-        .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.LEADER_GET_WORK + ".*").setAlias(ApiPathConstants.LEADER_GET_WORK).setType(MatchType.REGEX))
-        .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.LEADER_PREFIX + ApiPathConstants.APPS_PREFIX + ".*").setAlias(ApiPathConstants.LEADER_PREFIX + ApiPathConstants.APPS_PREFIX).setType(MatchType.REGEX))
-        .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.LEADER_PREFIX + ApiPathConstants.CLUSTERS_PREFIX + ".*").setAlias(ApiPathConstants.LEADER_PREFIX + ApiPathConstants.CLUSTERS_PREFIX).setType(MatchType.REGEX))
-        .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.LEADER_PREFIX + ApiPathConstants.PROCS_PREFIX + ".*").setAlias(ApiPathConstants.LEADER_PREFIX + ApiPathConstants.PROCS_PREFIX ).setType(MatchType.REGEX))
-        .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.LEADER_PREFIX + ApiPathConstants.POLICY_PREFIX + ".*").setAlias(ApiPathConstants.LEADER_PREFIX + ApiPathConstants.POLICY_PREFIX).setType(MatchType.REGEX));
+        .addMonitoredHttpServerUri(new Match().setValue(ApiPathConstants.LEADER_GET_WORK + ".*").setAlias(ApiPathConstants.LEADER_GET_WORK).setType(MatchType.REGEX));
     return metricsOptions;
   }
 
