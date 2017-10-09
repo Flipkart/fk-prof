@@ -3,6 +3,8 @@
 #include <iostream>
 #include "test.hh"
 #include <util.hh>
+#include <boost/asio.hpp>
+#include <ftrace/proto.hh>
 
 TEST(Util_content_upto_when_line_is_found) {
     std::regex r("^int main.+");
@@ -60,4 +62,37 @@ TEST(Util_first_content_line_matching__when_multiple_matches_exist) {
     auto content = Util::first_content_line_matching("src/test/cpp/main.cc", r);
     auto expectd = "#include \"TestReporterStdout.h\"";
     CHECK_EQUAL(expectd, content);
+}
+
+TEST(ftrace_client) {
+    using boost::asio::local::stream_protocol;
+    try {
+        boost::asio::io_service io_service;
+        stream_protocol::socket s(io_service);
+        s.connect(stream_protocol::endpoint("/var/tmp/fkp-tracer.sock"));
+
+        ftrace::v_curr::Header h = { .v = ftrace::v_curr::VERSION, .type = ftrace::v_curr::add_tid };
+        ftrace::v_curr::payload::AddTid p = 10953;
+        h.len = sizeof(h) + sizeof(p);
+
+        std::vector<boost::asio::const_buffer> buffers;
+        buffers.push_back(boost::asio::buffer(&h, sizeof(h)));
+        buffers.push_back(boost::asio::buffer(&p, sizeof(p)));
+        boost::asio::write(s, buffers);
+
+        while(true) {
+            char reply[4096];
+            size_t reply_length = boost::asio::read(s, boost::asio::buffer(reply, h.len));
+            if(reply_length > 0) {
+                std::cout << "Reply: " << reply;
+            } else if (reply_length == 0) {
+                std::cout << "closed connection probably";
+            } else {
+                std::cout << "not sure what to do now";
+            }
+        }
+
+    } catch (std::exception& e) {
+        std::cerr << "Exception: " << e.what() << "\n";
+    }
 }

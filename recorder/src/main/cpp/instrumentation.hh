@@ -5,7 +5,9 @@
 #include <jvmti.h>
 #include "config.hh"
 
-namespace Crw { // copied from java_crw_demo.h
+// copied from java_crw_demo.h: https://github.com/twitter/jvmgcprof/blob/master/java_crw_demo/java_crw_demo.h
+// docs: https://github.com/twitter/jvmgcprof/tree/master/java_crw_demo
+namespace Crw {
     typedef void (*FatalErrorHandler)(const char*message, const char*file, int line);
 
     typedef void (*MethodNumberRegister)(unsigned, const char**, const char**, int);

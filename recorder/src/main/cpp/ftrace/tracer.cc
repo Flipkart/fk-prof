@@ -36,7 +36,7 @@ std::uint16_t cpus_present() {
     std::string content;
     in >> content;
     auto idx = content.find('-');
-    return Util::stoun<std::uint16_t>(content.substr(idx + 1));
+    return Util::stoun<std::uint16_t>(content.substr(idx + 1)) + 1;
 }
 
 static void populate_data_links(const std::string& instance_path, std::list<ftrace::Tracer::DataLink>& dls, std::function<void(const ftrace::Tracer::DataLink&)>& data_link_listener) {
