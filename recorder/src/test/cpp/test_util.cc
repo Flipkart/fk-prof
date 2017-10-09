@@ -5,6 +5,7 @@
 #include <util.hh>
 #include <boost/asio.hpp>
 #include <ftrace/proto.hh>
+#include <fstream>
 
 TEST(Util_content_upto_when_line_is_found) {
     std::regex r("^int main.+");
@@ -65,6 +66,16 @@ TEST(Util_first_content_line_matching__when_multiple_matches_exist) {
 }
 
 TEST(ftrace_client) {
+    TestEnv _;
+    logger->info("Starting ftrace client test");
+    std::ifstream ctrlfile ("/tmp/fclient_test");
+    if (!ctrlfile.is_open())
+    {
+        throw "Error opening ftrace client test config file: /tmp/fclient_test";
+    }
+    int tid;
+    ctrlfile >> tid;
+
     using boost::asio::local::stream_protocol;
     try {
         boost::asio::io_service io_service;
@@ -72,7 +83,8 @@ TEST(ftrace_client) {
         s.connect(stream_protocol::endpoint("/var/tmp/fkp-tracer.sock"));
 
         ftrace::v_curr::Header h = { .v = ftrace::v_curr::VERSION, .type = ftrace::v_curr::add_tid };
-        ftrace::v_curr::payload::AddTid p = 10953;
+        ftrace::v_curr::payload::AddTid p = tid;
+        logger->info("Add tid");
         h.len = sizeof(h) + sizeof(p);
 
         std::vector<boost::asio::const_buffer> buffers;
@@ -84,11 +96,11 @@ TEST(ftrace_client) {
             char reply[4096];
             size_t reply_length = boost::asio::read(s, boost::asio::buffer(reply, h.len));
             if(reply_length > 0) {
-                std::cout << "Reply: " << reply;
+                logger->info("Reply: {}", reply);
             } else if (reply_length == 0) {
-                std::cout << "closed connection probably";
+                logger->info("closed connection probably");
             } else {
-                std::cout << "not sure what to do now";
+                logger->info("not sure what to do now");
             }
         }
 
