@@ -223,6 +223,7 @@ void ftrace::Server::do_add_tid(ClientFd fd, v_curr::payload::AddTid* payload) {
     it->second->tids.insert(pid);
     pids_client[pid] = fd;
     tracer->trace_on(pid, reinterpret_cast<void*>(static_cast<std::uint64_t>(fd)));
+    logger->info("Tracking pid {} for ftrace events", pid);
 }
 
 void ftrace::Server::do_del_tid(ClientFd fd, v_curr::payload::DelTid* payload) {
@@ -238,6 +239,7 @@ void ftrace::Server::do_del_tid(ClientFd fd, v_curr::payload::DelTid* payload) {
     }
     it->second->tids.erase(pid);
     pids_client.erase(pid);
+    logger->info("Removing tracking for pid {}", pid);
 }
 
 void ftrace::Server::handle_pkt(ClientFd fd, v_curr::PktType type, std::uint8_t* buff, size_t len) {
@@ -284,7 +286,7 @@ void ftrace::Server::handle_client_requests(ClientFd fd) {
                 auto h = reinterpret_cast<v_curr::Header*>(buff);
                 auto pkt_len = h->len;
                 if (read_sz >= pkt_len) {
-                    handle_pkt(fd, h->type, buff, pkt_len - hdr_sz);
+                    handle_pkt(fd, h->type, buff + hdr_sz, pkt_len - hdr_sz);
                     buff += pkt_len;
                     read_sz -= pkt_len;
                 } else {
@@ -322,10 +324,11 @@ void ftrace::Server::handle_client_requests(ClientFd fd) {
                     memcpy(sess.part_msg + sess.part_msg_len, buff, missing_header_bytes);
                     buff += missing_header_bytes;
                     read_sz -= missing_header_bytes;
+                    sess.part_msg_len += missing_header_bytes;
                     auto h = reinterpret_cast<v_curr::Header*>(sess.part_msg);
                     auto pkt_len = h->len;
-                    if (read_sz >= pkt_len) {
-                        auto payload_sz = pkt_len - hdr_sz;
+                    auto payload_sz = pkt_len - hdr_sz;
+                    if (read_sz >= payload_sz) {
                         handle_pkt(fd, h->type, buff, payload_sz);
                         buff += payload_sz;
                         read_sz -= payload_sz;

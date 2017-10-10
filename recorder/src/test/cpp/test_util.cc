@@ -73,7 +73,7 @@ TEST(ftrace_client) {
     {
         throw "Error opening ftrace client test config file: /tmp/fclient_test";
     }
-    int tid;
+    uint32_t tid;
     ctrlfile >> tid;
 
     using boost::asio::local::stream_protocol;
@@ -84,7 +84,7 @@ TEST(ftrace_client) {
 
         ftrace::v_curr::Header h = { .v = ftrace::v_curr::VERSION, .type = ftrace::v_curr::add_tid };
         ftrace::v_curr::payload::AddTid p = tid;
-        logger->info("Add tid");
+        logger->info("Add tid {}", tid);
         h.len = sizeof(h) + sizeof(p);
 
         std::vector<boost::asio::const_buffer> buffers;
