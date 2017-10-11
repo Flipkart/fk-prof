@@ -125,7 +125,7 @@ struct ftrace::ClientSession {
 
     std::uint8_t part_msg_len;
 
-    const static size_t max_msg_sz = 1 << sizeof((part_msg_len * 8) - 1);
+    const static size_t max_msg_sz = (1 << (sizeof(part_msg_len) * 8)) - 1;
 
     std::uint8_t part_msg[max_msg_sz];//partial message
 
@@ -304,7 +304,7 @@ void ftrace::Server::handle_client_requests(ClientFd fd) {
                 auto h = reinterpret_cast<v_curr::Header*>(sess.part_msg);
                 auto pkt_len = h->len;
                 auto payload_sz = pkt_len - hdr_sz;
-                auto missing_payload_bytes = payload_sz - sess.part_msg_len;
+                auto missing_payload_bytes = pkt_len - sess.part_msg_len;
                 assert(missing_payload_bytes > 0);
                 if (read_sz >= missing_payload_bytes) {
                     memcpy(sess.part_msg + sess.part_msg_len, buff, missing_payload_bytes);
@@ -314,8 +314,8 @@ void ftrace::Server::handle_client_requests(ClientFd fd) {
                     sess.part_msg_len = 0;
                 } else {
                     memcpy(sess.part_msg + sess.part_msg_len, buff, read_sz);
-                    read_sz = 0;
                     sess.part_msg_len += read_sz;
+                    read_sz = 0;
                 }
             } else {
                 auto missing_header_bytes = (hdr_sz - sess.part_msg_len);
