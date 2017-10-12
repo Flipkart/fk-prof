@@ -31,16 +31,8 @@ static int open_file(const std::string& instance_path, const std::string& subpat
     return open(path.c_str(), flags);
 }
 
-std::uint16_t cpus_present() {
-    std::fstream in{"/sys/devices/system/cpu/present", std::ios_base::in};
-    std::string content;
-    in >> content;
-    auto idx = content.find('-');
-    return Util::stoun<std::uint16_t>(content.substr(idx + 1)) + 1;
-}
-
 static void populate_data_links(const std::string& instance_path, std::list<ftrace::Tracer::DataLink>& dls, std::function<void(const ftrace::Tracer::DataLink&)>& data_link_listener) {
-    std::uint16_t nr_cpu = cpus_present();
+    unsigned nr_cpu = std::thread::hardware_concurrency();
     for (std::uint16_t c = 0; c < nr_cpu; c++) {
         auto cpu_dir = CPU_DIR_PREFIX + std::to_string(c);
         auto ring_fd = open_file(instance_path, cpu_dir + PER_CPU_RAW_TRACE_PIPE, O_RDONLY);
