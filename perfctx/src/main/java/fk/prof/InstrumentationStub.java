@@ -20,5 +20,16 @@ public class InstrumentationStub {
             evtReturn();
         }
     }
+
+    @SuppressWarnings("unused")
+    public static void entryTracepoint() {
+        System.out.println("Method ENTRY: " + Thread.currentThread().getStackTrace()[2].getMethodName());
+    }
+
+    @SuppressWarnings("unused")
+    public static void exitTracepoint() {
+        System.out.println("Method EXIT: " + Thread.currentThread().getStackTrace()[2].getMethodName());
+    }
+
 }
 
