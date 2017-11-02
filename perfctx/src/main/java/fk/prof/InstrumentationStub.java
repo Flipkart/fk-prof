@@ -22,6 +22,11 @@ public class InstrumentationStub {
     }
 
     @SuppressWarnings("unused")
+    public static void fsOpEndTracepoint(long elapsed, String filename, int fd) {
+        System.out.println("fsOpEndTracepoint method=" +  Thread.currentThread().getStackTrace()[2].getMethodName() + ", elapsed=" + elapsed + ", filename=" + filename + ", fd=" + fd);
+    }
+
+    @SuppressWarnings("unused")
     public static void entryTracepoint() {
         System.out.println("Method ENTRY: " + Thread.currentThread().getStackTrace()[2].getMethodName());
     }
