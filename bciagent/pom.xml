@@ -31,7 +31,7 @@
               <Premain-Class>fk.prof.bciagent.BciAgent</Premain-Class>
               <Can-Retransform-Classes>true</Can-Retransform-Classes>
               <Can-Redefine-Classes>true</Can-Redefine-Classes>
-              <Boot-Class-Path>/Users/ankurjain.v/code/fk-prof/perfctx/target/perfctx-2.0-SNAPSHOT.jar</Boot-Class-Path>
+              <Boot-Class-Path>../../perfctx/target/perfctx-2.0-SNAPSHOT.jar</Boot-Class-Path>
             </manifestEntries>
           </archive>
         </configuration>
