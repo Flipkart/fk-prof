@@ -14,6 +14,8 @@ public class InstrumentationStub {
 
     private static native void evtReturn();
 
+    private static native void fsMethodExit(long elapsed, int fd, String filename);
+
     @SuppressWarnings("unused")
     public static void returnTracepoint(int var0, int var1) {
         if (engaged) {
@@ -24,6 +26,7 @@ public class InstrumentationStub {
     @SuppressWarnings("unused")
     public static void fsOpEndTracepoint(long elapsed, String filename, int fd) {
         System.out.println("fsOpEndTracepoint method=" +  Thread.currentThread().getStackTrace()[2].getMethodName() + ", elapsed=" + elapsed + ", filename=" + filename + ", fd=" + fd);
+        fsMethodExit(elapsed, fd, filename);
     }
 
     @SuppressWarnings("unused")

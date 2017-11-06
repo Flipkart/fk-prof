@@ -146,6 +146,7 @@ set(SOURCE_FILES
     ${SRC}/config.cc
     ${SRC}/scheduler.hh
     ${SRC}/scheduler.cc
+    ${SRC}/instrumentation_stub.hh
     ${SRC}/util.hh
     ${SRC}/perf_ctx_jni.hh
     ${SRC}/perf_ctx.hh
