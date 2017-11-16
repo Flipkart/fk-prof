@@ -1,12 +1,7 @@
 package fk.prof.bciagenttest;
 
-import fk.prof.InstrumentationStub;
-
-import java.io.BufferedReader;
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.lang.reflect.Field;
+import java.io.*;
+import java.net.URL;
 
 public class BciTest {
   @ProfileOffCpu
@@ -67,11 +62,28 @@ public class BciTest {
     }
   }
 
-  public static void main(String[] args)  throws InterruptedException {
+  public void httpRequest() {
+    try {
+      URL url = new URL("http://www.google.com/");
+      InputStream is = url.openStream();
+      InputStreamReader isr = new InputStreamReader(is);
+      BufferedReader in = new BufferedReader(isr);
+
+      String inputLine;
+      while ((inputLine = in.readLine()) != null)
+        System.out.println(inputLine);
+      in.close();
+    } catch (Exception ex) {
+      ex.printStackTrace();
+    }
+  }
+
+  public static void main(String[] args)  throws Exception, InterruptedException {
     BciTest t = new BciTest();
 //    t.profiledRun();
 //    t.run();
     t.fileRead();
 //    t.exceptionRun();
+    t.httpRequest();
   }
 }
