@@ -23,7 +23,7 @@
   <build>
     <plugins>
       <plugin>
-        <artifactId>maven-jar-plugin</artifactId>`
+        <artifactId>maven-jar-plugin</artifactId>
         <version>${maven.jar.version}</version>
         <configuration>
           <archive>

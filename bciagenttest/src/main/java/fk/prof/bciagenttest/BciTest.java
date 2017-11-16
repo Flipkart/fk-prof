@@ -42,24 +42,19 @@ public class BciTest {
   }
 
   public void fileRead() {
-    InstrumentationStub.entryTracepoint();
     BufferedReader br = null;
     FileReader fr = null;
     try {
       fr = new FileReader("/tmp/hello");
       br = new BufferedReader(fr);
-      Field[] farr = FileReader.class.getDeclaredFields();
-      for(Field f: farr) {
-        if(f.getName().equals("lock")) {
-          System.out.println("Found fileinputstream object");
-          FileInputStream b = (FileInputStream) f.get(fr);
-          System.out.println(b);
-        }
+      char[] buff = new char[16384];
+      long readChars, totalChars = 0;
+      while ((readChars = br.read(buff)) != -1) {
+//        System.out.println(sCurrentLine);
+        totalChars += readChars;
+        System.out.println("total chars read till now: " + totalChars);
       }
-      String sCurrentLine;
-      while ((sCurrentLine = br.readLine()) != null) {
-        System.out.println(sCurrentLine);
-      }
+      System.out.println("Total chars: "  + totalChars);
     } catch (Exception e) {
       e.printStackTrace();
     } finally {

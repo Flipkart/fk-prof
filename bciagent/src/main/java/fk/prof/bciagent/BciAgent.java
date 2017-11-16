@@ -12,15 +12,15 @@ public class BciAgent {
     System.out.println("Starting the agent");
     Class[] classes = inst.getAllLoadedClasses();
     List<Class> modifiableClasses = new ArrayList<>();
-    System.out.println("Already loaded classes\n--------------");
+//    System.out.println("Already loaded classes\n--------------");
     for(int i = 0; i< classes.length;i++) {
       boolean isModifiable = inst.isModifiableClass(classes[i]);
-      System.out.println(isModifiable + " " + classes[i].getName());
+//      System.out.println(isModifiable + " " + classes[i].getName());
       if(isModifiable) {
         modifiableClasses.add(classes[i]);
       }
     }
-    System.out.println("----------------------");
+//    System.out.println("----------------------");
 
     ClassFileTransformer transformer = new ProfileMethodTransformer();
     inst.addTransformer(transformer, true);
