@@ -1,6 +1,7 @@
 package fk.prof.bciagenttest;
 
 import java.io.*;
+import java.net.Socket;
 import java.net.URL;
 
 public class BciTest {
@@ -62,7 +63,7 @@ public class BciTest {
     }
   }
 
-  public void httpRequest() {
+  public void httpRequest() throws Exception {
     try {
       URL url = new URL("http://www.google.com/");
       InputStream is = url.openStream();
@@ -76,6 +77,8 @@ public class BciTest {
     } catch (Exception ex) {
       ex.printStackTrace();
     }
+    Socket s = new Socket("stackoverflow.com", 80);
+    s.close();
   }
 
   public static void main(String[] args)  throws Exception, InterruptedException {

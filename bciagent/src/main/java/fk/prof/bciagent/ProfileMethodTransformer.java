@@ -41,17 +41,15 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     hooksMap.put("read([BII)I", fs_default);
     hooksMap.put("close()V", fs_close);
 
-    //creates recursion with print statements in bci code. uncomment when moving to jni
+    //creates recursion with print statements in bci code. uncomment when moving to jni and add hooks for open, write, close
 //    klass = "java.io.FileOutputStream";
 //    hooksMap = new HashMap<>();
 //    INSTRUMENTED_CLASSES.put(klass, hooksMap);
-//    hooksMap.put("open", fs_open);
-//    hooksMap.put("write", fs_default);
-//    hooksMap.put("close", fs_close);
 
     MethodInstrumentHooks sock_input_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_sock_mentry, ProfileMethodTransformer::instrument_sock_input_mexit);
     MethodInstrumentHooks sock_output_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_sock_mentry, ProfileMethodTransformer::instrument_sock_output_mexit);
     MethodInstrumentHooks sock_close = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_sock_close_mentry, ProfileMethodTransformer::instrument_sock_close_mexit);
+    MethodInstrumentHooks sock_connect = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_sock_mentry, ProfileMethodTransformer::instrument_sock_connect_mexit);
 
     klass = "java.net.SocketInputStream";
     hooksMap = new HashMap<>();
@@ -66,6 +64,11 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     INSTRUMENTED_CLASSES.put(klass, hooksMap);
     hooksMap.put("socketWrite([BII)V", sock_output_default);
     hooksMap.put("close()V", sock_close);
+
+    klass = "java.net.Socket";
+    hooksMap = new HashMap<>();
+    INSTRUMENTED_CLASSES.put(klass, hooksMap);
+    hooksMap.put("connect(Ljava/net/SocketAddress;I)V", sock_connect);
   }
 
   public ProfileMethodTransformer() {
@@ -85,7 +88,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
         Map<String, MethodInstrumentHooks> methodsToInstrument = INSTRUMENTED_CLASSES.get(cclass.getName());
         if(methodsToInstrument != null && methodsToInstrument.size() > 0) {
           for (CtMethod currentMethod : cclass.getDeclaredMethods()) {
-            //System.out.println("Declared method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
+//            System.out.println("Declared method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
             MethodInstrumentHooks hooks;
             if (((hooks = methodsToInstrument.get(currentMethod.getName() + currentMethod.getSignature())) != null) && !Modifier.isNative(currentMethod.getModifiers()) && !currentMethod.isEmpty()) {
               System.out.println("Transformed method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
@@ -170,6 +173,17 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     jStr += "fdField.setAccessible(true);";
     jStr += "int $$$_fd = this.impl.getFileDescriptor() != null ? fdField.getInt(this.impl.getFileDescriptor()) : -1;";
     jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" written=\" + ($3 - $2) + \" elapsed=\" + " + elapsedLocalVar + ");";
+    //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
+    m.insertAfter(jStr, true);
+  }
+
+  private static void instrument_sock_connect_mexit(CtMethod m) throws Exception {
+    String jStr = "";
+    jStr += elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
+    jStr += "java.lang.reflect.Field fdField = (this.impl == null || this.impl.getFileDescriptor() == null) ? null : this.impl.getFileDescriptor().getClass().getDeclaredField(\"fd\");";
+    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
+    jStr += "int $$$_fd = fdField != null ? fdField.getInt(this.impl.getFileDescriptor()) : -1;";
+    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" connected=\" + connected + \" addr=\" + $1 + \" elapsed=\" + " + elapsedLocalVar + ");";
     //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
     m.insertAfter(jStr, true);
   }
