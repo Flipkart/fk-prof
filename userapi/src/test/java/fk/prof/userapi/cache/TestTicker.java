@@ -1,4 +1,4 @@
-package fk.prof.userapi.api.cache;
+package fk.prof.userapi.cache;
 
 import com.google.common.base.Ticker;
 

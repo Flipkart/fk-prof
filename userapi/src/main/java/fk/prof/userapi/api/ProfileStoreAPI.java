@@ -1,12 +1,8 @@
 package fk.prof.userapi.api;
 
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
-import fk.prof.userapi.Pair;
-import fk.prof.userapi.model.AggregatedProfileInfo;
-import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
-import fk.prof.userapi.model.AggregationWindowSummary;
-import fk.prof.userapi.model.tree.CallTreeView;
-import fk.prof.userapi.model.tree.CalleesTreeView;
+import fk.prof.userapi.model.*;
+import fk.prof.userapi.util.Pair;
 import io.vertx.core.Future;
 
 import java.time.ZonedDateTime;
@@ -77,18 +73,12 @@ public interface ProfileStoreAPI {
     void loadSummary(Future<AggregationWindowSummary> future, AggregatedProfileNamingStrategy filename);
 
     /**
-     * Get/Create a callerTree view for the trace
+     * Get/Create a CPISamplingTreeView for the trace
      * @param profileName
      * @param traceName
-     * @return Future containing calltree view and the associated aggregated samples.
+     * @param viewType
+     * @param <T>
+     * @return Future containing treeView (Callee/Caller) view and the associated aggregated samples
      */
-    Future<Pair<AggregatedSamplesPerTraceCtx,CallTreeView>> getCpuSamplingCallersTreeView(AggregatedProfileNamingStrategy profileName, String traceName);
-
-    /**
-     * Get/Create a calleeTree view for the trace
-     * @param profileName
-     * @param traceName
-     * @return Future containing calleetree view and the associated aggregated samples.
-     */
-    Future<Pair<AggregatedSamplesPerTraceCtx,CalleesTreeView>> getCpuSamplingCalleesTreeView(AggregatedProfileNamingStrategy profileName, String traceName);
+    <T extends TreeView> Future<Pair<AggregatedSamplesPerTraceCtx,T>> getCPUSamplingTreeView(AggregatedProfileNamingStrategy profileName, String traceName, StacktraceTreeViewType viewType);
 }

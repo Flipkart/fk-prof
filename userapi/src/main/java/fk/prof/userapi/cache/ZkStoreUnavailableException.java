@@ -1,6 +1,6 @@
-package fk.prof.userapi.api.cache;
+package fk.prof.userapi.cache;
 
-import fk.prof.userapi.ServiceUnavailableException;
+import fk.prof.userapi.http.ServiceUnavailableException;
 
 /**
  * Created by gaurav.ashok on 03/08/17.

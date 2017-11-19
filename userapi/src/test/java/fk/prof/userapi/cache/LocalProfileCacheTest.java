@@ -1,14 +1,14 @@
-package fk.prof.userapi.api.cache;
+package fk.prof.userapi.cache;
 
 import com.google.common.cache.RemovalListener;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.userapi.Configuration;
-import fk.prof.userapi.Pair;
+import fk.prof.userapi.model.tree.CallTreeView;
+import fk.prof.userapi.util.Pair;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.model.AggregatedProfileInfo;
-import fk.prof.userapi.model.tree.CallTreeView;
 import io.vertx.core.Future;
 import org.junit.Assert;
 import org.junit.Before;
@@ -96,7 +96,7 @@ public class LocalProfileCacheTest {
         Assert.assertNull(profileViewPair.second);
 
         // force the cleanup
-        cache.claenUp();
+        cache.cleanUp();
 
         verify(listener, times(1)).onRemoval(any());
     }

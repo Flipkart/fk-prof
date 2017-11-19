@@ -2,7 +2,7 @@ package fk.prof.userapi.model.tree;
 
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
-import fk.prof.userapi.Cacheable;
+import fk.prof.userapi.cache.Cacheable;
 import fk.prof.userapi.model.Tree;
 
 import java.io.IOException;
@@ -15,17 +15,32 @@ import java.util.NoSuchElementException;
 /**
  * Created by gaurav.ashok on 01/06/17.
  */
-public class CallTree implements Tree<FrameNode>, Cacheable {
+public class CallTree implements Tree<FrameNode>, Cacheable<Tree> {
 
-    protected List<FrameNode> nodes;
+    private List<FrameNode> nodes;
     private int[] subtreeSizes;
     private int[] parentIds;
 
+    /**
+     * Constructor for creating a CallTree from a list of FrameNodes orders in a dfs manner. i.e.
+     * first node should be the root node and then followed by its subtree, with the subtree ordered
+     * in the same way recursively.
+     * @param frameNodes the list of frameNodes
+     */
     public CallTree(List<FrameNode> frameNodes) {
         this.nodes = frameNodes;
         treeify();
     }
 
+    /**
+     * Parses a serialized tree from provided inputStream into a CallTree object. Input should be a dfs serialization
+     * of the tree i.e. first node should be the root node and then followed by its subtree, with the subtree serialized
+     * using the same definition recursively.
+     *
+     * @param in the inputStream providing parsable FrameNodes
+     * @return the instantiated CallTree object from the FrameNodes provided by the inputStream
+     * @throws IOException when inputStream is not parseable
+     */
     public static CallTree parseFrom(InputStream in) throws IOException {
         int nodeCount = 1; // for root node
         int parsedNodeCount = 0;
@@ -43,19 +58,19 @@ public class CallTree implements Tree<FrameNode>, Cacheable {
     }
 
     @Override
-    public FrameNode get(int idx) {
+    public FrameNode getNode(int idx) {
         return nodes.get(idx);
     }
 
     @Override
-    public int getChildrenSize(int idx) {
+    public int getChildrenCount(int idx) {
         return nodes.get(idx).getChildCount();
     }
 
     @Override
     public Iterable<Integer> getChildren(int idx) {
         return () -> new Iterator<Integer>() {
-            private int childCount = getChildrenSize(idx);
+            private int childCount = getChildrenCount(idx);
             private int childCounter = 0;
             private int offset = 1;
             @Override
@@ -77,7 +92,7 @@ public class CallTree implements Tree<FrameNode>, Cacheable {
     }
 
     @Override
-    public int getMaxSize() {
+    public int size() {
         return nodes.size();
     }
 
@@ -93,27 +108,39 @@ public class CallTree implements Tree<FrameNode>, Cacheable {
         return parentIds[idx];
     }
 
+    /**
+     * Populates the member fields subTreeSizes, parentIds of callTree object using
+     * nodes list
+     */
     private void treeify() {
         subtreeSizes = new int[nodes.size()];
         parentIds = new int[nodes.size()];
 
-        int treeSize = buildTree(0, 1, -1) - 1;
+        int treeSize = 0;
+        if (nodes.size() > 0) {
+            treeSize = buildTree(0,-1);
+        }
         if(treeSize != nodes.size()) {
             throw new IllegalStateException("not able to build calltree");
         }
     }
 
-    private int buildTree(int idx, int childCount, int parentIdx) {
-        int treeSize = 0;
-        for(int i = 0; i < childCount; ++i) {
-            AggregatedProfileModel.FrameNode child = nodes.get(idx + treeSize);
-            parentIds[idx + treeSize] = parentIdx;
-
-            int subTreeSize = buildTree(idx + 1 + treeSize, child.getChildCount(), idx + treeSize);
-            subtreeSizes[idx + treeSize] = subTreeSize;
-            treeSize += subTreeSize;
+    /**
+     * Recursively traverses the tree node list and populates parentIds and subtreeSizes helping the treeify
+     * method
+     * @param idx the index of the current in the node list
+     * @param parentIdx the index of the current node in the node list
+     * @return the size of the subtree rooted at index idx including the root itself
+     */
+    private int buildTree(int idx, int parentIdx) {
+        int treeSize = 1;
+        AggregatedProfileModel.FrameNode curr = nodes.get(idx);
+        parentIds[idx] = parentIdx;
+        for(int i = 0; i < curr.getChildCount(); ++i) {
+            treeSize += buildTree(idx + treeSize, idx);
         }
-        // add 1 for the node itself
-        return treeSize + 1;
+        subtreeSizes[idx] = treeSize;
+        return treeSize;
     }
+
 }

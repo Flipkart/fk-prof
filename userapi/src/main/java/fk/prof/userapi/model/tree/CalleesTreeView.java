@@ -1,16 +1,17 @@
 package fk.prof.userapi.model.tree;
 
+import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
 import fk.prof.userapi.model.Tree;
+import fk.prof.userapi.model.TreeView;
 
 import java.util.*;
-import java.util.List;
 import java.util.stream.Collectors;
 
 /**
  * Created by gaurav.ashok on 01/06/17.
  */
-public class CalleesTreeView implements CacheableView {
+public class CalleesTreeView implements TreeView<IndexedTreeNode<AggregatedProfileModel.FrameNode>> {
 
     private Tree<FrameNode> callTree;
     private List<IndexedTreeNode<FrameNode>> hotMethods;
@@ -51,7 +52,7 @@ public class CalleesTreeView implements CacheableView {
 
         List<IndexedTreeNode<FrameNode>> expand() {
             Map<Integer, List<IndexedTreeNode<FrameNode>>> idxGroupedByMethodId = ids.stream()
-                .map(e -> new IndexedTreeNode<>(e, callTree.get(e)))
+                .map(e -> new IndexedTreeNode<>(e, callTree.getNode(e)))
                 .collect(Collectors.groupingBy(e -> e.getData().getMethodId()));
             return idxGroupedByMethodId.values().stream().peek(this::expand).flatMap(List::stream).collect(Collectors.toList());
         }
@@ -68,7 +69,7 @@ public class CalleesTreeView implements CacheableView {
                     int callerId = callTree.getParent(callers.get(i).getIdx());
                     // if parent node exist, add it as a caller to the current caller, and update the current caller
                     if(callerId > 0) {
-                        FrameNode fn = callTree.get(callerId);
+                        FrameNode fn = callTree.getNode(callerId);
                         IndexedTreeNode<FrameNode> caller = new IndexedTreeNode<>(callerId, fn);
                         callers.get(i).setChildren(Collections.singletonList(caller));
                         callers.set(i, caller);

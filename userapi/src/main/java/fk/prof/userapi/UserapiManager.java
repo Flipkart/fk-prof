@@ -17,7 +17,7 @@ import fk.prof.userapi.api.AggregatedProfileLoader;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.api.ProfileViewCreator;
-import fk.prof.userapi.api.cache.ClusterAwareCache;
+import fk.prof.userapi.cache.ClusterAwareCache;
 import fk.prof.userapi.deployer.VerticleDeployer;
 import fk.prof.userapi.deployer.impl.UserapiHttpVerticleDeployer;
 import fk.prof.userapi.model.json.CustomSerializers;

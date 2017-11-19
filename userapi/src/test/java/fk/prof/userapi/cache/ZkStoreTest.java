@@ -1,4 +1,4 @@
-package fk.prof.userapi.api.cache;
+package fk.prof.userapi.cache;
 
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
@@ -8,7 +8,6 @@ import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.proto.LoadInfoEntities;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.framework.api.transaction.CuratorTransactionResult;
 import org.apache.curator.retry.RetryOneTime;
 import org.apache.curator.test.InstanceSpec;
 import org.apache.curator.test.TestingServer;
@@ -19,7 +18,6 @@ import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.Supplier;

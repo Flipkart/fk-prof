@@ -1,18 +1,18 @@
-package fk.prof.userapi.api.cache;
+package fk.prof.userapi.cache;
 
 import com.google.common.io.BaseEncoding;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.userapi.Configuration;
-import fk.prof.userapi.Pair;
+import fk.prof.userapi.model.tree.CallTreeView;
+import fk.prof.userapi.model.tree.CalleesTreeView;
+import fk.prof.userapi.util.Pair;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.AggregatedProfileLoader;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.api.ProfileViewCreator;
 import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
-import fk.prof.userapi.model.tree.CallTreeView;
-import fk.prof.userapi.model.tree.CalleesTreeView;
 import fk.prof.userapi.proto.LoadInfoEntities;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;

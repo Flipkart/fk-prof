@@ -11,9 +11,9 @@ import fk.prof.metrics.ProcessGroupTag;
 import fk.prof.metrics.Util;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.buffer.StorageBackedInputStream;
-import fk.prof.userapi.Deserializer;
 import fk.prof.userapi.model.*;
 import fk.prof.userapi.model.tree.CallTree;
+import fk.prof.userapi.util.ProtoUtil;
 import io.vertx.core.Future;
 
 import java.io.IOException;
@@ -116,7 +116,7 @@ public class AggregatedProfileLoader {
         try {
             CheckedInputStream cin = new CheckedInputStream(in, checksum);
 
-            int magicNum = Deserializer.readVariantInt32(cin);
+            int magicNum = ProtoUtil.readVariantInt32(cin);
 
             if (magicNum != AggregationWindowSerializer.AGGREGATION_FILE_MAGIC_NUM) {
                 future.fail("Unknown file. Unexpected first 4 bytes");
@@ -124,23 +124,23 @@ public class AggregatedProfileLoader {
             }
 
             // read header
-            AggregatedProfileModel.Header parsedHeader = Deserializer.readCheckedDelimited(AggregatedProfileModel.Header.parser(), cin, "header");
+            AggregatedProfileModel.Header parsedHeader = ProtoUtil.buildProtoFromCheckedInputStream(AggregatedProfileModel.Header.parser(), cin, "header");
 
             // read traceCtx list
-            AggregatedProfileModel.TraceCtxNames traceNames = Deserializer.readCheckedDelimited(AggregatedProfileModel.TraceCtxNames.parser(), cin, "traceNames");
-            AggregatedProfileModel.TraceCtxDetailList traceDetails = Deserializer.readCheckedDelimited(AggregatedProfileModel.TraceCtxDetailList.parser(), cin, "traceDetails");
+            AggregatedProfileModel.TraceCtxNames traceNames = ProtoUtil.buildProtoFromCheckedInputStream(AggregatedProfileModel.TraceCtxNames.parser(), cin, "traceNames");
+            AggregatedProfileModel.TraceCtxDetailList traceDetails = ProtoUtil.buildProtoFromCheckedInputStream(AggregatedProfileModel.TraceCtxDetailList.parser(), cin, "traceDetails");
 
             // read profiles summary
             checksumReset(checksum);
             List<AggregatedProfileModel.ProfileWorkInfo> profiles = new ArrayList<>();
             int size = 0;
-            while ((size = Deserializer.readVariantInt32(cin)) != 0) {
+            while ((size = ProtoUtil.readVariantInt32(cin)) != 0) {
                 profiles.add(AggregatedProfileModel.ProfileWorkInfo.parseFrom(ByteStreams.limit(cin, size)));
             }
-            checksumVerify((int) checksum.getValue(), Deserializer.readVariantInt32(in), "checksum error profileWorkInfo");
+            checksumVerify((int) checksum.getValue(), ProtoUtil.readVariantInt32(in), "checksum error profileWorkInfo");
 
             // read method lookup table
-            AggregatedProfileModel.MethodLookUp methodLookUp = Deserializer.readCheckedDelimited(AggregatedProfileModel.MethodLookUp.parser(), cin, "methodLookup");
+            AggregatedProfileModel.MethodLookUp methodLookUp = ProtoUtil.buildProtoFromCheckedInputStream(AggregatedProfileModel.MethodLookUp.parser(), cin, "methodLookup");
 
             // read work specific samples
             Map<String, AggregatedSamplesPerTraceCtx> samplesPerTrace = new HashMap<>();
@@ -157,7 +157,7 @@ public class AggregatedProfileLoader {
                     break;
             }
 
-            checksumVerify((int) checksum.getValue(), Deserializer.readVariantInt32(in), "checksum error " + filename.workType.name() + " aggregated samples");
+            checksumVerify((int) checksum.getValue(), ProtoUtil.readVariantInt32(in), "checksum error " + filename.workType.name() + " aggregated samples");
 
             AggregatedProfileInfo profileInfo = new AggregatedProfileInfo(parsedHeader, traceNames, traceDetails, profiles, samplesPerTrace);
 
@@ -175,7 +175,7 @@ public class AggregatedProfileLoader {
         try {
             CheckedInputStream cin = new CheckedInputStream(in, checksum);
 
-            int magicNum = Deserializer.readVariantInt32(cin);
+            int magicNum = ProtoUtil.readVariantInt32(cin);
 
             if (magicNum !=  AggregationWindowSummarySerializer.SUMMARY_FILE_MAGIC_NUM) {
                 future.fail("Unknown file. Unexpected first 4 bytes");
@@ -183,25 +183,25 @@ public class AggregatedProfileLoader {
             }
 
             // read header
-            AggregatedProfileModel.Header parsedHeader = Deserializer.readCheckedDelimited(AggregatedProfileModel.Header.parser(), cin, "header");
+            AggregatedProfileModel.Header parsedHeader = ProtoUtil.buildProtoFromCheckedInputStream(AggregatedProfileModel.Header.parser(), cin, "header");
 
             // read traceCtx list
-            AggregatedProfileModel.TraceCtxNames traceNames = Deserializer.readCheckedDelimited(AggregatedProfileModel.TraceCtxNames.parser(), cin, "traceNames");
+            AggregatedProfileModel.TraceCtxNames traceNames = ProtoUtil.buildProtoFromCheckedInputStream(AggregatedProfileModel.TraceCtxNames.parser(), cin, "traceNames");
 
             // read profiles summary
             checksumReset(checksum);
             List<AggregatedProfileModel.ProfileWorkInfo> profiles = new ArrayList<>();
             int size = 0;
-            while((size = Deserializer.readVariantInt32(cin)) != 0) {
+            while((size = ProtoUtil.readVariantInt32(cin)) != 0) {
                 profiles.add(AggregatedProfileModel.ProfileWorkInfo.parseFrom(ByteStreams.limit(cin, size)));
             }
-            checksumVerify((int)checksum.getValue(), Deserializer.readVariantInt32(in), "checksum error profileWorkInfo");
+            checksumVerify((int)checksum.getValue(), ProtoUtil.readVariantInt32(in), "checksum error profileWorkInfo");
 
             // read work specific samples
             Map<AggregatedProfileModel.WorkType, AggregationWindowSummary.WorkSpecificSummary> summaryPerTrace = new HashMap<>();
 
             // cpu_sampling
-            AggregatedProfileModel.TraceCtxDetailList traceDetails = Deserializer.readCheckedDelimited(AggregatedProfileModel.TraceCtxDetailList.parser(), cin, "cpu_sample traceDetails");
+            AggregatedProfileModel.TraceCtxDetailList traceDetails = ProtoUtil.buildProtoFromCheckedInputStream(AggregatedProfileModel.TraceCtxDetailList.parser(), cin, "cpu_sample traceDetails");
             summaryPerTrace.put(AggregatedProfileModel.WorkType.cpu_sample_work, new AggregationWindowSummary.CpuSampleSummary(traceDetails));
 
             AggregationWindowSummary summary = new AggregationWindowSummary(parsedHeader, traceNames, profiles, summaryPerTrace);

@@ -1,7 +1,7 @@
 package fk.prof.userapi.model;
 
 import fk.prof.aggregation.proto.AggregatedProfileModel;
-import fk.prof.userapi.Cacheable;
+import fk.prof.userapi.cache.Cacheable;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * @author gaurav.ashok
  */
-public class AggregatedProfileInfo implements Cacheable {
+public class AggregatedProfileInfo implements Cacheable<AggregatedProfileInfo> {
 
     private final AggregatedProfileModel.Header header;
     private final AggregatedProfileModel.TraceCtxNames traceNames;

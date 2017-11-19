@@ -6,7 +6,6 @@ import com.google.protobuf.util.JsonFormat;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.userapi.Configuration;
-import fk.prof.userapi.Pair;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.exception.UserapiHttpFailure;
 import fk.prof.userapi.http.ProfHttpClient;
@@ -14,10 +13,10 @@ import fk.prof.userapi.http.UserapiHttpHelper;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
 import fk.prof.userapi.model.AggregationWindowSummary;
 import fk.prof.userapi.model.StacktraceTreeViewType;
-import fk.prof.userapi.model.tree.CallTreeView;
-import fk.prof.userapi.model.tree.CalleesTreeView;
+import fk.prof.userapi.model.TreeView;
 import fk.prof.userapi.model.tree.IndexedTreeNode;
 import fk.prof.userapi.model.tree.TreeViewResponse;
+import fk.prof.userapi.util.Pair;
 import fk.prof.userapi.util.ProtoUtil;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.AsyncResult;
@@ -255,29 +254,23 @@ public class HttpVerticle extends AbstractVerticle {
 
       AggregatedProfileNamingStrategy profileName = new AggregatedProfileNamingStrategy(baseDir, VERSION, appId, clusterId, procId, startTime, duration, AggregatedProfileModel.WorkType.cpu_sample_work);
 
-      if(StacktraceTreeViewType.CALLERS.equals(viewType)) {
-        getCallersViewForCpuSampling(routingContext, profileName, traceName, nodeIds, autoExpand, maxDepth);
-      }
-      else {
-        getCalleesViewForCpuSampling(routingContext, profileName, traceName, nodeIds, autoExpand, maxDepth);
-      }
+      getTreeViewForCpuSampling(routingContext, profileName, traceName, nodeIds, autoExpand, maxDepth, viewType);
     }
 
-    private void getCallersViewForCpuSampling(RoutingContext routingContext, AggregatedProfileNamingStrategy profileName, String traceName,
-                                              List<Integer> nodeIds, boolean autoExpand, int maxDepth) {
-      Future<Pair<AggregatedSamplesPerTraceCtx,CallTreeView>> callTreeView = profileStoreAPI.getCpuSamplingCallersTreeView(profileName, traceName);
+    private <T extends TreeView<IndexedTreeNode<AggregatedProfileModel.FrameNode>>>void getTreeViewForCpuSampling(RoutingContext routingContext, AggregatedProfileNamingStrategy profileName, String traceName,
+                                                                                                                  List<Integer> nodeIds, boolean autoExpand, int maxDepth, StacktraceTreeViewType viewType) {
+      Future<Pair<AggregatedSamplesPerTraceCtx, T>> treeViewPair = profileStoreAPI.getCPUSamplingTreeView(profileName, traceName, viewType);
 
-      callTreeView.setHandler(ar -> {
+      treeViewPair.setHandler(ar -> {
         if(ar.failed()) {
           setResponse(ar, routingContext);
         }
         else {
           AggregatedSamplesPerTraceCtx samplesPerTraceCtx = ar.result().first;
-          CallTreeView treeView = ar.result().second;
-
+          T treeView = ar.result().second;
           List<Integer> originIds = nodeIds;
           if(originIds == null || originIds.isEmpty()) {
-            originIds = treeView.getRootNodes().stream().map(e -> e.getIdx()).collect(Collectors.toList());
+            originIds = treeView.getRootNodes().stream().map(IndexedTreeNode::getIdx).collect(Collectors.toList());
           }
 
           List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> subTree = treeView.getSubTree(originIds, maxDepth, autoExpand);
@@ -286,33 +279,6 @@ public class HttpVerticle extends AbstractVerticle {
           subTree.forEach(e -> e.visit((i,data) -> methodLookup.put(data.getMethodId(), samplesPerTraceCtx.getMethodLookup().get(data.getMethodId()))));
 
           setResponse(Future.succeededFuture(new TreeViewResponse.CpuSampleCallersTreeViewResponse(subTree, methodLookup)), routingContext, true);
-        }
-      });
-    }
-
-    private void getCalleesViewForCpuSampling(RoutingContext routingContext, AggregatedProfileNamingStrategy profileName, String traceName,
-                                              List<Integer> nodeIds, boolean autoExpand, int maxDepth) {
-      Future<Pair<AggregatedSamplesPerTraceCtx,CalleesTreeView>> calleesTreeView = profileStoreAPI.getCpuSamplingCalleesTreeView(profileName, traceName);
-
-      calleesTreeView.setHandler(ar -> {
-        if(ar.failed()) {
-          setResponse(ar, routingContext);
-        }
-        else {
-          AggregatedSamplesPerTraceCtx samplesPerTraceCtx = ar.result().first;
-          CalleesTreeView treeView = ar.result().second;
-
-          List<Integer> originIds = nodeIds;
-          if(originIds == null || originIds.isEmpty()) {
-            originIds = treeView.getRootNodes().stream().map(e -> e.getIdx()).collect(Collectors.toList());
-          }
-
-          List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> subTree = treeView.getSubTree(originIds, maxDepth, autoExpand);
-          Map<Integer, String> methodLookup = new HashMap<>();
-
-          subTree.forEach(e -> e.visit((i,data) -> methodLookup.put(data.getMethodId(), samplesPerTraceCtx.getMethodLookup().get(data.getMethodId()))));
-
-          setResponse(Future.succeededFuture(new TreeViewResponse.CpuSampleCalleesTreeViewResponse(subTree, methodLookup)), routingContext, true);
         }
       });
     }

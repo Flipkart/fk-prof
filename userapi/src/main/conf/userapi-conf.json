@@ -11,7 +11,7 @@
     "connection.url": "",
     "namespace": "fkprof-userapi",
     "connection.timeout.ms": 5000,
-    "session.timeout.ms": 15000,
+    "session.timeout.ms": 50000,
     "max.retries": 3
   },
   "profile.retention.duration.min": 30,

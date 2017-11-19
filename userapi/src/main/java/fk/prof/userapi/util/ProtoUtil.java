@@ -7,7 +7,11 @@ import io.netty.buffer.Unpooled;
 import io.vertx.core.buffer.Buffer;
 import recording.Recorder;
 
+import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.zip.CheckedInputStream;
+import java.util.zip.Checksum;
 
 //TODO : Duplicate from backend, extract out in a common module
 public class ProtoUtil {
@@ -43,5 +47,27 @@ public class ProtoUtil {
   public static <T extends AbstractMessage> T buildProtoFromBuffer(Parser<T> parser, Buffer buffer)
       throws InvalidProtocolBufferException {
     return parser.parseFrom(CodedInputStream.newInstance(buffer.getByteBuf().nioBuffer()));
+  }
+
+  public static int readVariantInt32(InputStream in) throws IOException {
+      int firstByte = in.read();
+      if(firstByte == -1) {
+          throw new EOFException("Expecting variantInt32");
+      }
+      return CodedInputStream.readRawVarint32(firstByte, in);
+  }
+
+  public static <T extends AbstractMessage> T buildProtoFromCheckedInputStream(Parser<T> parser, CheckedInputStream cin, String tag) throws IOException {
+      Checksum checksum = cin.getChecksum();
+
+      checksum.reset();
+      T msg = parser.parseDelimitedFrom(cin);
+
+      int chksmValue = (int)checksum.getValue();
+      int expectedChksmValue = readVariantInt32(cin);
+
+      assert chksmValue == expectedChksmValue : "Checksum did not match for " + tag;
+
+      return msg;
   }
 }

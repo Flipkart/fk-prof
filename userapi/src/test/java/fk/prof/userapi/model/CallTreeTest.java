@@ -226,7 +226,7 @@ public class CallTreeTest {
     }
 
     private void testTreeEquality(IndexedTreeNode<FrameNode> node, CallTree callTree) {
-        Assert.assertEquals(node.getData(), callTree.get(node.getIdx()));
+        Assert.assertEquals(node.getData(), callTree.getNode(node.getIdx()));
         for(IndexedTreeNode<FrameNode> child: node.getChildren()) {
             testTreeEquality(child, callTree);
         }
