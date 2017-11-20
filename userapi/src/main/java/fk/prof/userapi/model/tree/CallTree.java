@@ -2,7 +2,6 @@ package fk.prof.userapi.model.tree;
 
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
-import fk.prof.userapi.cache.Cacheable;
 import fk.prof.userapi.model.Tree;
 
 import java.io.IOException;
@@ -15,7 +14,7 @@ import java.util.NoSuchElementException;
 /**
  * Created by gaurav.ashok on 01/06/17.
  */
-public class CallTree implements Tree<FrameNode>, Cacheable<Tree> {
+public class CallTree implements Tree<FrameNode>{
 
     private List<FrameNode> nodes;
     private int[] subtreeSizes;

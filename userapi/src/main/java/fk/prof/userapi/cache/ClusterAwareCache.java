@@ -5,13 +5,14 @@ import com.google.common.cache.RemovalCause;
 import com.google.common.cache.RemovalNotification;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.userapi.Configuration;
-import fk.prof.userapi.model.*;
-import fk.prof.userapi.model.tree.CallTreeView;
-import fk.prof.userapi.model.tree.CalleesTreeView;
-import fk.prof.userapi.util.Pair;
 import fk.prof.userapi.api.AggregatedProfileLoader;
 import fk.prof.userapi.api.ProfileViewCreator;
+import fk.prof.userapi.model.AggregatedProfileInfo;
+import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
+import fk.prof.userapi.model.ProfileView;
+import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.proto.LoadInfoEntities.ProfileResidencyInfo;
+import fk.prof.userapi.util.Pair;
 import io.vertx.core.Future;
 import io.vertx.core.WorkerExecutor;
 import io.vertx.core.logging.Logger;
@@ -96,7 +97,7 @@ public class ClusterAwareCache {
         else {
             // check zookeeper if it is loaded somewhere else
             doAsync((Future<AggregatedProfileInfo> f) -> {
-                try (AutoCloseable lock = zkStore.getLock()) {
+                    try (AutoCloseable ignored = zkStore.getLock()) {
                     Future<AggregatedProfileInfo> _cachedProfileInfo = cache.get(profileName);
                     if (_cachedProfileInfo != null) {
                         completeFuture(profileName, _cachedProfileInfo, f);
@@ -143,26 +144,6 @@ public class ClusterAwareCache {
     }
 
     /**
-     * Get a callers view for cpuSampled data for the given trace.
-     * @param profileName
-     * @param traceName
-     * @return Future containing a pair of trace specific aggregated samples and its callTreeView.
-     */
-    public Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> getCallTreeView(AggregatedProfileNamingStrategy profileName, String traceName) {
-        return getView(profileName, traceName, StacktraceTreeViewType.CALLERS);
-    }
-
-    /**
-     * Get a callees view for cpuSampled data for the given trace.
-     * @param profileName
-     * @param traceName
-     * @return Future containing a pair of trace specific aggregated samples and its calleeTreeView.
-     */
-    public Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> getCalleesTreeView(AggregatedProfileNamingStrategy profileName, String traceName) {
-        return getView(profileName, traceName, StacktraceTreeViewType.CALLEES);
-    }
-
-    /**
      * Event handler for evicted profiles. Deletes the profile -> ip:port mapping fom shared store.
      * @param onRemoval
      */
@@ -170,7 +151,7 @@ public class ClusterAwareCache {
         if(!RemovalCause.REPLACED.equals(onRemoval.getCause()) && onRemoval.wasEvicted()) {
             AggregatedProfileNamingStrategy profileName = onRemoval.getKey();
             doAsync(f -> {
-                try(AutoCloseable lock = zkStore.getLock()) {
+                try(AutoCloseable ignored = zkStore.getLock()) {
                     ProfileResidencyInfo residencyInfo = zkStore.readProfileResidencyInfo(profileName);
                     boolean deleteProfileNode = false;
                     if(residencyInfo != null && (myIp.equals(residencyInfo.getIp()) && port == residencyInfo.getPort()) && cache.get(profileName) == null) {
@@ -207,33 +188,33 @@ public class ClusterAwareCache {
      *
      * @param profileName
      * @param traceName
-     * @param viewType
+     * @param profileViewType
      * @return Future containing a pair of trace specific aggregated samples and its view.
      */
-    public <T extends TreeView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getView(AggregatedProfileNamingStrategy profileName, String traceName, StacktraceTreeViewType viewType) {
+    public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
         Future<Pair<AggregatedSamplesPerTraceCtx, T >> viewFuture = Future.future();
-        Pair<Future<AggregatedProfileInfo>, T> profileViewPair = cache.getView(profileName, getViewName(traceName, viewType));
+        Pair<Future<AggregatedProfileInfo>, T> profileViewPair = cache.getView(profileName, traceName, profileViewType);
 
         if(profileViewPair.first != null) {
             if(profileViewPair.second != null) {
                 return Future.succeededFuture(Pair.of(profileViewPair.first.result().getAggregatedSamples(traceName), profileViewPair.second));
             }
             else {
-                workerExecutor.executeBlocking(f -> getOrCreateView(profileName, traceName, f, viewType), viewFuture.completer());
+                workerExecutor.executeBlocking(f -> getOrCreateView(profileName, traceName, f, profileViewType), viewFuture.completer());
             }
         }
         else {
             // else check into zookeeper if this is cached in another node
             doAsync((Future<Pair<AggregatedSamplesPerTraceCtx, T>> f) -> {
                 ProfileResidencyInfo residencyInfo;
-                try(AutoCloseable lock = zkStore.getLock()) {
+                try(AutoCloseable ignored = zkStore.getLock()) {
                     residencyInfo = zkStore.readProfileResidencyInfo(profileName);
                 }
 
                 if(residencyInfo != null) {
                     // by the time we got the lock, it is possible a profile load has started
                     if (residencyInfo.getIp().equals(myIp) && residencyInfo.getPort() == port) {
-                        getOrCreateView(profileName, traceName, f, viewType);
+                        getOrCreateView(profileName, traceName, f, profileViewType);
                     }
                     else {
                         // cached in another node
@@ -254,10 +235,10 @@ public class ClusterAwareCache {
      * @param profileName
      * @param traceName
      * @param f
-     * @param viewType
+     * @param profileViewType
      */
-    private <T extends TreeView> void getOrCreateView(AggregatedProfileNamingStrategy profileName, String traceName, Future<Pair<AggregatedSamplesPerTraceCtx, T>> f, StacktraceTreeViewType viewType) {
-        Pair<Future<AggregatedProfileInfo>, T> profileViewPair = cache.getView(profileName, getViewName(traceName, viewType));
+    private <T extends ProfileView> void getOrCreateView(AggregatedProfileNamingStrategy profileName, String traceName, Future<Pair<AggregatedSamplesPerTraceCtx, T>> f, ProfileViewType profileViewType) {
+        Pair<Future<AggregatedProfileInfo>, T> profileViewPair = cache.getView(profileName, traceName, profileViewType);
         Future<AggregatedProfileInfo> cachedProfileInfo = profileViewPair.first;
 
         if (cachedProfileInfo != null) {
@@ -280,7 +261,7 @@ public class ClusterAwareCache {
                 // no cached view, so create a new one
                 switch (profileName.workType) {
                     case cpu_sample_work:
-                        profileViewPair = cache.computeViewIfAbsent(profileName, getViewName(traceName, viewType), p -> buildView(p, traceName, viewType));
+                        profileViewPair = cache.computeViewIfAbsent(profileName, traceName, profileViewType, p -> buildView(p, traceName, profileViewType));
                         if(profileViewPair.second == null) {
                             f.fail(new CachedProfileNotFoundException());
                         }
@@ -298,17 +279,13 @@ public class ClusterAwareCache {
         }
     }
 
-    private <T extends TreeView> T buildView(AggregatedProfileInfo profile, String traceName, StacktraceTreeViewType viewType) {
-        if (StacktraceTreeViewType.CALLERS.equals(viewType)) {
+    private <T extends ProfileView> T buildView(AggregatedProfileInfo profile, String traceName, ProfileViewType profileViewType) {
+        if (ProfileViewType.CALLERS.equals(profileViewType)) {
             return (T)viewCreator.buildCallTreeView(profile, traceName);
         }
         else {
             return (T)viewCreator.buildCalleesTreeView(profile, traceName);
         }
-    }
-
-    private String getViewName(String traceName, StacktraceTreeViewType viewType) {
-        return "/" + traceName + "/" + viewType.name();
     }
 
     interface BlockingTask<T> {

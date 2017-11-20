@@ -4,6 +4,7 @@ import com.google.common.io.BaseEncoding;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.userapi.Configuration;
+import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.model.tree.CallTreeView;
 import fk.prof.userapi.model.tree.CalleesTreeView;
 import fk.prof.userapi.util.Pair;
@@ -173,7 +174,7 @@ public class CacheTest {
             async.countDown();
         });
 
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view = cache.getCallTreeView(profileName, "");
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view = cache.getProfileView(profileName,"", ProfileViewType.CALLERS);
         view.setHandler(ar -> {
             context.assertTrue(ar.failed());
             context.assertTrue(ar.cause() instanceof CachedProfileNotFoundException);
@@ -192,8 +193,8 @@ public class CacheTest {
         setUpDefaultCache(context, null, viewCreator);
         localProfileCache.put(npPair.name, Future.succeededFuture(npPair.profileInfo));
 
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getCallTreeView(npPair.name, "t1");
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view2 = cache.getCallTreeView(npPair.name, "t1");
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view2 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
 
         view1.setHandler(ar -> {
             context.assertTrue(ar.succeeded());
@@ -221,8 +222,8 @@ public class CacheTest {
         setUpDefaultCache(context, null, viewCreator);
         localProfileCache.put(npPair.name, Future.succeededFuture(npPair.profileInfo));
 
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getCallTreeView(npPair.name, "t1");
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view2 = cache.getCallTreeView(npPair.name, "t2");
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view2 = cache.getProfileView(npPair.name,"t2", ProfileViewType.CALLERS);
 
         view1.setHandler(ar -> {
             context.assertTrue(ar.succeeded());
@@ -251,8 +252,8 @@ public class CacheTest {
         setUpDefaultCache(context, null, viewCreator);
         localProfileCache.put(npPair.name, Future.succeededFuture(npPair.profileInfo));
 
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getCallTreeView(npPair.name, "t1");
-        Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> view2 = cache.getCalleesTreeView(npPair.name, "t1");
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
+        Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> view2 = cache.getProfileView(npPair.name, "t1", ProfileViewType.CALLEES);
 
         view1.setHandler(ar -> {
             context.assertTrue(ar.succeeded());
@@ -296,7 +297,7 @@ public class CacheTest {
         async.awaitSuccess(2000);
 
         Async async2 = context.async(1);
-        Future<?> f = cache.getCalleesTreeView(profileName, "t1");
+        Future<?> f = cache.getProfileView(profileName, "t1", ProfileViewType.CALLEES);
         f.setHandler(ar -> {
             context.assertTrue(ar.failed());
             context.assertTrue(ar.cause() instanceof CachedProfileNotFoundException);
@@ -330,7 +331,7 @@ public class CacheTest {
         async1.awaitSuccess(2000);
 
         Async async2 = context.async();
-        Future<?> view1 = cache.getCallTreeView(npPair.name, "t1");
+        Future<?> view1 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
         view1.setHandler(ar -> {
             context.assertTrue(ar.succeeded());
             async2.countDown();
@@ -342,7 +343,7 @@ public class CacheTest {
 
         // retry fetching
         Async async3 = context.async(1);
-        view1 = cache.getCallTreeView(npPair.name, "t1");
+        view1 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
         view1.setHandler(ar -> {
             context.assertTrue(ar.failed());
             context.assertTrue(ar.cause() instanceof CachedProfileNotFoundException);

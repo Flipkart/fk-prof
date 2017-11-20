@@ -10,7 +10,8 @@ import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.metrics.Util;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.model.AggregatedProfileInfo;
-import fk.prof.userapi.model.TreeView;
+import fk.prof.userapi.model.ProfileView;
+import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.util.Pair;
 import io.vertx.core.Future;
 import io.vertx.core.logging.Logger;
@@ -35,7 +36,7 @@ class LocalProfileCache {
 
     private final AtomicInteger uidGenerator;
     private final Cache<AggregatedProfileNamingStrategy, CacheableProfile> cache;
-    private final Cache<String, TreeView> viewCache;
+    private final Cache<String, CacheableProfileView> viewCache;
 
     private RemovalListener<AggregatedProfileNamingStrategy, Future<AggregatedProfileInfo>> removalListener;
 
@@ -80,22 +81,23 @@ class LocalProfileCache {
         cache.put(key, new CacheableProfile(key, uidGenerator.incrementAndGet(), profileFuture));
     }
 
-    <T extends TreeView> Pair<Future<AggregatedProfileInfo>, T> getView(AggregatedProfileNamingStrategy profileName, String viewName) {
+    <T extends ProfileView> Pair<Future<AggregatedProfileInfo>, T> getView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
         CacheableProfile cacheableProfile = cache.getIfPresent(profileName);
         if (cacheableProfile != null) {
-            String viewKey = toViewKey(profileName, viewName, cacheableProfile.uid);
+            String viewKey = toViewKey(profileName, traceName, profileViewType, cacheableProfile.uid);
             return Pair.of(cacheableProfile.profile, (T)viewCache.getIfPresent(viewKey));
         }
         return Pair.of(null, null);
     }
 
-    <T extends TreeView> Pair<Future<AggregatedProfileInfo>, T> computeViewIfAbsent(AggregatedProfileNamingStrategy profileName, String viewName, Function<AggregatedProfileInfo, T> viewProvider) {
+    <T extends ProfileView> Pair<Future<AggregatedProfileInfo>, T> computeViewIfAbsent(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType, Function<AggregatedProfileInfo, T> viewProvider) {
         // dont cache it if dependent profile is not there.
         CacheableProfile cacheableProfile = cache.getIfPresent(profileName);
         if(cacheableProfile == null) {
             return Pair.of(null, null);
         }
-        T cachedView = cacheableProfile.computeAndAddViewIfAbsent(viewName, viewProvider);
+        String viewKey = toViewKey(profileName, traceName, profileViewType, cacheableProfile.uid);
+        T cachedView = cacheableProfile.computeAndAddViewIfAbsent(viewKey, viewProvider);
         return cachedView == null ? Pair.of(null, null) : Pair.of(cacheableProfile.profile, cachedView);
     }
 
@@ -147,18 +149,17 @@ class LocalProfileCache {
             }
         }
 
-        <T extends TreeView> T computeAndAddViewIfAbsent(String viewName, Function<AggregatedProfileInfo, T> viewProvider) {
-            String viewKey = toViewKey(profileName, viewName, uid);
+        <T extends ProfileView> T computeAndAddViewIfAbsent(String viewKey, Function<AggregatedProfileInfo, T> viewProvider) {
             synchronized (this) {
                 if(!evicted) {
-                    TreeView prev = viewCache.getIfPresent(viewKey);
+                    T prev = (T)viewCache.getIfPresent(viewKey);
                     if(prev != null) {
-                        return (T)prev;
+                        return prev;
                     }
                     else {
                         cachedViews.add(viewKey);
                         T view = viewProvider.apply(profile.result());
-                        viewCache.put(viewKey, view);
+                        viewCache.put(viewKey, (CacheableProfileView) view);
                         return view;
                     }
                 }
@@ -172,17 +173,12 @@ class LocalProfileCache {
                 cachedViews.clear();
             }
         }
-
-        @Override
-        public int weight() {
-            if(profile.succeeded()) {
-                return profile.result().weight();
-            }
-            return 1;
-        }
     }
 
-    private static String toViewKey(AggregatedProfileNamingStrategy profileName, String viewName, int uid) {
-        return profileName.toString() + viewName + uid;
+    private static String toViewKey(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType, int uid) {
+        return profileName.toString() + "/" + traceName + "/" + profileViewType.name() + "/" + uid;
+    }
+
+    private class CacheableProfileView implements Cacheable<ProfileView>  {
     }
 }

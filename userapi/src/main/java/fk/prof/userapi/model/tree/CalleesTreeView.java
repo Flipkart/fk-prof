@@ -1,9 +1,8 @@
 package fk.prof.userapi.model.tree;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
 import fk.prof.userapi.model.Tree;
-import fk.prof.userapi.model.TreeView;
+import fk.prof.userapi.model.ProfileView;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -11,7 +10,7 @@ import java.util.stream.Collectors;
 /**
  * Created by gaurav.ashok on 01/06/17.
  */
-public class CalleesTreeView implements TreeView<IndexedTreeNode<AggregatedProfileModel.FrameNode>> {
+public class CalleesTreeView implements ProfileView<IndexedTreeNode<FrameNode>> {
 
     private Tree<FrameNode> callTree;
     private List<IndexedTreeNode<FrameNode>> hotMethods;

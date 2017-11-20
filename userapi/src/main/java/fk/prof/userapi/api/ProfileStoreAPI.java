@@ -76,9 +76,9 @@ public interface ProfileStoreAPI {
      * Get/Create a CPISamplingTreeView for the trace
      * @param profileName
      * @param traceName
-     * @param viewType
+     * @param profileViewType
      * @param <T>
      * @return Future containing treeView (Callee/Caller) view and the associated aggregated samples
      */
-    <T extends TreeView> Future<Pair<AggregatedSamplesPerTraceCtx,T>> getCPUSamplingTreeView(AggregatedProfileNamingStrategy profileName, String traceName, StacktraceTreeViewType viewType);
+    <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx,T>> getCPUSamplingTreeView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType);
 }

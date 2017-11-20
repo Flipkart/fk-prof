@@ -12,8 +12,8 @@ import fk.prof.userapi.http.ProfHttpClient;
 import fk.prof.userapi.http.UserapiHttpHelper;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
 import fk.prof.userapi.model.AggregationWindowSummary;
-import fk.prof.userapi.model.StacktraceTreeViewType;
-import fk.prof.userapi.model.TreeView;
+import fk.prof.userapi.model.ProfileView;
+import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.model.tree.IndexedTreeNode;
 import fk.prof.userapi.model.tree.TreeViewResponse;
 import fk.prof.userapi.util.Pair;
@@ -217,14 +217,14 @@ public class HttpVerticle extends AbstractVerticle {
     }
 
     private void getCallersViewForCpuSampling(RoutingContext routingContext) {
-      getViewForCpuSampling(routingContext, StacktraceTreeViewType.CALLERS);
+      getViewForCpuSampling(routingContext, ProfileViewType.CALLERS);
     }
 
     private void getCalleesViewForCpuSampling(RoutingContext routingContext) {
-      getViewForCpuSampling(routingContext, StacktraceTreeViewType.CALLEES);
+      getViewForCpuSampling(routingContext, ProfileViewType.CALLEES);
     }
 
-    private void getViewForCpuSampling(RoutingContext routingContext, StacktraceTreeViewType viewType) {
+    private void getViewForCpuSampling(RoutingContext routingContext, ProfileViewType profileViewType) {
       HttpServerRequest req = routingContext.request();
 
       String appId, clusterId, procId, traceName;
@@ -254,12 +254,12 @@ public class HttpVerticle extends AbstractVerticle {
 
       AggregatedProfileNamingStrategy profileName = new AggregatedProfileNamingStrategy(baseDir, VERSION, appId, clusterId, procId, startTime, duration, AggregatedProfileModel.WorkType.cpu_sample_work);
 
-      getTreeViewForCpuSampling(routingContext, profileName, traceName, nodeIds, autoExpand, maxDepth, viewType);
+      getTreeViewForCpuSampling(routingContext, profileName, traceName, nodeIds, autoExpand, maxDepth, profileViewType);
     }
 
-    private <T extends TreeView<IndexedTreeNode<AggregatedProfileModel.FrameNode>>>void getTreeViewForCpuSampling(RoutingContext routingContext, AggregatedProfileNamingStrategy profileName, String traceName,
-                                                                                                                  List<Integer> nodeIds, boolean autoExpand, int maxDepth, StacktraceTreeViewType viewType) {
-      Future<Pair<AggregatedSamplesPerTraceCtx, T>> treeViewPair = profileStoreAPI.getCPUSamplingTreeView(profileName, traceName, viewType);
+    private <T extends ProfileView<IndexedTreeNode<AggregatedProfileModel.FrameNode>>>void getTreeViewForCpuSampling(RoutingContext routingContext, AggregatedProfileNamingStrategy profileName, String traceName,
+                                                                                                                     List<Integer> nodeIds, boolean autoExpand, int maxDepth, ProfileViewType profileViewType) {
+      Future<Pair<AggregatedSamplesPerTraceCtx, T>> treeViewPair = profileStoreAPI.getCPUSamplingTreeView(profileName, traceName, profileViewType);
 
       treeViewPair.setHandler(ar -> {
         if(ar.failed()) {

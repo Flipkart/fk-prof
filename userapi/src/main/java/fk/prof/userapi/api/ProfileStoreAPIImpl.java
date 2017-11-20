@@ -182,10 +182,10 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
     }
 
     @Override
-    public <T extends TreeView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getCPUSamplingTreeView(AggregatedProfileNamingStrategy profileName, String traceName, StacktraceTreeViewType viewType) {
+    public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getCPUSamplingTreeView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
         Future<Pair<AggregatedSamplesPerTraceCtx, T>> result = Future.future();
 
-        Future<Pair<AggregatedSamplesPerTraceCtx, T>> f = clusterAwareCache.getView(profileName, traceName, viewType);
+        Future<Pair<AggregatedSamplesPerTraceCtx, T>> f = clusterAwareCache.getProfileView(profileName, traceName, profileViewType);
         f.setHandler(ar -> {
             if (ar.failed() && ar.cause() instanceof CachedProfileNotFoundException && !((CachedProfileNotFoundException) ar.cause()).isCachedRemotely()) {
                 // initiate the load locally
@@ -193,7 +193,7 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
                 load(profileLoad, profileName);
 
                 profileLoad.setHandler(ar2 -> {
-                    Future<Pair<AggregatedSamplesPerTraceCtx, T>> f2 = clusterAwareCache.getView(profileName, traceName, viewType);
+                    Future<Pair<AggregatedSamplesPerTraceCtx, T>> f2 = clusterAwareCache.getProfileView(profileName, traceName, profileViewType);
                     f2.setHandler(result.completer());
                 });
             } else {
@@ -203,58 +203,6 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
         });
         return result;
     }
-
-//    /**
-//     * GetOrCreate a callTree view for the loaded profile. In case the profile is not loaded, it will be loaded locally
-//     * first and then the view will be created.
-//     * @param profileName
-//     * @param traceName
-//     * @return Future containing calltree view and the associated aggregated samples
-//     */
-//    @Override
-//    public Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> getCpuSamplingCallersTreeView(AggregatedProfileNamingStrategy profileName, String traceName) {
-//        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> result = Future.future();
-//        getTreeViewFromClusterAwareCache(profileName, traceName, result, StacktraceTreeViewType.CALLERS);
-//
-//    }
-
-//    @Override
-//    public  <T extends Cacheable<TreeView> & TreeView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getTreeViewFromClusterAwareCache(AggregatedProfileNamingStrategy profileName, String traceName,
-//                                                                                                                           StacktraceTreeViewType viewType) {
-//        Future<Pair<AggregatedSamplesPerTraceCtx, T>> result = Future.future();
-//
-//        Future<Pair<AggregatedSamplesPerTraceCtx, T>> f = clusterAwareCache.getView(profileName, traceName, viewType);
-//        f.setHandler(ar -> {
-//            if (ar.failed() && ar.cause() instanceof CachedProfileNotFoundException && !((CachedProfileNotFoundException) ar.cause()).isCachedRemotely()) {
-//                // initiate the load locally
-//                Future<AggregatedProfileInfo> profileLoad = Future.future();
-//                load(profileLoad, profileName);
-//
-//                profileLoad.setHandler(ar2 -> {
-//                    Future<Pair<AggregatedSamplesPerTraceCtx, T>> f2 = clusterAwareCache.getView(profileName, traceName, viewType);
-//                    f2.setHandler(result.completer());
-//                });
-//            } else {
-//
-//                result.handle(ar);
-//            }
-//        });
-//        return result;
-//    }
-
-//    /**
-//     * GetOrCreate a calleeTree view for the loaded profile. In case the profile is not loaded, it will be loaded locally
-//     * first and then the view will be created.
-//     * @param profileName
-//     * @param traceName
-//     * @return Future containing calleetree view and the associated aggregated samples
-//     */
-//    @Override
-//    public Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> getCpuSamplingCalleesTreeView(AggregatedProfileNamingStrategy profileName, String traceName) {
-//        Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> result = Future.future();
-//        getTreeViewFromClusterAwareCache(profileName, traceName, result, StacktraceTreeViewType.CALLEES);
-//        return result;
-//    }
 
     private <T> void saveRequestedFutureInMap(String filename, Future<T> future, Map<String, FuturesList<T>> futuresListMap) {
         FuturesList<T> futures = futuresListMap.get(filename);

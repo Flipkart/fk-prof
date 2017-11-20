@@ -1,16 +1,15 @@
 package fk.prof.userapi.model.tree;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
+import fk.prof.userapi.model.ProfileView;
 import fk.prof.userapi.model.Tree;
-import fk.prof.userapi.model.TreeView;
 
 import java.util.*;
 
 /**
  * Created by gaurav.ashok on 05/06/17.
  */
-public class CallTreeView implements TreeView<IndexedTreeNode<AggregatedProfileModel.FrameNode>> {
+public class CallTreeView implements ProfileView<IndexedTreeNode<FrameNode>> {
 
     private Tree<FrameNode> tree;
 
