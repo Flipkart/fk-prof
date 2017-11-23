@@ -43,8 +43,8 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     String klass;
     ClassInstrumentHooks hooks;
 
-    MethodInstrumentHooks fs_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_fs_mexit);
-    MethodInstrumentHooks fs_open = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_fs_mexit);
+    MethodInstrumentHooks fs_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_fileStream_mexit);
+    MethodInstrumentHooks fs_open = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_fileStream_mexit);
 
     klass = "java.io.FileInputStream";
     hooks = new ClassInstrumentHooks();
@@ -57,9 +57,10 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     //creates recursion with print statements in bci code. uncomment when moving to jni and add hooks for open, write, close
 //    klass = "java.io.FileOutputStream";
 
-    MethodInstrumentHooks sock_input_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sock_input_mexit);
-    MethodInstrumentHooks sock_output_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sock_output_mexit);
+    MethodInstrumentHooks sock_input_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockStream_input_mexit);
+    MethodInstrumentHooks sock_output_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockStream_output_mexit);
     MethodInstrumentHooks sock_connect = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sock_connect_mexit);
+    MethodInstrumentHooks sock_accept = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sock_accept_mexit);
 
     klass = "java.net.SocketInputStream";
     hooks = new ClassInstrumentHooks();
@@ -78,14 +79,12 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     INSTRUMENTED_CLASSES.put(klass, hooks);
     hooks.methods.put("connect(Ljava/net/SocketAddress;I)V", sock_connect);
 
-    //Not necessary if channel impl classes are instrumented correctly
-//    MethodInstrumentHooks net_connect = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_net_connect_mexit);
-//    klass = "sun.nio.ch.Net";
-//    hooks = new ClassInstrumentHooks();
-//    INSTRUMENTED_CLASSES.put(klass, hooks);
-//    hooks.methods.put("connect(Ljava/net/ProtocolFamily;Ljava/io/FileDescriptor;Ljava/net/InetAddress;I)I", net_connect);
+    klass = "java.net.ServerSocket";
+    hooks = new ClassInstrumentHooks();
+    INSTRUMENTED_CLASSES.put(klass, hooks);
+    hooks.methods.put("accept()Ljava/net/Socket;", sock_accept);
 
-    MethodInstrumentHooks sock_ch_connect = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sock_ch_connect_mexit);
+    MethodInstrumentHooks sock_ch_connect = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockCh_connect_mexit);
     ConstructorInstrumentHooks sock_ch_ctr = new ConstructorInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_centry, ProfileMethodTransformer::instrument_sock_ch_cexit);
 
     klass = "sun.nio.ch.SocketChannelImpl";
@@ -136,7 +135,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
 
           if (instrumentHooks.methods.size() > 0) {
             for (CtMethod currentMethod : cclass.getDeclaredMethods()) {
-//              System.out.println("Declared method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
+              System.out.println("Declared method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
               MethodInstrumentHooks hooks;
               if (((hooks = instrumentHooks.methods.get(currentMethod.getName() + currentMethod.getSignature())) != null) && !Modifier.isNative(currentMethod.getModifiers()) && !currentMethod.isEmpty()) {
                 System.out.println("Transformed method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
@@ -189,81 +188,70 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     m.insertBefore(jStr);
   }
 
-  private static void instrument_fs_mexit(CtMethod m) throws Exception {
+  private static void instrument_fileStream_mexit(CtMethod m) throws Exception {
     String jStr = "";
-    jStr += elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
-    jStr += "java.lang.reflect.Field fdField = this.fd == null ? null : this.fd.getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int $$$_fd = fdField != null ? fdField.getInt(this.fd) : -1;";
+    jStr += codebuild_calculateElapsedMillis();
+    jStr += codebuild_fileStream_saveFDToLocalVar();
     jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": name=\" + this.path + \" FD=\" + $$$_fd + \" elapsed=\" + " + elapsedLocalVar + ");";
     //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
     m.insertAfter(jStr, true);
   }
 
-  private static void instrument_sock_input_mexit(CtMethod m) throws Exception {
+  private static void instrument_sockStream_input_mexit(CtMethod m) throws Exception {
     String jStr = "";
-    jStr += elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
-    jStr += "java.lang.reflect.Field fdField = (this.impl == null || this.impl.getFileDescriptor() == null) ? null : this.impl.getFileDescriptor().getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int $$$_fd = fdField != null ? fdField.getInt(this.impl.getFileDescriptor()) : -1;";
+    jStr += codebuild_calculateElapsedMillis();
+    jStr += codebuild_sockStream_saveFDToLocalVar();
     jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" return=\" + $_ + \" elapsed=\" + " + elapsedLocalVar + ");";
-    //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
     m.insertAfter(jStr, true);
   }
 
-  private static void instrument_sock_output_mexit(CtMethod m) throws Exception {
+  private static void instrument_sockStream_output_mexit(CtMethod m) throws Exception {
     String jStr = "";
-    jStr += elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
-    jStr += "java.lang.reflect.Field fdField = (this.impl == null || this.impl.getFileDescriptor() == null) ? null : this.impl.getFileDescriptor().getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int $$$_fd = fdField != null ? fdField.getInt(this.impl.getFileDescriptor()) : -1;";
+    jStr += codebuild_calculateElapsedMillis();
+    jStr += codebuild_sockStream_saveFDToLocalVar();
     jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" written=\" + $3 + \" elapsed=\" + " + elapsedLocalVar + ");";
-    //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
     m.insertAfter(jStr, true);
   }
 
   private static void instrument_sock_connect_mexit(CtMethod m) throws Exception {
     String jStr = "";
-    jStr += elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
-    jStr += "java.lang.reflect.Field fdField = (this.impl == null || this.impl.getFileDescriptor() == null) ? null : this.impl.getFileDescriptor().getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int $$$_fd = fdField != null ? fdField.getInt(this.impl.getFileDescriptor()) : -1;";
+    jStr += codebuild_calculateElapsedMillis();
+    jStr += codebuild_sockStream_saveFDToLocalVar();
     jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" connected=\" + connected + \" addr=\" + $1 + \" elapsed=\" + " + elapsedLocalVar + ");";
-    //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
     m.insertAfter(jStr, true);
   }
 
-  private static void instrument_sock_ch_connect_mexit(CtMethod m) throws Exception {
+  private static void instrument_sock_accept_mexit(CtMethod m) throws Exception {
     String jStr = "";
-    jStr += elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
-    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + fdVal + \" remote_addr=\" + $1 + \" elapsed=\" + " + elapsedLocalVar + ");";
-    //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
+    jStr += codebuild_calculateElapsedMillis();
+    jStr += codebuild_sock_accept_saveFDToLocalVar();
+    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" connected=\" + ($_ == null ? null : $_.isConnected()) + \" addr=\" + ($_ == null ? null : $_.getInetAddress()) + \" elapsed=\" + " + elapsedLocalVar + ");";
+    m.insertAfter(jStr, true);
+  }
+
+  private static void instrument_sockCh_connect_mexit(CtMethod m) throws Exception {
+    String jStr = "";
+    jStr += codebuild_calculateElapsedMillis();
+    jStr += codebuild_sockCh_saveFDToLocalVar();
+    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" remote_addr=\" + $1 + \" elapsed=\" + " + elapsedLocalVar + ");";
     m.insertAfter(jStr, true);
   }
 
   private static void instrument_ioutil_read_mexit(CtMethod m) throws Exception {
     String jStr = "";
-    jStr += elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
-    jStr += "java.lang.reflect.Field fdField = ($1 == null) ? null : $1.getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int $$$_fd = fdField != null ? fdField.getInt($1) : -1;";
+    jStr += codebuild_calculateElapsedMillis();
+    jStr += codebuild_ioUtil_saveFDToLocalVar();
     jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" read=\" + $_ + \" elapsed=\" + " + elapsedLocalVar + ");";
-    //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
     m.insertAfter(jStr, true);
   }
 
   private static void instrument_ioutil_write_mexit(CtMethod m) throws Exception {
     String jStr = "";
-    jStr += elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
-    jStr += "java.lang.reflect.Field fdField = ($1 == null) ? null : $1.getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int $$$_fd = fdField != null ? fdField.getInt($1) : -1;";
+    jStr += codebuild_calculateElapsedMillis();
+    jStr += codebuild_ioUtil_saveFDToLocalVar();
     jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" written=\" + $_ + \" elapsed=\" + " + elapsedLocalVar + ");";
-    //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
     m.insertAfter(jStr, true);
   }
-
-
 
 
   private static void instrument_elapsed_centry(CtConstructor c) throws Exception {
@@ -275,10 +263,51 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
 
   private static void instrument_sock_ch_cexit(CtConstructor c) throws Exception {
     String jStr = "";
-    jStr += elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
-    jStr += "System.out.println(\"CONSTRUCTOR=" + c.getLongName() + ": FD=\" + fdVal + \" remote_addr=\" + $3 + \" elapsed=\" + " + elapsedLocalVar + ");";
-    //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
+    jStr += codebuild_calculateElapsedMillis();
+    jStr += codebuild_sockCh_saveFDToLocalVar();
+    jStr += "System.out.println(\"CONSTRUCTOR=" + c.getLongName() + ": FD=\" + $$$_fd + \" remote_addr=\" + $3 + \" elapsed=\" + " + elapsedLocalVar + ");";
     c.insertAfter(jStr, true);
+  }
+
+
+  private static String codebuild_calculateElapsedMillis() {
+    return elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
+  }
+
+  private static String codebuild_fileStream_saveFDToLocalVar() {
+    String jStr = "";
+    jStr += "java.lang.reflect.Field fdField = this.fd == null ? null : this.fd.getClass().getDeclaredField(\"fd\");";
+    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
+    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt(this.fd) : -1;";
+    return jStr;
+  }
+
+  private static String codebuild_sock_accept_saveFDToLocalVar() {
+    String jStr = "";
+    jStr += "java.lang.reflect.Field fdField = ($_ == null || $_.getImpl() == null || $_.getImpl().getFileDescriptor() == null) ? null : $_.getImpl().getFileDescriptor().getClass().getDeclaredField(\"fd\");";
+    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
+    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt($_.getImpl().getFileDescriptor()) : -1;";
+    return jStr;
+  }
+
+  private static String codebuild_sockStream_saveFDToLocalVar() {
+    String jStr = "";
+    jStr += "java.lang.reflect.Field fdField = (this.impl == null || this.impl.getFileDescriptor() == null) ? null : this.impl.getFileDescriptor().getClass().getDeclaredField(\"fd\");";
+    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
+    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt(this.impl.getFileDescriptor()) : -1;";
+    return jStr;
+  }
+
+  private static String codebuild_ioUtil_saveFDToLocalVar() {
+    String jStr = "";
+    jStr += "java.lang.reflect.Field fdField = $1 == null ? null : $1.getClass().getDeclaredField(\"fd\");";
+    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
+    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt($1) : -1;";
+    return jStr;
+  }
+
+  private static String codebuild_sockCh_saveFDToLocalVar() {
+    return "int " + fdLocalVar + " = fdVal;";
   }
 
 }
@@ -347,7 +376,12 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
 //  }
 
 
-
+//Not necessary if channel impl classes are instrumented correctly
+//    MethodInstrumentHooks net_connect = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_net_connect_mexit);
+//    klass = "sun.nio.ch.Net";
+//    hooks = new ClassInstrumentHooks();
+//    INSTRUMENTED_CLASSES.put(klass, hooks);
+//    hooks.methods.put("connect(Ljava/net/ProtocolFamily;Ljava/io/FileDescriptor;Ljava/net/InetAddress;I)I", net_connect);
 
 //  private static void instrument_net_connect_mexit(CtMethod m) throws Exception {
 //    String jStr = "";
