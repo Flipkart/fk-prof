@@ -2,7 +2,7 @@ package fk.prof.userapi.model.tree;
 
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
 import fk.prof.userapi.model.Tree;
-import fk.prof.userapi.model.ProfileView;
+import fk.prof.userapi.model.TreeView;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 /**
  * Created by gaurav.ashok on 01/06/17.
  */
-public class CalleesTreeView implements ProfileView<IndexedTreeNode<FrameNode>> {
+public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>> {
 
     private Tree<FrameNode> callTree;
     private List<IndexedTreeNode<FrameNode>> hotMethods;
@@ -24,16 +24,16 @@ public class CalleesTreeView implements ProfileView<IndexedTreeNode<FrameNode>> 
         return hotMethods;
     }
 
-    public List<IndexedTreeNode<FrameNode>> getSubTree(List<Integer> ids, int depth, boolean autoExpand) {
+    public List<IndexedTreeNode<FrameNode>> getSubTrees(List<Integer> ids, int depth, boolean autoExpand) {
         return new Expander(ids, depth, autoExpand).expand();
     }
 
     private void findOnCpuFrames() {
         hotMethods = new ArrayList<>();
-        callTree.foreach((i, fn) -> {
-            int cpuSampleCount = fn.getCpuSamplingProps().getOnCpuSamples();
+        callTree.foreach((i, node) -> {
+            int cpuSampleCount = node.getCpuSamplingProps().getOnCpuSamples();
             if(cpuSampleCount > 0) {
-                hotMethods.add(new IndexedTreeNode<>(i, fn));
+                hotMethods.add(new IndexedTreeNode<>(i, node));
             }
         });
     }

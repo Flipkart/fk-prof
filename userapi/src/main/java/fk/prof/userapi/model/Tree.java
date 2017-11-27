@@ -50,6 +50,8 @@ public interface Tree<T> {
      * @param <T> type of the tree node
      */
     interface Visitor<T> {
-        void    visit(int idx, T node);
+        default void preVisit(T node) {}
+        void visit(int idx, T node);
+        default void postVisit(T node) {}
     }
 }

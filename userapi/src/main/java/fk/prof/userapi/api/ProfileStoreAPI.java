@@ -73,13 +73,13 @@ public interface ProfileStoreAPI {
     void loadSummary(Future<AggregationWindowSummary> future, AggregatedProfileNamingStrategy filename);
 
     /**
-     * Get/Create a ProfileView for the provided profile name, trace name of a specific type
+     * Get/Create a TreeView for the provided profile name, trace name of a specific type
      *
      * @param profileName       name of the profile file
      * @param traceName         name of the trace context
      * @param profileViewType   type of the profile view intended to be get
-     * @param <T>               type implementing the ProfileView interface
-     * @return Future containing pair of aggregated samples and ProfileView of type T
+     * @param <T>               type implementing the TreeView interface
+     * @return Future containing pair of aggregated samples and TreeView of type T
      */
-    <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx,T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType);
+    <T extends TreeView> Future<Pair<AggregatedSamplesPerTraceCtx,T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType);
 }

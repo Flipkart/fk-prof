@@ -9,7 +9,7 @@ import fk.prof.userapi.api.AggregatedProfileLoader;
 import fk.prof.userapi.api.ProfileViewCreator;
 import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
-import fk.prof.userapi.model.ProfileView;
+import fk.prof.userapi.model.TreeView;
 import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.proto.LoadInfoEntities.ProfileResidencyInfo;
 import fk.prof.userapi.util.Pair;
@@ -191,7 +191,7 @@ public class ClusterAwareCache {
      * @param profileViewType
      * @return Future containing a pair of trace specific aggregated samples and its view.
      */
-    public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
+    public <T extends TreeView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
         Future<Pair<AggregatedSamplesPerTraceCtx, T >> viewFuture = Future.future();
         Pair<Future<AggregatedProfileInfo>, T> profileViewPair = cache.getView(profileName, traceName, profileViewType);
 
@@ -237,7 +237,7 @@ public class ClusterAwareCache {
      * @param f
      * @param profileViewType
      */
-    private <T extends ProfileView> void getOrCreateView(AggregatedProfileNamingStrategy profileName, String traceName, Future<Pair<AggregatedSamplesPerTraceCtx, T>> f, ProfileViewType profileViewType) {
+    private <T extends TreeView> void getOrCreateView(AggregatedProfileNamingStrategy profileName, String traceName, Future<Pair<AggregatedSamplesPerTraceCtx, T>> f, ProfileViewType profileViewType) {
         Pair<Future<AggregatedProfileInfo>, T> profileViewPair = cache.getView(profileName, traceName, profileViewType);
         Future<AggregatedProfileInfo> cachedProfileInfo = profileViewPair.first;
 
@@ -279,7 +279,7 @@ public class ClusterAwareCache {
         }
     }
 
-    private <T extends ProfileView> T buildView(AggregatedProfileInfo profile, String traceName, ProfileViewType profileViewType) {
+    private <T extends TreeView> T buildView(AggregatedProfileInfo profile, String traceName, ProfileViewType profileViewType) {
         if (ProfileViewType.CALLERS.equals(profileViewType)) {
             return (T)viewCreator.buildCallTreeView(profile, traceName);
         }

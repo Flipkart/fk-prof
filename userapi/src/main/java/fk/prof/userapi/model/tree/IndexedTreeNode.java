@@ -3,6 +3,7 @@ package fk.prof.userapi.model.tree;
 import fk.prof.userapi.model.Tree;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Represents a indexable node in the tree. This node has an index, accompanying data and the list of children nodes.
@@ -37,13 +38,19 @@ public class IndexedTreeNode<T> {
         return children;
     }
 
-    public void visit(Tree.Visitor<T> visitor) {
-        visitor.visit(idx, data);
+    public int getChildrenCount() {
+        return children.size();
+    }
+
+    public void visit(Tree.Visitor<IndexedTreeNode<T>> visitor) {
+        visitor.preVisit(this);
+        visitor.visit(idx, this);
         if(children != null) {
-            for(IndexedTreeNode node : children) {
+            for(IndexedTreeNode<T> node : children) {
                 node.visit(visitor);
             }
         }
+        visitor.postVisit(this);
     }
 
     public IndexedTreeNode<T> setChildren(List<IndexedTreeNode<T>> children) {
@@ -51,6 +58,13 @@ public class IndexedTreeNode<T> {
         return this;
     }
 
+    /**
+     * Indicates whether some other object is "equal to" this IndexTreeNode object.
+     * Only idx and data members are checked for equality and children are ignored.
+     * This is to avoid making the method computationally complex.
+     * @param o the object to be checked for equality with
+     * @return true or false
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -59,7 +73,7 @@ public class IndexedTreeNode<T> {
         IndexedTreeNode<?> that = (IndexedTreeNode<?>) o;
 
         if (idx != that.idx) return false;
-        return data.equals(that.data);
+        return Objects.equals(data, that.data);
     }
 
     @Override

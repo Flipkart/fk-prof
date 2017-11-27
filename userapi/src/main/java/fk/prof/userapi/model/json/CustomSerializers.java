@@ -7,18 +7,23 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
-import fk.prof.userapi.model.tree.TreeViewResponse;
+import fk.prof.userapi.model.Tree;
 import fk.prof.userapi.model.tree.IndexedTreeNode;
+import fk.prof.userapi.model.tree.TreeViewResponse;
 import fk.prof.userapi.model.tree.TreeViewResponse.CpuSampleCalleesTreeViewResponse;
 import fk.prof.userapi.model.tree.TreeViewResponse.CpuSampleCallersTreeViewResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+
 
 /**
  * Created by gaurav.ashok on 07/08/17.
  */
 public class CustomSerializers {
+    private static final Logger logger = LoggerFactory.getLogger(CustomSerializers.class);
 
     public static void registerSerializers(ObjectMapper om) {
         SimpleModule module = new SimpleModule("customSerializers", new Version(1, 0, 0, null, null, null));
@@ -37,21 +42,54 @@ public class CustomSerializers {
         }
 
         @Override
-        public void serialize(IndexedTreeNode value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            gen.writeStartObject();
-            gen.writeFieldName("data");
-            dataSerializer.serialize(value.getData(), gen, serializers);
-            List<IndexedTreeNode> children = value.getChildren();
-            if(children != null) {
-                gen.writeFieldName("chld");
-                gen.writeStartObject();
-                for(IndexedTreeNode chld : children) {
-                    gen.writeFieldName(String.valueOf(chld.getIdx()));
-                    this.serialize(chld, gen, serializers);
-                }
-                gen.writeEndObject();
+        public void serialize(IndexedTreeNode indexedTreeNode, JsonGenerator gen, SerializerProvider serializers) {
+            indexedTreeNode.visit(new IndexedTreeNodeVisitor(dataSerializer, gen, serializers));
+        }
+    }
+
+    static class IndexedTreeNodeVisitor implements Tree.Visitor<IndexedTreeNode> {
+        private final StdSerializer dataSerializer;
+        private final JsonGenerator gen;
+        private final SerializerProvider serializers;
+
+        IndexedTreeNodeVisitor(StdSerializer dataSerializer, JsonGenerator gen, SerializerProvider serializers) {
+            this.dataSerializer = dataSerializer;
+            this.gen = gen;
+            this.serializers = serializers;
+        }
+
+        @Override
+        public void preVisit(IndexedTreeNode node) {
+            try {
+                gen.writeEndObject();                   //1 open {
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
-            gen.writeEndObject();
+        }
+
+        @Override
+        public void visit(int idx, IndexedTreeNode node) {
+            try {
+                gen.writeFieldName(String.valueOf(idx));
+                gen.writeStartObject();                 //2 close {
+                gen.writeFieldName("data");
+                dataSerializer.serialize(node.getData(), gen, serializers);
+                if (node.getChildrenCount() > 0) {
+                    gen.writeFieldName("chld");
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
+        public void postVisit(IndexedTreeNode node) {
+            try {
+                gen.writeEndObject();                   //2 close }
+                gen.writeEndObject();                   //1 close }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 

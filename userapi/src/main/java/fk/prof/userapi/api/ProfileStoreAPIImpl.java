@@ -182,7 +182,7 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
     }
 
     @Override
-    public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
+    public <T extends TreeView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
         Future<Pair<AggregatedSamplesPerTraceCtx, T>> result = Future.future();
 
         Future<Pair<AggregatedSamplesPerTraceCtx, T>> f = clusterAwareCache.getProfileView(profileName, traceName, profileViewType);

@@ -12,7 +12,7 @@ import fk.prof.userapi.http.ProfHttpClient;
 import fk.prof.userapi.http.UserapiHttpHelper;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
 import fk.prof.userapi.model.AggregationWindowSummary;
-import fk.prof.userapi.model.ProfileView;
+import fk.prof.userapi.model.TreeView;
 import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.model.tree.IndexedTreeNode;
 import fk.prof.userapi.model.tree.TreeViewResponse;
@@ -257,8 +257,8 @@ public class HttpVerticle extends AbstractVerticle {
       getTreeViewForCpuSampling(routingContext, profileName, traceName, nodeIds, autoExpand, maxDepth, profileViewType);
     }
 
-    private <T extends ProfileView<IndexedTreeNode<AggregatedProfileModel.FrameNode>>>void getTreeViewForCpuSampling(RoutingContext routingContext, AggregatedProfileNamingStrategy profileName, String traceName,
-                                                                                                                     List<Integer> nodeIds, boolean autoExpand, int maxDepth, ProfileViewType profileViewType) {
+    private <T extends TreeView<IndexedTreeNode<AggregatedProfileModel.FrameNode>>>void getTreeViewForCpuSampling(RoutingContext routingContext, AggregatedProfileNamingStrategy profileName, String traceName,
+                                                                                                                  List<Integer> nodeIds, boolean autoExpand, int maxDepth, ProfileViewType profileViewType) {
       Future<Pair<AggregatedSamplesPerTraceCtx, T>> treeViewPair = profileStoreAPI.getProfileView(profileName, traceName, profileViewType);
 
       treeViewPair.setHandler(ar -> {
@@ -273,10 +273,10 @@ public class HttpVerticle extends AbstractVerticle {
             originIds = treeView.getRootNodes().stream().map(IndexedTreeNode::getIdx).collect(Collectors.toList());
           }
 
-          List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> subTree = treeView.getSubTree(originIds, maxDepth, autoExpand);
+          List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> subTree = treeView.getSubTrees(originIds, maxDepth, autoExpand);
           Map<Integer, String> methodLookup = new HashMap<>();
 
-          subTree.forEach(e -> e.visit((i,data) -> methodLookup.put(data.getMethodId(), samplesPerTraceCtx.getMethodLookup().get(data.getMethodId()))));
+          subTree.forEach(e -> e.visit((i, node) -> methodLookup.put(node.getData().getMethodId(), samplesPerTraceCtx.getMethodLookup().get(node.getData().getMethodId()))));
 
           setResponse(Future.succeededFuture(new TreeViewResponse.CpuSampleCallersTreeViewResponse(subTree, methodLookup)), routingContext, true);
         }
