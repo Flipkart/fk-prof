@@ -259,7 +259,7 @@ public class HttpVerticle extends AbstractVerticle {
 
     private <T extends ProfileView<IndexedTreeNode<AggregatedProfileModel.FrameNode>>>void getTreeViewForCpuSampling(RoutingContext routingContext, AggregatedProfileNamingStrategy profileName, String traceName,
                                                                                                                      List<Integer> nodeIds, boolean autoExpand, int maxDepth, ProfileViewType profileViewType) {
-      Future<Pair<AggregatedSamplesPerTraceCtx, T>> treeViewPair = profileStoreAPI.getCPUSamplingTreeView(profileName, traceName, profileViewType);
+      Future<Pair<AggregatedSamplesPerTraceCtx, T>> treeViewPair = profileStoreAPI.getProfileView(profileName, traceName, profileViewType);
 
       treeViewPair.setHandler(ar -> {
         if(ar.failed()) {
