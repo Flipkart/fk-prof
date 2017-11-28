@@ -41,7 +41,7 @@ public class ClusterAwareCache {
     private final String myIp;
     private final int port;
 
-    public ClusterAwareCache(CuratorFramework zookeeper, WorkerExecutor workerExecutor,
+    public ClusterAwareCache(CuratorFramework curatorClient, WorkerExecutor workerExecutor,
                              AggregatedProfileLoader profileLoader, ProfileViewCreator viewCreator, Configuration config) {
         this.myIp = config.getIpAddress();
         this.port = config.getHttpConfig().getHttpPort();
@@ -51,13 +51,13 @@ public class ClusterAwareCache {
 
         this.profileLoader = profileLoader;
         this.viewCreator = viewCreator;
-        this.zkStore = new ZkLoadInfoStore(zookeeper, myIp, port, this.cache::cachedProfiles);
+        this.zkStore = new ZkLoadInfoStore(curatorClient, myIp, port, this.cache::cachedProfiles);
 
         this.workerExecutor = workerExecutor;
     }
 
     @VisibleForTesting
-    ClusterAwareCache(CuratorFramework zookeeper, WorkerExecutor workerExecutor,
+    ClusterAwareCache(CuratorFramework curatorClient, WorkerExecutor workerExecutor,
                              AggregatedProfileLoader profileLoader, ProfileViewCreator viewCreator, Configuration config, LocalProfileCache localCache) {
         this.myIp = config.getIpAddress();
         this.port = config.getHttpConfig().getHttpPort();
@@ -67,7 +67,7 @@ public class ClusterAwareCache {
 
         this.profileLoader = profileLoader;
         this.viewCreator = viewCreator;
-        this.zkStore = new ZkLoadInfoStore(zookeeper, myIp, port, this.cache::cachedProfiles);
+        this.zkStore = new ZkLoadInfoStore(curatorClient, myIp, port, this.cache::cachedProfiles);
 
         this.workerExecutor = workerExecutor;
     }

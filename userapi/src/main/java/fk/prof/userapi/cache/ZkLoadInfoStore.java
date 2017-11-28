@@ -48,7 +48,7 @@ class ZkLoadInfoStore {
     private static final String distributedLockPath = "/global_mutex";
 
     private final String zkNodesInfoPath;
-    private final CuratorFramework zookeeper;
+    private final CuratorFramework curatorClient;
     private final InterProcessSemaphoreMutex sharedMutex;
 
     private final AtomicReference<ConnectionState> connectionState;
@@ -61,35 +61,35 @@ class ZkLoadInfoStore {
     private Counter lockAcquireTimeoutCounter = Util.counter("zk.lock.timeouts");
     private Counter onReconnectFailures = Util.counter("zk.onreconnect.failures");
 
-    ZkLoadInfoStore(CuratorFramework zookeeper, String myIp, int port, Supplier<List<AggregatedProfileNamingStrategy>> cachedProfiles) {
-        this.zookeeper = zookeeper;
+    ZkLoadInfoStore(CuratorFramework curatorClient, String myIp, int port, Supplier<List<AggregatedProfileNamingStrategy>> cachedProfiles) {
+        this.curatorClient = curatorClient;
 
         this.zkNodesInfoPath = "/nodesInfo/" + myIp + ":" + port;
-        this.sharedMutex = new InterProcessSemaphoreMutex(zookeeper, distributedLockPath);
+        this.sharedMutex = new InterProcessSemaphoreMutex(curatorClient, distributedLockPath);
         this.lastZkLostTime = new AtomicReference<>(LocalDateTime.MIN);
         this.recentlyZkConnectionLost = new AtomicBoolean(false);
 
         this.myResidencyInfo = ProfileResidencyInfo.newBuilder().setIp(myIp).setPort(port).build().toByteArray();
 
-        this.zookeeper.getConnectionStateListenable().addListener(this::zkStateChangeListener,
+        this.curatorClient.getConnectionStateListenable().addListener(this::zkStateChangeListener,
             Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("curator-state-listener").build()));
 
         this.cachedProfiles = cachedProfiles;
 
         this.connectionState = new AtomicReference<>(
-            zookeeper.getZookeeperClient().isConnected() ? ConnectionState.Connected : ConnectionState.Disconnected);
+            curatorClient.getZookeeperClient().isConnected() ? ConnectionState.Connected : ConnectionState.Disconnected);
     }
 
     boolean ensureBasePathExists() throws Exception {
         ensureConnected();
-        if(zookeeper.checkExists().forPath(zkNodesInfoPath) == null) {
-            zookeeper.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkNodesInfoPath, buildNodeLoadInfo(0).toByteArray());
+        if(curatorClient.checkExists().forPath(zkNodesInfoPath) == null) {
+            curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkNodesInfoPath, buildNodeLoadInfo(0).toByteArray());
         }
         else {
-            zookeeper.setData().forPath(zkNodesInfoPath, buildNodeLoadInfo(0).toByteArray());
+            curatorClient.setData().forPath(zkNodesInfoPath, buildNodeLoadInfo(0).toByteArray());
         }
-        if(zookeeper.checkExists().forPath("/profilesLoadStatus") == null) {
-            zookeeper.create().withMode(CreateMode.PERSISTENT).forPath("/profilesLoadStatus");
+        if(curatorClient.checkExists().forPath("/profilesLoadStatus") == null) {
+            curatorClient.create().withMode(CreateMode.PERSISTENT).forPath("/profilesLoadStatus");
             return true;
         }
         return false;
@@ -127,7 +127,7 @@ class ZkLoadInfoStore {
         ensureConnected();
         NodeLoadInfo nodeLoadInfo = readFrom(zkNodesInfoPath, NodeLoadInfo.parser());
         int profileLoadedCount = nodeLoadInfo.getProfilesLoaded() + (profileNodeExists ? 0 : 1);
-        CuratorTransactionFinal transaction = zookeeper.inTransaction().setData().forPath(zkNodesInfoPath, buildNodeLoadInfo(profileLoadedCount).toByteArray()).and();
+        CuratorTransactionFinal transaction = curatorClient.inTransaction().setData().forPath(zkNodesInfoPath, buildNodeLoadInfo(profileLoadedCount).toByteArray()).and();
         if(profileNodeExists) {
             transaction = transaction.setData().forPath(zkPathForProfile(profileName), myResidencyInfo).and();
         }
@@ -142,12 +142,12 @@ class ZkLoadInfoStore {
         NodeLoadInfo nodeLoadInfo = readFrom(zkNodesInfoPath, NodeLoadInfo.parser());
         byte[] newData = buildNodeLoadInfo(nodeLoadInfo.getProfilesLoaded() - 1).toByteArray();
         if(deleteProfileNode) {
-            zookeeper.inTransaction().setData().forPath(zkNodesInfoPath, newData)
+            curatorClient.inTransaction().setData().forPath(zkNodesInfoPath, newData)
                 .and().delete().forPath(zkPathForProfile(profileName))
                 .and().commit();
         }
         else {
-            zookeeper.setData().forPath(zkNodesInfoPath, newData);
+            curatorClient.setData().forPath(zkNodesInfoPath, newData);
         }
     }
 
@@ -176,7 +176,7 @@ class ZkLoadInfoStore {
     }
 
     private boolean pathExists(String path) throws  Exception {
-        return zookeeper.checkExists().forPath(path) != null;
+        return curatorClient.checkExists().forPath(path) != null;
     }
 
     private class CloseableSharedLock implements AutoCloseable {
@@ -216,7 +216,7 @@ class ZkLoadInfoStore {
     }
 
     private <T extends AbstractMessage> T readFrom(String path, Parser<T> parser) throws Exception {
-        byte[] bytes = zookeeper.getData().forPath(path);
+        byte[] bytes = curatorClient.getData().forPath(path);
         return parser.parseFrom(bytes);
     }
 
@@ -265,16 +265,16 @@ class ZkLoadInfoStore {
         List<AggregatedProfileNamingStrategy> cachedProfiles = this.cachedProfiles.get();
         List<AggregatedProfileNamingStrategy> remotelyCachedProfiles = new ArrayList<>();
 
-        long mySessionId = zookeeper.getZookeeperClient().getZooKeeper().getSessionId();
+        long mySessionId = curatorClient.getZookeeperClient().getZooKeeper().getSessionId();
 
-        Stat stat = zookeeper.checkExists().forPath(zkNodesInfoPath);
+        Stat stat = curatorClient.checkExists().forPath(zkNodesInfoPath);
         Boolean nodeInfoNodeExists = stat != null;
 
         logger.info("curr sessionId: {}, existing session id: {}", mySessionId, nodeInfoNodeExists ? stat.getEphemeralOwner() : -1);
 
         // if i am not the owner, wait for it to be deleted
         if(nodeInfoNodeExists && stat.getEphemeralOwner() != mySessionId) {
-            int retry = 2 * zookeeper.getZookeeperClient().getZooKeeper().getSessionTimeout() / 1000;
+            int retry = 2 * curatorClient.getZookeeperClient().getZooKeeper().getSessionTimeout() / 1000;
             while(retry > 0) {
                 logger.info("Checking loadInfo node presence: {}, retry remaining: {}", nodeInfoNodeExists, retry);
                 if((nodeInfoNodeExists = pathExists(zkNodesInfoPath))) {
@@ -294,7 +294,7 @@ class ZkLoadInfoStore {
         if(!nodeInfoNodeExists) {
             for (AggregatedProfileNamingStrategy profileName : cachedProfiles) {
                 try {
-                    zookeeper.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkPathForProfile(profileName), myResidencyInfo);
+                    curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkPathForProfile(profileName), myResidencyInfo);
                 }
                 catch (KeeperException.NodeExistsException e) {
                     // profile is not cached on some other node
@@ -306,7 +306,7 @@ class ZkLoadInfoStore {
             // now create a nodeInfo node
             NodeLoadInfo loadInfo = buildNodeLoadInfo(cachedProfiles.size() - remotelyCachedProfiles.size());
             logger.info("After reconnection, {} many profiles were loaded, {} were remotely loaded", cachedProfiles.size(), remotelyCachedProfiles.size());
-            zookeeper.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkNodesInfoPath, loadInfo.toByteArray());
+            curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkNodesInfoPath, loadInfo.toByteArray());
         }
     }
 }

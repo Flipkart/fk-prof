@@ -12,10 +12,11 @@ import fk.prof.userapi.http.ProfHttpClient;
 import fk.prof.userapi.http.UserapiHttpHelper;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
 import fk.prof.userapi.model.AggregationWindowSummary;
-import fk.prof.userapi.model.TreeView;
 import fk.prof.userapi.model.ProfileViewType;
+import fk.prof.userapi.model.TreeView;
 import fk.prof.userapi.model.tree.IndexedTreeNode;
 import fk.prof.userapi.model.tree.TreeViewResponse;
+import fk.prof.userapi.util.HttpRequestUtil;
 import fk.prof.userapi.util.Pair;
 import fk.prof.userapi.util.ProtoUtil;
 import io.vertx.core.AbstractVerticle;
@@ -41,7 +42,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static fk.prof.userapi.http.UserapiApiPathConstants.*;
-import static fk.prof.userapi.util.HttpRequestUtil.getParam;
+import static fk.prof.userapi.util.HttpRequestUtil.extractTypedParam;
 import static fk.prof.userapi.util.HttpResponseUtil.setResponse;
 
 /**
@@ -233,14 +234,14 @@ public class HttpVerticle extends AbstractVerticle {
       ZonedDateTime startTime;
       List<Integer> nodeIds;
       try {
-        appId = getParam(req, "appId");
-        clusterId = getParam(req, "clusterId");
-        procId = getParam(req, "procId");
-        traceName = getParam(req, "traceName");
-        startTime = getParam(req, "start", ZonedDateTime.class);
-        duration = getParam(req, "duration", Integer.class);
-        autoExpand = MoreObjects.firstNonNull(getParam(req, "autoExpand", Boolean.class, false), false);
-        maxDepth = Math.min(maxDepthForTreeExpand, MoreObjects.firstNonNull(getParam(req, "maxDepth", Integer.class, false), maxDepthForTreeExpand));
+        appId = extractTypedParam(req, "appId");
+        clusterId = extractTypedParam(req, "clusterId");
+        procId = extractTypedParam(req, "procId");
+        traceName = extractTypedParam(req, "traceName");
+        startTime = HttpRequestUtil.extractTypedParam(req, "start", ZonedDateTime.class);
+        duration = HttpRequestUtil.extractTypedParam(req, "duration", Integer.class);
+        autoExpand = MoreObjects.firstNonNull(HttpRequestUtil.extractTypedParam(req, "autoExpand", Boolean.class, false), false);
+        maxDepth = Math.min(maxDepthForTreeExpand, MoreObjects.firstNonNull(HttpRequestUtil.extractTypedParam(req, "maxDepth", Integer.class, false), maxDepthForTreeExpand));
         nodeIds = routingContext.getBodyAsJsonArray().getList();
       }
       catch (IllegalArgumentException e) {
@@ -278,7 +279,7 @@ public class HttpVerticle extends AbstractVerticle {
 
           subTree.forEach(e -> e.visit((i, node) -> methodLookup.put(node.getData().getMethodId(), samplesPerTraceCtx.getMethodLookup().get(node.getData().getMethodId()))));
 
-          setResponse(Future.succeededFuture(new TreeViewResponse.CpuSampleCallersTreeViewResponse(subTree, methodLookup)), routingContext, true);
+          setResponse(Future.succeededFuture(new TreeViewResponse<>(subTree, methodLookup)), routingContext, true);
         }
       });
     }

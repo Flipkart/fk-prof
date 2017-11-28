@@ -29,27 +29,4 @@ public class TreeViewResponse<T> {
         return methodLookup;
     }
 
-    public static class CpuSampleCallersTreeViewResponse extends TreeViewResponse<FrameNode> {
-
-        public CpuSampleCallersTreeViewResponse(List<IndexedTreeNode<FrameNode>> tree, Map<Integer, String> methodLookup) {
-            super(tree, methodLookup);
-        }
-
-        @Override
-        public List<IndexedTreeNode<FrameNode>> getTree() {
-            return super.getTree();
-        }
-    }
-
-    public static class CpuSampleCalleesTreeViewResponse extends TreeViewResponse<FrameNode> {
-
-        public CpuSampleCalleesTreeViewResponse(List<IndexedTreeNode<FrameNode>> tree, Map<Integer, String> methodLookup) {
-            super(tree, methodLookup);
-        }
-
-        @Override
-        public List<IndexedTreeNode<FrameNode>> getTree() {
-            return super.getTree();
-        }
-    }
 }

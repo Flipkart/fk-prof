@@ -10,8 +10,8 @@ import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
 import fk.prof.userapi.model.Tree;
 import fk.prof.userapi.model.tree.IndexedTreeNode;
 import fk.prof.userapi.model.tree.TreeViewResponse;
-import fk.prof.userapi.model.tree.TreeViewResponse.CpuSampleCalleesTreeViewResponse;
-import fk.prof.userapi.model.tree.TreeViewResponse.CpuSampleCallersTreeViewResponse;
+import fk.prof.userapi.model.tree.CpuSamplingCallTreeViewResponse;
+import fk.prof.userapi.model.tree.CpuSamplingCalleesTreeViewResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,8 +27,8 @@ public class CustomSerializers {
 
     public static void registerSerializers(ObjectMapper om) {
         SimpleModule module = new SimpleModule("customSerializers", new Version(1, 0, 0, null, null, null));
-        module.addSerializer(CpuSampleCallersTreeViewResponse.class, new TreeViewResponseSerializer(new IndexedNodeSerializer(new ProtoSerializers.CpuSampleFrameNodeWithStackSampleSerializer())));
-        module.addSerializer(CpuSampleCalleesTreeViewResponse.class, new TreeViewResponseSerializer(new IndexedNodeSerializer(new ProtoSerializers.CpuSampleFrameNodeWithCpuSampleSerializer())));
+        module.addSerializer(CpuSamplingCallTreeViewResponse.class, new TreeViewResponseSerializer(new IndexedNodeSerializer(new ProtoSerializers.CpuSampleFrameNodeWithStackSampleSerializer())));
+        module.addSerializer(CpuSamplingCalleesTreeViewResponse.class, new TreeViewResponseSerializer(new IndexedNodeSerializer(new ProtoSerializers.CpuSampleFrameNodeWithCpuSampleSerializer())));
         om.registerModule(module);
     }
 
@@ -71,11 +71,11 @@ public class CustomSerializers {
         public void visit(int idx, IndexedTreeNode node) {
             try {
                 gen.writeFieldName(String.valueOf(idx));
-                gen.writeStartObject();                 //2 close {
-                gen.writeFieldName("data");
+                gen.writeStartObject();                 //2 open {
+                gen.writeFieldName("d");
                 dataSerializer.serialize(node.getData(), gen, serializers);
                 if (node.getChildrenCount() > 0) {
-                    gen.writeFieldName("chld");
+                    gen.writeFieldName("c");
                 }
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -104,16 +104,16 @@ public class CustomSerializers {
 
         @Override
         public void serialize(TreeViewResponse value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            gen.writeStartObject();
+            gen.writeStartObject();                     //1 open
             gen.writeFieldName("method_lookup");
             serializers.defaultSerializeValue(value.getMethodLookup(), gen);
 
             List<IndexedTreeNode<FrameNode>> nodes = value.getTree();
-
+            gen.writeFieldName("nodes");
             for (IndexedTreeNode node : nodes) {
-                gen.writeFieldName(String.valueOf(node.getIdx()));
                 indexedNodeSerializer.serialize(node, gen, serializers);
             }
+            gen.writeEndObject();                       //1 close
         }
     }
 }

@@ -55,7 +55,7 @@ public class CacheTest {
     private Vertx vertx;
     private static Configuration config;
     private static TestingServer zookeeper;
-    private static CuratorFramework curator;
+    private static CuratorFramework curatorClient;
     private WorkerExecutor executor;
     private ClusterAwareCache cache;
     private LocalProfileCache localProfileCache;
@@ -69,7 +69,7 @@ public class CacheTest {
         zookeeper = new TestingServer(zkPort, true);
 
         Configuration.CuratorConfig curatorConfig = config.getCuratorConfig();
-        curator = CuratorFrameworkFactory.builder()
+        curatorClient = CuratorFrameworkFactory.builder()
             .connectString("127.0.0.1:" + zkPort)
             .retryPolicy(new ExponentialBackoffRetry(1000, curatorConfig.getMaxRetries()))
             .connectionTimeoutMs(curatorConfig.getConnectionTimeoutMs())
@@ -77,8 +77,8 @@ public class CacheTest {
             .namespace(curatorConfig.getNamespace())
             .build();
 
-        curator.start();
-        curator.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
+        curatorClient.start();
+        curatorClient.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
     }
 
     @AfterClass
@@ -99,7 +99,7 @@ public class CacheTest {
 
     private void setUpCache(TestContext context, LocalProfileCache localCache, AggregatedProfileLoader profileLoader, ProfileViewCreator viewCreator) {
         localProfileCache = localCache;
-        cache = new ClusterAwareCache(curator, executor, profileLoader, viewCreator, config, localProfileCache);
+        cache = new ClusterAwareCache(curatorClient, executor, profileLoader, viewCreator, config, localProfileCache);
         Async async = context.async();
         cache.onClusterJoin().setHandler(ar -> {
             context.assertTrue(ar.succeeded());
@@ -112,7 +112,7 @@ public class CacheTest {
     public void testNodesInfoExistWhenCacheIsCreated(TestContext context) throws Exception {
         setUpDefaultCache(context, null, null);
 
-        byte[] bytes = curator.getData().forPath("/nodesInfo/127.0.0.1:" + config.getHttpConfig().getHttpPort());
+        byte[] bytes = curatorClient.getData().forPath("/nodesInfo/127.0.0.1:" + config.getHttpConfig().getHttpPort());
         Assert.assertNotNull(bytes);
         Assert.assertNotNull(LoadInfoEntities.NodeLoadInfo.parseFrom(bytes));
     }
@@ -398,7 +398,7 @@ public class CacheTest {
     }
 
     private void createProfileNode(AggregatedProfileNamingStrategy profileName, String ip, int port) throws Exception {
-        curator.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkPathForProfile(profileName),
+        curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkPathForProfile(profileName),
             LoadInfoEntities.ProfileResidencyInfo.newBuilder().setIp(ip).setPort(port).build().toByteArray());
     }
 
@@ -441,18 +441,18 @@ public class CacheTest {
     private void cleanUpZookeeper() throws Exception {
         List<String> profileNodes = new ArrayList<>();
         List<String> nodes = new ArrayList<>();
-        if(curator.checkExists().forPath("/profilesLoadStatus") != null) {
-            profileNodes.addAll(curator.getChildren().forPath("/profilesLoadStatus"));
+        if(curatorClient.checkExists().forPath("/profilesLoadStatus") != null) {
+            profileNodes.addAll(curatorClient.getChildren().forPath("/profilesLoadStatus"));
         }
-        if(curator.checkExists().forPath("/nodesInfo") != null) {
-            nodes.addAll(curator.getChildren().forPath("/nodesInfo"));
+        if(curatorClient.checkExists().forPath("/nodesInfo") != null) {
+            nodes.addAll(curatorClient.getChildren().forPath("/nodesInfo"));
         }
 
         for(String path : profileNodes) {
-            curator.delete().forPath("/profilesLoadStatus/" + path);
+            curatorClient.delete().forPath("/profilesLoadStatus/" + path);
         }
         for(String path : nodes) {
-            curator.delete().forPath("/nodesInfo/" + path);
+            curatorClient.delete().forPath("/nodesInfo/" + path);
         }
     }
 

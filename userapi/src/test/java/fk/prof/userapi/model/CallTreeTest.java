@@ -221,8 +221,8 @@ public class CallTreeTest {
         CallTreeView ctv = new CallTreeView(calltree);
         List<IndexedTreeNode<FrameNode>> subtree = ctv.getSubTrees(toList(ctv.getRootNodes().get(0).getIdx()), 1, false);
 
-        Assert.assertEquals("{\"method_lookup\":{},\"0\":{\"data\":[0,0,23],\"chld\":{\"1\":{\"data\":[1,0,0]},\"2\":{\"data\":[2,0,14]},\"7\":{\"data\":[7,0,9]}}}}",
-            mapper.writeValueAsString(new TreeViewResponse.CpuSampleCallersTreeViewResponse(subtree, new HashMap<>())));
+        Assert.assertEquals("{\"method_lookup\":{},\"0\":{\"d\":[0,0,23],\"c\":{\"1\":{\"d\":[1,0,0]},\"2\":{\"d\":[2,0,14]},\"7\":{\"d\":[7,0,9]}}}}",
+            mapper.writeValueAsString(new CpuSamplingCallTreeViewResponse(subtree, new HashMap<>())));
     }
 
     private void testTreeEquality(IndexedTreeNode<FrameNode> node, CallTree callTree) {

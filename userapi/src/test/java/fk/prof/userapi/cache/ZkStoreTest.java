@@ -38,7 +38,7 @@ public class ZkStoreTest {
 
     private static Configuration config;
     private static TestingServer zookeeper;
-    private static CuratorFramework curator;
+    private static CuratorFramework curatorClient;
 
     private ZkLoadInfoStore zkStore;
     private Supplier<List<AggregatedProfileNamingStrategy>> loadedProfiles = Mockito.mock(Supplier.class);
@@ -52,7 +52,7 @@ public class ZkStoreTest {
         zookeeper = new TestingServer(instanceSpec, true);
 
         Configuration.CuratorConfig curatorConfig = config.getCuratorConfig();
-        curator = CuratorFrameworkFactory.builder()
+        curatorClient = CuratorFrameworkFactory.builder()
             .connectString("127.0.0.1:" + zkPort)
             .retryPolicy(new RetryOneTime(1000))
             .connectionTimeoutMs(curatorConfig.getConnectionTimeoutMs())
@@ -60,25 +60,25 @@ public class ZkStoreTest {
             .namespace(curatorConfig.getNamespace())
             .build();
 
-        curator.start();
-        curator.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
+        curatorClient.start();
+        curatorClient.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
     }
 
     @AfterClass
     public static void afterClass() throws Exception {
-        curator.close();
+        curatorClient.close();
         zookeeper.close();
     }
 
     @Before
     public void beforeTest() throws Exception {
-        zkStore = new ZkLoadInfoStore(curator, "127.0.0.1", 8080, loadedProfiles);
+        zkStore = new ZkLoadInfoStore(curatorClient, "127.0.0.1", 8080, loadedProfiles);
         zkStore.ensureBasePathExists();
     }
 
     @After
     public void afterTest() throws Exception {
-        if(curator.getZookeeperClient().isConnected()) {
+        if(curatorClient.getZookeeperClient().isConnected()) {
             cleanUpZookeeper();
         }
     }
@@ -136,7 +136,7 @@ public class ZkStoreTest {
         }
 
         // after connection lost we still expect the data to be there as part of reinitialization
-        int retry = 2 * curator.getZookeeperClient().getZooKeeper().getSessionTimeout() / 1000;
+        int retry = 2 * curatorClient.getZookeeperClient().getZooKeeper().getSessionTimeout() / 1000;
         while(retry > 0 && zkStore.getState() == ZkLoadInfoStore.ConnectionState.Disconnected) {
             Thread.sleep(1000);
             retry--;
@@ -156,7 +156,7 @@ public class ZkStoreTest {
     private void bringUpZk() throws Exception {
         if(zkDown) {
             zookeeper.restart();
-            curator.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
+            curatorClient.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
             zkDown = false;
         }
     }
@@ -164,19 +164,19 @@ public class ZkStoreTest {
     private void cleanUpZookeeper() throws Exception {
         List<String> profileNodes = new ArrayList<>();
         List<String> nodes = new ArrayList<>();
-        if(curator.checkExists().forPath("/profilesLoadStatus") != null) {
-            profileNodes.addAll(curator.getChildren().forPath("/profilesLoadStatus"));
+        if(curatorClient.checkExists().forPath("/profilesLoadStatus") != null) {
+            profileNodes.addAll(curatorClient.getChildren().forPath("/profilesLoadStatus"));
         }
 
-        if(curator.checkExists().forPath("/nodesInfo") != null) {
-            nodes.addAll(curator.getChildren().forPath("/nodesInfo"));
+        if(curatorClient.checkExists().forPath("/nodesInfo") != null) {
+            nodes.addAll(curatorClient.getChildren().forPath("/nodesInfo"));
         }
 
         for(String path : profileNodes) {
-            curator.delete().forPath("/profilesLoadStatus/" + path);
+            curatorClient.delete().forPath("/profilesLoadStatus/" + path);
         }
         for(String path : nodes) {
-            curator.delete().forPath("/nodesInfo/" + path);
+            curatorClient.delete().forPath("/nodesInfo/" + path);
         }
     }
 
