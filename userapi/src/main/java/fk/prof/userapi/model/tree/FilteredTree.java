@@ -28,7 +28,7 @@ public class FilteredTree<T> implements Tree<T> {
         this.visible = new boolean[size()];
         tree.foreach((i, node) -> visible[i] = predicate.testVisibility(i, node));
 
-        treeify(0, false);
+        applyMask(0, false);
     }
 
     @Override
@@ -115,11 +115,11 @@ public class FilteredTree<T> implements Tree<T> {
         });
     }
 
-    private boolean treeify(int idx, boolean isParentVisible) {
+    private boolean applyMask(int idx, boolean isParentVisible) {
         boolean isNodeVisible = visible[idx] | isParentVisible;
         boolean isChildVisible = false;
         for(Integer i : tree.getChildren(idx)) {
-            isChildVisible |= treeify(i, isNodeVisible);
+            isChildVisible |= applyMask(i, isNodeVisible);
         }
         visible[idx] = isNodeVisible | isChildVisible;
         return visible[idx];
