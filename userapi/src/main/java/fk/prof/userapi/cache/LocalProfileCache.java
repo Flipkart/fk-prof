@@ -110,6 +110,11 @@ class LocalProfileCache {
         viewCache.cleanUp();
     }
 
+    void invalidateCache() {
+        cache.invalidateAll();
+        viewCache.invalidateAll();
+    }
+
     private void doCleanupOnEviction(RemovalNotification<AggregatedProfileNamingStrategy, CacheableProfile> evt) {
         evt.getValue().markEvicted();
         if(evt.wasEvicted()) {

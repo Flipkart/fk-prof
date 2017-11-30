@@ -41,7 +41,7 @@ public class ZkStoreTest {
     private static CuratorFramework curatorClient;
 
     private ZkLoadInfoStore zkStore;
-    private Supplier<List<AggregatedProfileNamingStrategy>> loadedProfiles = Mockito.mock(Supplier.class);
+    private Runnable loadedProfiles = Mockito.mock(Runnable.class);
     private boolean zkDown = false;
 
     @BeforeClass
@@ -73,7 +73,7 @@ public class ZkStoreTest {
     @Before
     public void beforeTest() throws Exception {
         zkStore = new ZkLoadInfoStore(curatorClient, "127.0.0.1", 8080, loadedProfiles);
-        zkStore.ensureBasePathExists();
+        zkStore.init();
     }
 
     @After
@@ -110,8 +110,6 @@ public class ZkStoreTest {
 
         zkStore.updateProfileResidencyInfo(profileName1, false);
         zkStore.updateProfileResidencyInfo(profileName2, false);
-
-        doReturn(Arrays.asList(profileName1, profileName2)).when(loadedProfiles).get();
 
         try {
             bringDownZk();

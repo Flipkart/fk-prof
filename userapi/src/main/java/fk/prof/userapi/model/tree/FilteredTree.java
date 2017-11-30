@@ -13,8 +13,9 @@ import java.util.NoSuchElementException;
  * |__1
  * |  |__2
  * |__3
+ *    |__4
  *
- * getChildrenCount(0) will return 1, and getChildren(0) will return [3].
+ * getChildrenCount(0) will return 1, and getChildren(0) will return [3] and getChildren(3) will return [4].
  *
  * Created by gaurav.ashok on 05/06/17.
  */

@@ -37,7 +37,7 @@ public class ClusterAwareCache {
     private final AggregatedProfileLoader profileLoader;
     private final ProfileViewCreator viewCreator;
 
-    private ZkLoadInfoStore zkStore;
+    private ZkLoadInfoStore zkLoadInfoStore;
     private final String myIp;
     private final int port;
 
@@ -51,7 +51,7 @@ public class ClusterAwareCache {
 
         this.profileLoader = profileLoader;
         this.viewCreator = viewCreator;
-        this.zkStore = new ZkLoadInfoStore(curatorClient, myIp, port, this.cache::cachedProfiles);
+        this.zkLoadInfoStore = new ZkLoadInfoStore(curatorClient, myIp, port, this.cache::invalidateCache);
 
         this.workerExecutor = workerExecutor;
     }
@@ -67,13 +67,21 @@ public class ClusterAwareCache {
 
         this.profileLoader = profileLoader;
         this.viewCreator = viewCreator;
-        this.zkStore = new ZkLoadInfoStore(curatorClient, myIp, port, this.cache::cachedProfiles);
+        this.zkLoadInfoStore = new ZkLoadInfoStore(curatorClient, myIp, port, this.cache::cachedProfiles);
 
         this.workerExecutor = workerExecutor;
     }
 
-    public Future<Object> onClusterJoin() {
-        return doAsync(f -> f.complete(zkStore.ensureBasePathExists()));
+    public Future<Void> onClusterJoin() {
+        return doAsync(f -> {
+            try {
+                zkLoadInfoStore.init();
+                f.complete();
+            } catch (Exception e) {
+                f.fail(e);
+            }
+
+        });
     }
 
     /**
@@ -97,7 +105,7 @@ public class ClusterAwareCache {
         else {
             // check zookeeper if it is loaded somewhere else
             doAsync((Future<AggregatedProfileInfo> f) -> {
-                    try (AutoCloseable ignored = zkStore.getLock()) {
+                    try (AutoCloseable ignored = zkLoadInfoStore.getLock()) {
                     Future<AggregatedProfileInfo> _cachedProfileInfo = cache.get(profileName);
                     if (_cachedProfileInfo != null) {
                         completeFuture(profileName, _cachedProfileInfo, f);
@@ -105,7 +113,7 @@ public class ClusterAwareCache {
                     }
 
                     // still no cached profile. read zookeeper for remotely cached profile
-                    ProfileResidencyInfo residencyInfo = zkStore.readProfileResidencyInfo(profileName);
+                    ProfileResidencyInfo residencyInfo = zkLoadInfoStore.readProfileResidencyInfo(profileName);
                     // stale node exists. will update instead of create
                     boolean staleNodeExists = false;
                     if(residencyInfo != null) {
@@ -124,7 +132,7 @@ public class ClusterAwareCache {
                     workerExecutor.executeBlocking(f2 -> profileLoader.load(f2, profileName), loadProfileFuture.completer());
 
                     // update LOADING status in zookeeper
-                    zkStore.updateProfileResidencyInfo(profileName, staleNodeExists);
+                    zkLoadInfoStore.updateProfileResidencyInfo(profileName, staleNodeExists);
                     cache.put(profileName, loadProfileFuture);
 
                     loadProfileFuture.setHandler(ar -> {
@@ -151,13 +159,13 @@ public class ClusterAwareCache {
         if(!RemovalCause.REPLACED.equals(onRemoval.getCause()) && onRemoval.wasEvicted()) {
             AggregatedProfileNamingStrategy profileName = onRemoval.getKey();
             doAsync(f -> {
-                try(AutoCloseable ignored = zkStore.getLock()) {
-                    ProfileResidencyInfo residencyInfo = zkStore.readProfileResidencyInfo(profileName);
+                try(AutoCloseable ignored = zkLoadInfoStore.getLock()) {
+                    ProfileResidencyInfo residencyInfo = zkLoadInfoStore.readProfileResidencyInfo(profileName);
                     boolean deleteProfileNode = false;
                     if(residencyInfo != null && (myIp.equals(residencyInfo.getIp()) && port == residencyInfo.getPort()) && cache.get(profileName) == null) {
                         deleteProfileNode = true;
                     }
-                    zkStore.removeProfileResidencyInfo(profileName, deleteProfileNode);
+                    zkLoadInfoStore.removeProfileResidencyInfo(profileName, deleteProfileNode);
                 }
                 f.complete();
             }, "Error while cleaning for file: {}", profileName.toString());
@@ -207,8 +215,8 @@ public class ClusterAwareCache {
             // else check into zookeeper if this is cached in another node
             doAsync((Future<Pair<AggregatedSamplesPerTraceCtx, T>> f) -> {
                 ProfileResidencyInfo residencyInfo;
-                try(AutoCloseable ignored = zkStore.getLock()) {
-                    residencyInfo = zkStore.readProfileResidencyInfo(profileName);
+                try(AutoCloseable ignored = zkLoadInfoStore.getLock()) {
+                    residencyInfo = zkLoadInfoStore.readProfileResidencyInfo(profileName);
                 }
 
                 if(residencyInfo != null) {
