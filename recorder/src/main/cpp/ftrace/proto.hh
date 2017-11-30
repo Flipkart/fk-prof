@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <sys/types.h>
 #include <string>
+#include <functional>
 
 /*
   This is designed to facilitate talk between 2 processes on the same host.
@@ -86,7 +87,25 @@ namespace ftrace {
     }
 
     namespace v_curr = v0;
+
+    struct PartMsgBuff {
+        std::uint8_t buff[ftrace::v_curr::max_pkt_sz];
+
+        std::uint8_t len;
+
+        PartMsgBuff() : len(0) {}
+    };
+
+    template <typename PMsg, typename Hdr, std::size_t MaxPktSz> void read_events(int fd, std::uint8_t* buff, ssize_t read_sz, PMsg& pmsg,
+                                                                                  std::function<void(int, const Hdr&, const std::uint8_t*, std::size_t sz)> pkt_hdlr);
+
 }
+
+extern template void
+ftrace::read_events<ftrace::PartMsgBuff, ftrace::v_curr::Header, ftrace::v_curr::max_pkt_sz>(int fd, std::uint8_t* buff, ssize_t rd_sz, PartMsgBuff& pmsg,
+                                                                                             std::function<void(int, const v_curr::Header&, const std::uint8_t*, std::size_t sz)> pkt_hdlr);
+
+
 
 namespace std {
     string to_string(const ftrace::v0::PktType type);

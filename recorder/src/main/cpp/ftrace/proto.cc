@@ -1,6 +1,8 @@
 #include "ftrace/proto.hh"
 #include <stdexcept>
 #include <ostream>
+#include <cassert>
+#include <cstring>
 
 const std::uint8_t ftrace::v0::VERSION = 0;
 
@@ -61,3 +63,79 @@ std::ostream& operator<<(std::ostream& os, const ftrace::v0::payload::SchedWakeu
     os << '}';
     return os;
 }
+
+template <typename PMsg, typename Hdr, std::size_t MaxPktSz> void
+ftrace::read_events(int fd, std::uint8_t* buff, ssize_t read_sz, PMsg& pmsg, std::function<void(int, const Hdr&, const std::uint8_t*, std::size_t sz)> pkt_hdlr) {
+    const auto hdr_sz = sizeof(Hdr);
+    assert(sizeof(pmsg.buff) == MaxPktSz);
+    
+    while (read_sz > 0) {
+        if (pmsg.len == 0) {
+            if (read_sz >= hdr_sz) {
+                auto h = reinterpret_cast<Hdr*>(buff);
+                auto pkt_len = h->len;
+                if (read_sz >= pkt_len) {
+                    pkt_hdlr(fd, *h, buff, pkt_len - hdr_sz);
+                    buff += pkt_len;
+                    read_sz -= pkt_len;
+                } else {
+                    memcpy(pmsg.buff, buff, read_sz);
+                    pmsg.len = read_sz;
+                    read_sz = 0;
+                }
+            } else {
+                memcpy(pmsg.buff, buff, read_sz);
+                pmsg.len = read_sz;
+                read_sz = 0;
+            }
+        } else {
+            if (pmsg.len >= hdr_sz) {
+                auto h = reinterpret_cast<Hdr*>(pmsg.buff);
+                auto pkt_len = h->len;
+                auto payload_sz = pkt_len - hdr_sz;
+                auto missing_payload_bytes = payload_sz - pmsg.len;
+                assert(missing_payload_bytes > 0);
+                if (read_sz >= missing_payload_bytes) {
+                    memcpy(pmsg.buff + pmsg.len, buff, missing_payload_bytes);
+                    pkt_hdlr(fd, *h, pmsg.buff + hdr_sz, payload_sz);
+                    buff += missing_payload_bytes;
+                    read_sz -= missing_payload_bytes;
+                    pmsg.len = 0;
+                } else {
+                    memcpy(pmsg.buff + pmsg.len, buff, read_sz);
+                    read_sz = 0;
+                    pmsg.len += read_sz;
+                }
+            } else {
+                auto missing_header_bytes = (hdr_sz - pmsg.len);
+                assert(missing_header_bytes > 0);
+                if (read_sz >= missing_header_bytes) {
+                    memcpy(pmsg.buff + pmsg.len, buff, missing_header_bytes);
+                    buff += missing_header_bytes;
+                    read_sz -= missing_header_bytes;
+                    auto h = reinterpret_cast<Hdr*>(pmsg.buff);
+                    auto pkt_len = h->len;
+                    if (read_sz >= pkt_len) {
+                        auto payload_sz = pkt_len - hdr_sz;
+                        pkt_hdlr(fd, *h, buff, payload_sz);
+                        buff += payload_sz;
+                        read_sz -= payload_sz;
+                        pmsg.len = 0;
+                    } else {
+                        memcpy(pmsg.buff + pmsg.len, buff, read_sz);
+                        pmsg.len += read_sz;
+                        read_sz = 0;
+                    }
+                } else {
+                    memcpy(pmsg.buff + pmsg.len, buff, read_sz);
+                    pmsg.len += read_sz;
+                    read_sz = 0;
+                }
+            }
+        }
+    }
+}
+
+template void
+ftrace::read_events<ftrace::PartMsgBuff, ftrace::v_curr::Header, ftrace::v_curr::max_pkt_sz>(int fd, std::uint8_t* buff, ssize_t rd_sz, ftrace::PartMsgBuff& pmsg,
+                                                                                             std::function<void(int, const ftrace::v_curr::Header&, const std::uint8_t*, std::size_t sz)> pkt_hdlr);

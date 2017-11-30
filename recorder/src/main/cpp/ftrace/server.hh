@@ -54,12 +54,12 @@ namespace ftrace {
 
         void write(ClientFd fd, iovec* iov, size_t iov_len, size_t len);
 
-        void handle_pkt(ClientFd fd, v_curr::PktType type, std::uint8_t* buff, size_t len);
+        void handle_pkt(ClientFd fd, v_curr::PktType type, const std::uint8_t* buff, std::size_t len);
 
         //RPC actions
-        void do_add_tid(ClientFd fd, v_curr::payload::AddTid* add_tid);
+        void do_add_tid(ClientFd fd, const v_curr::payload::AddTid* add_tid);
 
-        void do_del_tid(ClientFd fd, v_curr::payload::DelTid* add_tid);
+        void do_del_tid(ClientFd fd, const v_curr::payload::DelTid* add_tid);
 
         const std::string socket_path;
 

@@ -123,15 +123,11 @@ void ftrace::Server::shutdown() {
 struct ftrace::ClientSession {
     std::unordered_set<pid_t> tids;
 
-    std::uint8_t part_msg_len;
-
-    const static size_t max_msg_sz = (1 << (sizeof(part_msg_len) * 8)) - 1;
-
-    std::uint8_t part_msg[max_msg_sz];//partial message
+    ftrace::PartMsgBuff part_msg;
 
     std::string sock_path;
 
-    ClientSession(const char* _sock_path) : tids(), part_msg_len(0), sock_path(_sock_path) {}
+    ClientSession(const char* _sock_path) : tids(), sock_path(_sock_path) {}
 
     ~ClientSession() {};
 };
@@ -200,7 +196,7 @@ void ftrace::Server::fail_client(ClientFd fd) {
     drop_client_session(fd);
 }
 
-void ftrace::Server::do_add_tid(ClientFd fd, v_curr::payload::AddTid* payload) {
+void ftrace::Server::do_add_tid(ClientFd fd, const v_curr::payload::AddTid* payload) {
     auto it = client_sessions.find(fd);
     assert(it != std::end(client_sessions));
     auto pid = *payload;
@@ -226,7 +222,7 @@ void ftrace::Server::do_add_tid(ClientFd fd, v_curr::payload::AddTid* payload) {
     logger->info("Tracking pid {} for ftrace events", pid);
 }
 
-void ftrace::Server::do_del_tid(ClientFd fd, v_curr::payload::DelTid* payload) {
+void ftrace::Server::do_del_tid(ClientFd fd, const v_curr::payload::DelTid* payload) {
     auto it = client_sessions.find(fd);
     assert(it != std::end(client_sessions));
     auto pid = *payload;
@@ -242,7 +238,7 @@ void ftrace::Server::do_del_tid(ClientFd fd, v_curr::payload::DelTid* payload) {
     logger->info("Removing tracking for pid {}", pid);
 }
 
-void ftrace::Server::handle_pkt(ClientFd fd, v_curr::PktType type, std::uint8_t* buff, size_t len) {
+void ftrace::Server::handle_pkt(ClientFd fd, v_curr::PktType type, const std::uint8_t* buff, std::size_t len) {
     switch (type) {
     case v_curr::PktType::toggle_features:
         assert(len == sizeof(v_curr::payload::Features));
@@ -250,11 +246,11 @@ void ftrace::Server::handle_pkt(ClientFd fd, v_curr::PktType type, std::uint8_t*
         break;
     case v_curr::PktType::add_tid:
         assert(len == sizeof(v_curr::payload::AddTid));
-        do_add_tid(fd, reinterpret_cast<v_curr::payload::AddTid*>(buff));
+        do_add_tid(fd, reinterpret_cast<const v_curr::payload::AddTid*>(buff));
         break;
     case v_curr::PktType::del_tid:
         assert(len == sizeof(v_curr::payload::DelTid));
-        do_del_tid(fd, reinterpret_cast<v_curr::payload::DelTid*>(buff));
+        do_del_tid(fd, reinterpret_cast<const v_curr::payload::DelTid*>(buff));
         break;
     default:
         logger->error("Received pkt with unexpected type ({}) of RPC", std::to_string(type));
@@ -269,84 +265,31 @@ void ftrace::Server::handle_client_requests(ClientFd fd) {
     //  Wrap another method around this one, so the wrapper can deal with first 3 bits (for versioning) and
     //   dispatch this by version -jj
     auto buff = io_buff.get();
-    auto read_sz = recv(fd, buff, io_buff_sz, 0);
+    auto it = client_sessions.find(fd);
+    assert(it != std::end(client_sessions));
+    auto& sess = *it->second.get();
 
-    if (read_sz == 0) {
-        drop_client_session(fd);
-        return;
-    }
+    auto hdlr = [&](int fd, const ftrace::v_curr::Header& h, const std::uint8_t* buff, std::size_t len) {
+        handle_pkt(fd, h.type, buff, len);
+    };
 
-    while (read_sz > 0) {
-        auto it = client_sessions.find(fd);
-        assert(it != std::end(client_sessions));
-        auto& sess = *it->second.get();
+    while (true) {
+        auto read_sz = recv(fd, buff, io_buff_sz, 0);
 
-        if (sess.part_msg_len == 0) {
-            if (read_sz >= hdr_sz) {
-                auto h = reinterpret_cast<v_curr::Header*>(buff);
-                auto pkt_len = h->len;
-                if (read_sz >= pkt_len) {
-                    handle_pkt(fd, h->type, buff + hdr_sz, pkt_len - hdr_sz);
-                    buff += pkt_len;
-                    read_sz -= pkt_len;
-                } else {
-                    memcpy(sess.part_msg, buff, read_sz);
-                    sess.part_msg_len = read_sz;
-                    read_sz = 0;
-                }
-            } else {
-                memcpy(sess.part_msg, buff, read_sz);
-                sess.part_msg_len = read_sz;
-                read_sz = 0;
-            }
-        } else {
-            if (sess.part_msg_len >= hdr_sz) {
-                auto h = reinterpret_cast<v_curr::Header*>(sess.part_msg);
-                auto pkt_len = h->len;
-                auto payload_sz = pkt_len - hdr_sz;
-                auto missing_payload_bytes = pkt_len - sess.part_msg_len;
-                assert(missing_payload_bytes > 0);
-                if (read_sz >= missing_payload_bytes) {
-                    memcpy(sess.part_msg + sess.part_msg_len, buff, missing_payload_bytes);
-                    handle_pkt(fd, h->type, sess.part_msg + hdr_sz, payload_sz);
-                    buff += missing_payload_bytes;
-                    read_sz -= missing_payload_bytes;
-                    sess.part_msg_len = 0;
-                } else {
-                    memcpy(sess.part_msg + sess.part_msg_len, buff, read_sz);
-                    sess.part_msg_len += read_sz;
-                    read_sz = 0;
-                }
-            } else {
-                auto missing_header_bytes = (hdr_sz - sess.part_msg_len);
-                assert(missing_header_bytes > 0);
-                if (read_sz >= missing_header_bytes) {
-                    memcpy(sess.part_msg + sess.part_msg_len, buff, missing_header_bytes);
-                    buff += missing_header_bytes;
-                    read_sz -= missing_header_bytes;
-                    sess.part_msg_len += missing_header_bytes;
-                    auto h = reinterpret_cast<v_curr::Header*>(sess.part_msg);
-                    auto pkt_len = h->len;
-                    auto payload_sz = pkt_len - hdr_sz;
-                    if (read_sz >= payload_sz) {
-                        handle_pkt(fd, h->type, buff, payload_sz);
-                        buff += payload_sz;
-                        read_sz -= payload_sz;
-                        sess.part_msg_len = 0;
-                    } else {
-                        memcpy(sess.part_msg + sess.part_msg_len, buff, read_sz);
-                        sess.part_msg_len += read_sz;
-                        read_sz = 0;
-                    }
-                } else {
-                    memcpy(sess.part_msg + sess.part_msg_len, buff, read_sz);
-                    sess.part_msg_len += read_sz;
-                    read_sz = 0;
-                }
-            }
+        if (read_sz == 0) {
+            drop_client_session(fd);
+            return;
         }
+
+        if (read_sz < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+            
+            logger->warn(error_message("IO error on client connection", errno));
+            //may be we should we close? -jj
+        }
+
+        ftrace::read_events<ftrace::PartMsgBuff, ftrace::v_curr::Header, ftrace::v_curr::max_pkt_sz>(fd, buff, read_sz, sess.part_msg, hdlr);
     }
-    
     //reinterpret_cast<ftrace::v_curr::Header*>(buff);
 }
 

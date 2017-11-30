@@ -102,8 +102,11 @@ CtxSwitchTracer::CtxSwitchTracer(JavaVM *jvm, jvmtiEnv *jvmti, ThreadMap& _threa
 }
 
 CtxSwitchTracer::~CtxSwitchTracer() {
+    do_stop.store(true, std::memory_order_relaxed);
     close(trace_conn);
     thread_map.remove_watch(THREAD_WATCHER_NAME);
+    await_thd_death(thd_proc);
+    thd_proc.reset();
 }
 
 void CtxSwitchTracer::run() {}
@@ -113,7 +116,7 @@ void CtxSwitchTracer::stop() {}
 void CtxSwitchTracer::handle_trace_events() {
     std::uint8_t buff[4096];
     std::size_t capacity = sizeof(buff);
-    while (! do_stop) {
+    while (! do_stop.load(std::memory_order_relaxed)) {
         auto total_ctx = s_t_recv_total.time_scope();
         ssize_t len;
         {
@@ -122,7 +125,7 @@ void CtxSwitchTracer::handle_trace_events() {
         }
         if (len > 0) {
             s_m_data_received.mark(len);
-            //handle and mark s_m_events_received
+            handle_trace_events(buff, len);
         } else if (len == 0) {
             s_c_peer_disconnected.inc();
             logger->warn("Ftrace-server closed the connection (us reading too slow could be the cause), failing work.");
@@ -136,6 +139,12 @@ void CtxSwitchTracer::handle_trace_events() {
             //TODO: may be we want to fail work here too? -jj
         }
     }
+}
+
+const ssize_t hdr_sz = sizeof(ftrace::v_curr::Header);
+
+void CtxSwitchTracer::handle_trace_events(std::uint8_t* buff, ssize_t read_sz) {
+    
 }
 
 void CtxSwitchTracer::connect_tracer(const char* listener_socket_path, const char* proc) {

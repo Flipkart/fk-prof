@@ -5,6 +5,7 @@
 #include "processor.hh"
 #include "thread_map.hh"
 #include "profile_writer.hh"
+#include "ftrace/proto.hh"
 
 class CtxSwitchTracer : public Process {
 public:
@@ -29,6 +30,8 @@ private:
 
     void send_msg(iovec *iov, std::size_t iov_len, std::size_t expected_len);
 
+    void handle_trace_events(std::uint8_t* buff,  ssize_t len);
+
     ThreadMap& thread_map;
 
     std::atomic<bool> do_stop;
@@ -52,6 +55,13 @@ private:
     metrics::Mtr& s_m_events_received;
 
     ThdProcP thd_proc;
+
+    struct {
+        std::uint8_t bytes[ftrace::v_curr::max_pkt_sz];
+
+        std::uint8_t len;
+
+    } part_msg; //partial message
 
     DISALLOW_COPY_AND_ASSIGN(CtxSwitchTracer);
 };
