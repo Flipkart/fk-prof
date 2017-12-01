@@ -207,12 +207,6 @@ class ZkLoadInfoStore implements LoadInfoStore {
                     reInit();
                     recentlyZkConnectionLost.set(false);
                 }
-                else {
-                    if(!pathExists(zkNodesInfoPath)) {
-                        // Assuming this should not happen. throwing an error here so that we can be notified if this assumption breaks any time.
-                        throw new RuntimeException("After zookeeper reconnection, my node was not found");
-                    }
-                }
                 connectionState.set(ConnectionState.Connected);
             }
             catch (Exception e) {
