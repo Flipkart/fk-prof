@@ -1,6 +1,7 @@
 package fk.prof.userapi.api;
 
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
+import fk.prof.userapi.model.ProfileView;
 import fk.prof.userapi.model.*;
 import fk.prof.userapi.util.Pair;
 import io.vertx.core.Future;
@@ -81,5 +82,5 @@ public interface ProfileStoreAPI {
      * @param <T>               type implementing the TreeView interface
      * @return Future containing pair of aggregated samples and TreeView of type T
      */
-    <T extends TreeView> Future<Pair<AggregatedSamplesPerTraceCtx,T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType);
+    <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx,T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType);
 }

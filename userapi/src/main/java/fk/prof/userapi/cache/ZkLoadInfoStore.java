@@ -183,11 +183,10 @@ class ZkLoadInfoStore implements LoadInfoStore {
     private class CloseableSharedLock implements AutoCloseable {
 
         CloseableSharedLock() throws Exception {
-            if(interProcessLock.acquire(5, TimeUnit.SECONDS)) {
+            if(!interProcessLock.acquire(5, TimeUnit.SECONDS)) {
                 lockAcquireTimeoutCounter.inc();
                 throw new ZkStoreUnavailableException("Could not acquire lock in the given time.");
             }
-
         }
 
         @Override

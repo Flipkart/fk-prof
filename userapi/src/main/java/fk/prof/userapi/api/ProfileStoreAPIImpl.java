@@ -8,6 +8,7 @@ import fk.prof.storage.AsyncStorage;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.cache.CachedProfileNotFoundException;
 import fk.prof.userapi.cache.ClusterAwareCache;
+import fk.prof.userapi.model.ProfileView;
 import fk.prof.userapi.model.*;
 import fk.prof.userapi.util.Pair;
 import io.vertx.core.*;
@@ -182,7 +183,7 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
     }
 
     @Override
-    public <T extends TreeView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
+    public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
         Future<Pair<AggregatedSamplesPerTraceCtx, T>> result = Future.future();
 
         Future<Pair<AggregatedSamplesPerTraceCtx, T>> f = clusterAwareCache.getProfileView(profileName, traceName, profileViewType);
