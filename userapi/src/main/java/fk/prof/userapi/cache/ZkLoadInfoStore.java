@@ -232,8 +232,11 @@ class ZkLoadInfoStore implements LoadInfoStore {
     }
 
     private void ensureRequiredZkNodesPresent() throws Exception {
-        if (curatorClient.checkExists().forPath(zkNodesInfoPath) != null) {
+        try {
             curatorClient.delete().forPath(zkNodesInfoPath);
+
+        } catch (KeeperException.NoNodeException e){
+            logger.info("Node does not exist while deleting zkNodeInfoPath Node, exception: ", e);
         }
         curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkNodesInfoPath, buildNodeLoadInfo(0).toByteArray());
 

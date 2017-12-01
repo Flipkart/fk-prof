@@ -8,6 +8,8 @@ import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.proto.LoadInfoEntities;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.listen.ListenerContainer;
+import org.apache.curator.framework.state.ConnectionStateListener;
 import org.apache.curator.retry.RetryOneTime;
 import org.apache.curator.test.InstanceSpec;
 import org.apache.curator.test.TestingServer;
@@ -77,6 +79,8 @@ public class ZkLoadInfoStoreTest {
         if(curatorClient.getZookeeperClient().isConnected()) {
             cleanUpZookeeper();
         }
+        //Clearing all connection listeners added to curatorClient in beforeTest zkLoadInfoStore creation
+        ((ListenerContainer<ConnectionStateListener>) curatorClient.getConnectionStateListenable()).clear();
     }
 
     @Test
@@ -121,7 +125,7 @@ public class ZkLoadInfoStoreTest {
             Assert.assertNotNull(caughtEx);
             Assert.assertEquals(ZkStoreUnavailableException.class, caughtEx.getClass());
 
-            // wait for some time, to let the session expire
+            // wait for some time, to let the session expire, sessionTimeout occurs after 4 secs
             Thread.sleep(4000);
         }
         finally {
@@ -135,7 +139,7 @@ public class ZkLoadInfoStoreTest {
         }
 
         Assert.assertEquals(ZkLoadInfoStore.ConnectionState.Connected, zkLoadInfoStore.getState());
-        Assert.assertEquals(0, zkLoadInfoStore.readNodeLoadInfo().getProfilesLoaded());    //Now the profiles associated to the node are reset to 0
+        Assert.assertEquals(0, zkLoadInfoStore.readNodeLoadInfo().getProfilesLoaded());
     }
 
     private void bringDownZk() throws Exception {
