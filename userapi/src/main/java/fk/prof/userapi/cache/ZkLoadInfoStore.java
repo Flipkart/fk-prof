@@ -81,17 +81,7 @@ class ZkLoadInfoStore implements LoadInfoStore {
     @Override
     public void init() throws Exception {
         ensureConnected();
-        logger.info("Initializing zkStore");
-
-        if (curatorClient.checkExists().forPath(zkNodesInfoPath) != null) {
-            curatorClient.delete().forPath(zkNodesInfoPath);
-            cacheInvalidator.run();
-        }
-        curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkNodesInfoPath, buildNodeLoadInfo(0).toByteArray());
-
-        if(curatorClient.checkExists().forPath("/profilesLoadStatus") == null) {
-            curatorClient.create().withMode(CreateMode.PERSISTENT).forPath("/profilesLoadStatus");
-        }
+        ensureRequiredZkNodesPresent();
     }
 
     @Override
@@ -214,7 +204,7 @@ class ZkLoadInfoStore implements LoadInfoStore {
         if(org.apache.curator.framework.state.ConnectionState.RECONNECTED.equals(newState)) {
             try {
                 if(recentlyZkConnectionLost.get()) {
-                    init();
+                    reInit();
                     recentlyZkConnectionLost.set(false);
                 }
                 else {
@@ -240,4 +230,21 @@ class ZkLoadInfoStore implements LoadInfoStore {
         }
         logger.info("zookeeper state changed to \"{}\"", newState.name());
     }
+
+    private void ensureRequiredZkNodesPresent() throws Exception {
+        if (curatorClient.checkExists().forPath(zkNodesInfoPath) != null) {
+            curatorClient.delete().forPath(zkNodesInfoPath);
+        }
+        curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkNodesInfoPath, buildNodeLoadInfo(0).toByteArray());
+
+        if (curatorClient.checkExists().forPath("/profilesLoadStatus") == null) {
+            curatorClient.create().withMode(CreateMode.PERSISTENT).forPath("/profilesLoadStatus");
+        }
+    }
+
+    private void reInit() throws Exception {
+        cacheInvalidator.run();
+        ensureRequiredZkNodesPresent();
+    }
+
 }

@@ -17,17 +17,13 @@ import org.mockito.Mockito;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.function.Supplier;
-
-import static org.mockito.Mockito.*;
 
 /**
  * Created by gaurav.ashok on 14/08/17.
  */
-public class ZkStoreTest {
+public class ZkLoadInfoStoreTest {
 
     static {
         UserapiConfigManager.setDefaultSystemProperties();
@@ -40,7 +36,7 @@ public class ZkStoreTest {
     private static TestingServer zookeeper;
     private static CuratorFramework curatorClient;
 
-    private ZkLoadInfoStore zkStore;
+    private ZkLoadInfoStore zkLoadInfoStore;
     private Runnable loadedProfiles = Mockito.mock(Runnable.class);
     private boolean zkDown = false;
 
@@ -72,8 +68,8 @@ public class ZkStoreTest {
 
     @Before
     public void beforeTest() throws Exception {
-        zkStore = new ZkLoadInfoStore(curatorClient, "127.0.0.1", 8080, loadedProfiles);
-        zkStore.init();
+        zkLoadInfoStore = new ZkLoadInfoStore(curatorClient, "127.0.0.1", 8080, loadedProfiles);
+        zkLoadInfoStore.init();
     }
 
     @After
@@ -87,20 +83,20 @@ public class ZkStoreTest {
     public void testBasic() throws Exception {
         AggregatedProfileNamingStrategy profileName1 = pn("proc1", dt(0));
 
-        try(AutoCloseable lock1 = zkStore.getLock()) {
-            zkStore.updateProfileResidencyInfo(profileName1, false);
+        try(AutoCloseable ignored = zkLoadInfoStore.getLock()) {
+            zkLoadInfoStore.updateProfileResidencyInfo(profileName1, false);
         }
 
-        LoadInfoEntities.NodeLoadInfo loadInfo = zkStore.readNodeLoadInfo();
-        LoadInfoEntities.ProfileResidencyInfo residencyInfo = zkStore.readProfileResidencyInfo(profileName1);
+        LoadInfoEntities.NodeLoadInfo loadInfo = zkLoadInfoStore.readNodeLoadInfo();
+        LoadInfoEntities.ProfileResidencyInfo residencyInfo = zkLoadInfoStore.readProfileResidencyInfo(profileName1);
 
         Assert.assertEquals(1, loadInfo.getProfilesLoaded());
         Assert.assertEquals("127.0.0.1", residencyInfo.getIp());
         Assert.assertEquals(8080, residencyInfo.getPort());
 
-        zkStore.removeProfileResidencyInfo(profileName1, true);
-        Assert.assertEquals(0, zkStore.readNodeLoadInfo().getProfilesLoaded());
-        Assert.assertNull(zkStore.readProfileResidencyInfo(profileName1));
+        zkLoadInfoStore.removeProfileResidencyInfo(profileName1, true);
+        Assert.assertEquals(0, zkLoadInfoStore.readNodeLoadInfo().getProfilesLoaded());
+        Assert.assertNull(zkLoadInfoStore.readProfileResidencyInfo(profileName1));
     }
 
     @Test(timeout = 10000)
@@ -108,15 +104,15 @@ public class ZkStoreTest {
         AggregatedProfileNamingStrategy profileName1 = pn("proc1", dt(0)),
             profileName2 = pn("proc2", dt(0));
 
-        zkStore.updateProfileResidencyInfo(profileName1, false);
-        zkStore.updateProfileResidencyInfo(profileName2, false);
+        zkLoadInfoStore.updateProfileResidencyInfo(profileName1, false);
+        zkLoadInfoStore.updateProfileResidencyInfo(profileName2, false);
 
         try {
             bringDownZk();
             Thread.sleep(500);
             Exception caughtEx = null;
             try {
-                zkStore.updateProfileResidencyInfo(profileName1, false);
+                zkLoadInfoStore.updateProfileResidencyInfo(profileName1, false);
             }
             catch (Exception e) {
                 caughtEx = e;
@@ -126,22 +122,20 @@ public class ZkStoreTest {
             Assert.assertEquals(ZkStoreUnavailableException.class, caughtEx.getClass());
 
             // wait for some time, to let the session expire
-            // weird that i have to wait for > 4sec here even though session timeout is 4sec.
-            Thread.sleep(7000);
+            Thread.sleep(4000);
         }
         finally {
             bringUpZk();
         }
-
-        // after connection lost we still expect the data to be there as part of reinitialization
+        // after connection lost we still expect the data to be reset to be 0
         int retry = 2 * curatorClient.getZookeeperClient().getZooKeeper().getSessionTimeout() / 1000;
-        while(retry > 0 && zkStore.getState() == ZkLoadInfoStore.ConnectionState.Disconnected) {
+        while(retry > 0 && zkLoadInfoStore.getState() == ZkLoadInfoStore.ConnectionState.Disconnected) {
             Thread.sleep(1000);
             retry--;
         }
 
-        Assert.assertEquals(ZkLoadInfoStore.ConnectionState.Connected, zkStore.getState());
-        Assert.assertEquals(2, zkStore.readNodeLoadInfo().getProfilesLoaded());
+        Assert.assertEquals(ZkLoadInfoStore.ConnectionState.Connected, zkLoadInfoStore.getState());
+        Assert.assertEquals(0, zkLoadInfoStore.readNodeLoadInfo().getProfilesLoaded());    //Now the profiles associated to the node are reset to 0
     }
 
     private void bringDownZk() throws Exception {
