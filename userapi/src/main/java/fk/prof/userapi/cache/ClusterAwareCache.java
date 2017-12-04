@@ -9,7 +9,6 @@ import fk.prof.userapi.api.AggregatedProfileLoader;
 import fk.prof.userapi.api.ProfileViewCreator;
 import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
-import fk.prof.userapi.model.TreeView;
 import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.model.ProfileView;
 import fk.prof.userapi.proto.LoadInfoEntities.ProfileResidencyInfo;
@@ -288,7 +287,7 @@ public class ClusterAwareCache {
         }
     }
 
-    private <T extends TreeView> T buildView(AggregatedProfileInfo profile, String traceName, ProfileViewType profileViewType) {
+    private <T extends ProfileView> T buildView(AggregatedProfileInfo profile, String traceName, ProfileViewType profileViewType) {
         if (ProfileViewType.CALLERS.equals(profileViewType)) {
             return (T)viewCreator.buildCallTreeView(profile, traceName);
         }
