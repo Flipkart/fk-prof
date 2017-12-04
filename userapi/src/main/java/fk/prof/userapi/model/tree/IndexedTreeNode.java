@@ -10,7 +10,7 @@ import java.util.Objects;
  * Created by gaurav.ashok on 01/06/17.
  */
 public class IndexedTreeNode<T> {
-    public IndexedTreeNode(int idx, T data) {
+    IndexedTreeNode(int idx, T data) {
         this(idx, data, null);
     }
 
@@ -39,7 +39,7 @@ public class IndexedTreeNode<T> {
     }
 
     public int getChildrenCount() {
-        return children.size();
+        return children != null ? children.size() : 0;
     }
 
     public void visit(Tree.Visitor<IndexedTreeNode<T>> visitor) {
@@ -53,7 +53,7 @@ public class IndexedTreeNode<T> {
         visitor.postVisit(this);
     }
 
-    public IndexedTreeNode<T> setChildren(List<IndexedTreeNode<T>> children) {
+    IndexedTreeNode<T> setChildren(List<IndexedTreeNode<T>> children) {
         this.children = children;
         return this;
     }

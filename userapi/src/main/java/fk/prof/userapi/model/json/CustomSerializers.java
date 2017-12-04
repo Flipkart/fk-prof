@@ -59,23 +59,15 @@ public class CustomSerializers {
         }
 
         @Override
-        public void preVisit(IndexedTreeNode node) {
-            try {
-                gen.writeEndObject();                   //1 open {
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        @Override
         public void visit(int idx, IndexedTreeNode node) {
             try {
                 gen.writeFieldName(String.valueOf(idx));
-                gen.writeStartObject();                 //2 open {
+                gen.writeStartObject();                     //1 open
                 gen.writeFieldName("d");
                 dataSerializer.serialize(node.getData(), gen, serializers);
                 if (node.getChildrenCount() > 0) {
                     gen.writeFieldName("c");
+                    gen.writeStartObject();                 //2 open
                 }
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -85,8 +77,10 @@ public class CustomSerializers {
         @Override
         public void postVisit(IndexedTreeNode node) {
             try {
-                gen.writeEndObject();                   //2 close }
-                gen.writeEndObject();                   //1 close }
+                if (node.getChildrenCount() > 0) {
+                    gen.writeEndObject();                   //2 close
+                }
+                gen.writeEndObject();                       //1 close
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -104,16 +98,18 @@ public class CustomSerializers {
 
         @Override
         public void serialize(TreeViewResponse value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-            gen.writeStartObject();                     //1 open
+            gen.writeStartObject();                         //1 open
             gen.writeFieldName("method_lookup");
             serializers.defaultSerializeValue(value.getMethodLookup(), gen);
 
             List<IndexedTreeNode<FrameNode>> nodes = value.getTree();
             gen.writeFieldName("nodes");
+            gen.writeStartObject();                         //2 open
             for (IndexedTreeNode node : nodes) {
                 indexedNodeSerializer.serialize(node, gen, serializers);
             }
-            gen.writeEndObject();                       //1 close
+            gen.writeEndObject();                           //2 close
+            gen.writeEndObject();                           //1 close
         }
     }
 }
