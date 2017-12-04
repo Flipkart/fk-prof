@@ -2,15 +2,15 @@ package fk.prof.userapi.model.tree;
 
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
 import fk.prof.userapi.model.Tree;
+import fk.prof.userapi.model.TreeView;
 
 import java.util.*;
-import java.util.List;
 import java.util.stream.Collectors;
 
 /**
  * Created by gaurav.ashok on 01/06/17.
  */
-public class CalleesTreeView implements CacheableView {
+public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>> {
 
     private Tree<FrameNode> callTree;
     private List<IndexedTreeNode<FrameNode>> hotMethods;
@@ -24,16 +24,16 @@ public class CalleesTreeView implements CacheableView {
         return hotMethods;
     }
 
-    public List<IndexedTreeNode<FrameNode>> getSubTree(List<Integer> ids, int depth, boolean autoExpand) {
-        return new Expander(ids, depth, autoExpand).expand();
+    public List<IndexedTreeNode<FrameNode>> getSubTrees(List<Integer> ids, int maxDepth, boolean autoExpand) {
+        return new Expander(ids, maxDepth, autoExpand).expand();
     }
 
     private void findOnCpuFrames() {
         hotMethods = new ArrayList<>();
-        callTree.foreach((i, fn) -> {
-            int cpuSampleCount = fn.getCpuSamplingProps().getOnCpuSamples();
+        callTree.foreach((i, node) -> {
+            int cpuSampleCount = node.getCpuSamplingProps().getOnCpuSamples();
             if(cpuSampleCount > 0) {
-                hotMethods.add(new IndexedTreeNode<>(i, fn));
+                hotMethods.add(new IndexedTreeNode<>(i, node));
             }
         });
     }
@@ -50,34 +50,34 @@ public class CalleesTreeView implements CacheableView {
         }
 
         List<IndexedTreeNode<FrameNode>> expand() {
-            Map<Integer, List<IndexedTreeNode<FrameNode>>> idxGroupedByMethodId = ids.stream()
-                .map(e -> new IndexedTreeNode<>(e, callTree.get(e)))
-                .collect(Collectors.groupingBy(e -> e.getData().getMethodId()));
-            return idxGroupedByMethodId.values().stream().peek(this::expand).flatMap(List::stream).collect(Collectors.toList());
+            Map<String, List<IndexedTreeNode<FrameNode>>> idxGroupedByMethodIdLineNum = ids.stream()
+                .map(e -> new IndexedTreeNode<>(e, callTree.getNode(e)))
+                .collect(Collectors.groupingBy((IndexedTreeNode<FrameNode> e) -> String.valueOf(e.getData().getMethodId()) + ":" + String.valueOf(e.getData().getLineNo())));
+            return idxGroupedByMethodIdLineNum.values().stream().peek(this::expand).flatMap(List::stream).collect(Collectors.toList());
         }
 
         void expand(List<IndexedTreeNode<FrameNode>> nodes) {
             // next set of callers.
             List<IndexedTreeNode<FrameNode>> callers = new ArrayList<>(nodes);
-            HashSet<Integer> methodidSet = new HashSet<>();
+            Set<String> methodIdLineNumSet = new HashSet<>();
 
             for(int d = 0; d < maxDepth; ++d) {
-                methodidSet.clear();
+                methodIdLineNumSet.clear();
 
                 for(int i = 0; i < nodes.size(); ++i) {
                     int callerId = callTree.getParent(callers.get(i).getIdx());
                     // if parent node exist, add it as a caller to the current caller, and update the current caller
                     if(callerId > 0) {
-                        FrameNode fn = callTree.get(callerId);
+                        FrameNode fn = callTree.getNode(callerId);
                         IndexedTreeNode<FrameNode> caller = new IndexedTreeNode<>(callerId, fn);
                         callers.get(i).setChildren(Collections.singletonList(caller));
                         callers.set(i, caller);
                         // add the methodid to set
-                        methodidSet.add(fn.getMethodId());
+                        methodIdLineNumSet.add(String.valueOf(fn.getMethodId())+":"+String.valueOf(fn.getLineNo()));
                     }
                 }
                 // if there are > 1 distinct caller, stop autoExpansion
-                if(autoExpand && methodidSet.size() > 1) {
+                if(autoExpand && methodIdLineNumSet.size() > 1) {
                     return;
                 }
             }

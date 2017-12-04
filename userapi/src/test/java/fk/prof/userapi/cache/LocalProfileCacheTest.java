@@ -1,14 +1,15 @@
-package fk.prof.userapi.api.cache;
+package fk.prof.userapi.cache;
 
 import com.google.common.cache.RemovalListener;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.userapi.Configuration;
-import fk.prof.userapi.Pair;
+import fk.prof.userapi.model.ProfileViewType;
+import fk.prof.userapi.model.tree.CallTreeView;
+import fk.prof.userapi.util.Pair;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.model.AggregatedProfileInfo;
-import fk.prof.userapi.model.tree.CallTreeView;
 import io.vertx.core.Future;
 import org.junit.Assert;
 import org.junit.Before;
@@ -49,7 +50,7 @@ public class LocalProfileCacheTest {
         AggregatedProfileNamingStrategy profileName = pn("proc1", dt(0));
         Assert.assertNull(cache.get(profileName));
 
-        Pair profileViewPair = cache.getView(profileName, "/trace1/callersView");
+        Pair profileViewPair = cache.getView(profileName, "/trace1/callersView", ProfileViewType.CALLERS);
         Assert.assertNotNull(profileViewPair);
         Assert.assertNull(profileViewPair.first);
         Assert.assertNull(profileViewPair.second);
@@ -67,12 +68,12 @@ public class LocalProfileCacheTest {
         cache.put(profileName, Future.succeededFuture(profile));
         Assert.assertSame(profile, cache.get(profileName).result());
 
-        cache.computeViewIfAbsent(profileName,  "view1", p -> view);
-        Pair<Future<AggregatedProfileInfo>, CallTreeView> profileViewPair = cache.getView(profileName, "view1");
+        cache.computeViewIfAbsent(profileName,  "view1", ProfileViewType.CALLERS, p -> view);
+        Pair<Future<AggregatedProfileInfo>, CallTreeView> profileViewPair = cache.getView(profileName, "view1", ProfileViewType.CALLERS);
         Assert.assertSame(view, profileViewPair.second);
         Assert.assertSame(profile, profileViewPair.first.result());
 
-        profileViewPair = cache.getView(profileName, "view2");
+        profileViewPair = cache.getView(profileName, "view2", ProfileViewType.CALLERS);
         Assert.assertNull(profileViewPair.second);
         Assert.assertSame(profile, profileViewPair.first.result());
     }
@@ -87,16 +88,16 @@ public class LocalProfileCacheTest {
 
         cache.setRemovalListener(listener);
         cache.put(profileName, Future.succeededFuture(profile));
-        cache.computeViewIfAbsent(profileName,  "view1", p -> view);
+        cache.computeViewIfAbsent(profileName,  "view1", ProfileViewType.CALLERS, p -> view);
 
         ticker.advance(config.getProfileRetentionDurationMin() + 1, TimeUnit.MINUTES);
         Assert.assertNull(cache.get(profileName));
-        Pair<Future<AggregatedProfileInfo>, CallTreeView> profileViewPair = cache.getView(profileName, "view1");
+        Pair<Future<AggregatedProfileInfo>, CallTreeView> profileViewPair = cache.getView(profileName, "view1", ProfileViewType.CALLERS);
         Assert.assertNull(profileViewPair.first);
         Assert.assertNull(profileViewPair.second);
 
         // force the cleanup
-        cache.claenUp();
+        cache.cleanUp();
 
         verify(listener, times(1)).onRemoval(any());
     }
@@ -116,7 +117,7 @@ public class LocalProfileCacheTest {
 
         cache.setRemovalListener(listener);
         cache.put(profileName, Future.succeededFuture(profile));
-        cache.computeViewIfAbsent(profileName, "view1", p -> view);
+        cache.computeViewIfAbsent(profileName, "view1", ProfileViewType.CALLERS, p -> view);
 
         // let some time pass
         ticker.advance(config.getProfileRetentionDurationMin() - 1, TimeUnit.MINUTES);
@@ -125,16 +126,16 @@ public class LocalProfileCacheTest {
 
         // put another one
         cache.put(profileName2, Future.succeededFuture(profile));
-        cache.computeViewIfAbsent(profileName2, "view2", p -> view);
+        cache.computeViewIfAbsent(profileName2, "view2", ProfileViewType.CALLERS, p -> view);
 
         // should evict the previous key
         Assert.assertNull(cache.get(profileName));
-        Pair<Future<AggregatedProfileInfo>, CallTreeView> profileViewPair = cache.getView(profileName, "view1");
+        Pair<Future<AggregatedProfileInfo>, CallTreeView> profileViewPair = cache.getView(profileName, "view1", ProfileViewType.CALLERS);
         Assert.assertNull(profileViewPair.first);
         Assert.assertNull(profileViewPair.second);
 
         Assert.assertSame(profile, cache.get(profileName2).result());
-        profileViewPair = cache.getView(profileName2, "view2");
+        profileViewPair = cache.getView(profileName2, "view2", ProfileViewType.CALLERS);
         Assert.assertSame(profile, profileViewPair.first.result());
         Assert.assertSame(view, profileViewPair.second);
 

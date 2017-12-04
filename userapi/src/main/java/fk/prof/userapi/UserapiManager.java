@@ -17,7 +17,7 @@ import fk.prof.userapi.api.AggregatedProfileLoader;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.api.ProfileViewCreator;
-import fk.prof.userapi.api.cache.ClusterAwareCache;
+import fk.prof.userapi.cache.ClusterAwareCache;
 import fk.prof.userapi.deployer.VerticleDeployer;
 import fk.prof.userapi.deployer.impl.UserapiHttpVerticleDeployer;
 import fk.prof.userapi.model.json.CustomSerializers;
@@ -92,7 +92,7 @@ public class UserapiManager {
         return future;
     }
 
-    public Future<Object> launch() {
+    public Future<Void> launch() {
         Future<Object> result = Future.future();
         // register serializers
         registerSerializers(Json.mapper);
@@ -101,15 +101,13 @@ public class UserapiManager {
         ProfileStoreAPI profileStoreAPI = new ProfileStoreAPIImpl(vertx, this.storage, cache, config);
         VerticleDeployer userapiHttpVerticleDeployer = new UserapiHttpVerticleDeployer(vertx, config, profileStoreAPI);
 
-        vertx.executeBlocking(f -> cache.onClusterJoin().setHandler(f.completer()), ar -> {
-            if(ar.failed()) {
+        return cache.onClusterJoin().setHandler(ar -> {
+            if (ar.failed()) {
                 result.fail(ar.cause());
-            }
-            else {
-                userapiHttpVerticleDeployer.deploy().map(r -> (Object)r).setHandler(result.completer());
+            } else {
+                userapiHttpVerticleDeployer.deploy().map(r -> (Object) r).setHandler(result.completer());
             }
         });
-        return result;
     }
 
     private void registerSerializers(ObjectMapper mapper) {

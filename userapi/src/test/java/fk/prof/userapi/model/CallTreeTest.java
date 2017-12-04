@@ -134,21 +134,21 @@ public class CallTreeTest {
     public void testCallTreeView() {
         CallTreeView ctv = new CallTreeView(calltree);
         /* root node */
-        testTreeEquality(ctv.getSubTree(toList(ctv.getRootNodes().get(0).getIdx()), 1, false), toList(expectedTree));
+        testTreeEquality(ctv.getSubTrees(toList(ctv.getRootNodes().get(0).getIdx()), 1, false), toList(expectedTree));
         /* E -> F -> B
                   -> D
          */
-        List<IndexedTreeNode<FrameNode>> e_subtree = ctv.getSubTree(toList(7), 2, false);
+        List<IndexedTreeNode<FrameNode>> e_subtree = ctv.getSubTrees(toList(7), 2, false);
         testTreeEquality(e_subtree, toList(expectedTree.getChildren().get(2)));
 
         /* A -> B -> C
              -> D -> G
          */
-        List<IndexedTreeNode<FrameNode>> a_subtree = ctv.getSubTree(toList(2), 10, false);
+        List<IndexedTreeNode<FrameNode>> a_subtree = ctv.getSubTrees(toList(2), 10, false);
         testTreeEquality(a_subtree, toList(expectedTree.getChildren().get(1)));
 
         /* full tree */
-        List<IndexedTreeNode<FrameNode>> fulltree = ctv.getSubTree(toList(0), 10, false);
+        List<IndexedTreeNode<FrameNode>> fulltree = ctv.getSubTrees(toList(0), 10, false);
         testTreeEquality(fulltree, toList(expectedTree));
     }
 
@@ -162,19 +162,19 @@ public class CallTreeTest {
         CallTreeView ctv = new CallTreeView(mt);
 
         /* root node */
-        testTreeEquality(ctv.getSubTree(toList(ctv.getRootNodes().get(0).getIdx()), 1, false), filterTree(toList(expectedTree), hiddenNodes));
+        testTreeEquality(ctv.getSubTrees(toList(ctv.getRootNodes().get(0).getIdx()), 1, false), filterTree(toList(expectedTree), hiddenNodes));
 
         /* E -> F -> B
            Branch with D() [id:11] will not be visible
          */
-        List<IndexedTreeNode<FrameNode>> e_subtree = ctv.getSubTree(toList(7), 2, false);
+        List<IndexedTreeNode<FrameNode>> e_subtree = ctv.getSubTrees(toList(7), 2, false);
         testTreeEquality(e_subtree,
             filterTree(toList(expectedTree.getChildren().get(2)), hiddenNodes));
 
         /* full tree
            Branch under nodes 1, 3, 11 will not be visible
          */
-        List<IndexedTreeNode<FrameNode>> fulltree = ctv.getSubTree(toList(0), 10, false);
+        List<IndexedTreeNode<FrameNode>> fulltree = ctv.getSubTrees(toList(0), 10, false);
         testTreeEquality(fulltree,
             filterTree(toList(expectedTree), hiddenNodes));
     }
@@ -188,11 +188,11 @@ public class CallTreeTest {
         testTreeEquality(hm, expectedHotMethodsTree);
 
         // get callers of C() [sampleCount:3]
-        List<IndexedTreeNode<FrameNode>> C3_callers_2deep = hmtv.getSubTree(toList(10), 2, false);
+        List<IndexedTreeNode<FrameNode>> C3_callers_2deep = hmtv.getSubTrees(toList(10), 2, false);
         testTreeEquality(C3_callers_2deep, toList(expectedHotMethodsTree.get(4)));
 
         // get callers of D() [sampleCount:6]
-        List<IndexedTreeNode<FrameNode>> D6_callers_1deep = hmtv.getSubTree(toList(3), 1, false);
+        List<IndexedTreeNode<FrameNode>> D6_callers_1deep = hmtv.getSubTrees(toList(3), 1, false);
         testTreeEquality(D6_callers_1deep, toList(expectedHotMethodsTree.get(1)));
     }
 
@@ -212,21 +212,21 @@ public class CallTreeTest {
             Arrays.asList(expectedHotMethodsTree.get(0), expectedHotMethodsTree.get(1), expectedHotMethodsTree.get(6)));
 
         // get callers of G() [sampleCount:1]
-        List<IndexedTreeNode<FrameNode>> G1_callers_5deep = hmtv.getSubTree(toList(4), 5, false);
+        List<IndexedTreeNode<FrameNode>> G1_callers_5deep = hmtv.getSubTrees(toList(4), 5, false);
         testTreeEquality(G1_callers_5deep, toList(expectedHotMethodsTree.get(0)));
     }
 
     @Test
     public void testIndexedTreeNodeSerialize() throws Exception {
         CallTreeView ctv = new CallTreeView(calltree);
-        List<IndexedTreeNode<FrameNode>> subtree = ctv.getSubTree(toList(ctv.getRootNodes().get(0).getIdx()), 1, false);
+        List<IndexedTreeNode<FrameNode>> subtree = ctv.getSubTrees(toList(ctv.getRootNodes().get(0).getIdx()), 1, false);
 
-        Assert.assertEquals("{\"method_lookup\":{},\"0\":{\"data\":[0,0,23],\"chld\":{\"1\":{\"data\":[1,0,0]},\"2\":{\"data\":[2,0,14]},\"7\":{\"data\":[7,0,9]}}}}",
-            mapper.writeValueAsString(new TreeViewResponse.CpuSampleCallersTreeViewResponse(subtree, new HashMap<>())));
+        Assert.assertEquals("{\"method_lookup\":{},\"nodes\":{\"0\":{\"d\":[0,0,23],\"c\":{\"1\":{\"d\":[1,0,0]},\"2\":{\"d\":[2,0,14]},\"7\":{\"d\":[7,0,9]}}}}}",
+            mapper.writeValueAsString(new CpuSamplingCallTreeViewResponse(subtree, new HashMap<>())));
     }
 
     private void testTreeEquality(IndexedTreeNode<FrameNode> node, CallTree callTree) {
-        Assert.assertEquals(node.getData(), callTree.get(node.getIdx()));
+        Assert.assertEquals(node.getData(), callTree.getNode(node.getIdx()));
         for(IndexedTreeNode<FrameNode> child: node.getChildren()) {
             testTreeEquality(child, callTree);
         }

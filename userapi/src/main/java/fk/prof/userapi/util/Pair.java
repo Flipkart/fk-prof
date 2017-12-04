@@ -1,4 +1,4 @@
-package fk.prof.userapi;
+package fk.prof.userapi.util;
 
 import java.util.Objects;
 
@@ -32,6 +32,7 @@ public class Pair<T, U> {
 
     @Override
     public boolean equals(Object that) {
+        if (this == that) return true;
         if (that == null || !(that instanceof Pair)) {
             return false;
         }

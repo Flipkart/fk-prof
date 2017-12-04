@@ -8,14 +8,14 @@ import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.ObjectNotFoundException;
 import fk.prof.storage.S3AsyncStorage;
 import fk.prof.userapi.Configuration;
-import fk.prof.userapi.Deserializer;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.AggregatedProfileLoader;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
-import fk.prof.userapi.api.cache.ClusterAwareCache;
+import fk.prof.userapi.cache.ClusterAwareCache;
 import fk.prof.userapi.model.json.ProtoSerializers;
 import fk.prof.userapi.model.tree.CallTree;
+import fk.prof.userapi.util.ProtoUtil;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.Json;
@@ -57,7 +57,7 @@ public class ParseProfileTest {
     public void testReadWriteForVariant() throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Serializer.writeVariantInt32(Integer.MAX_VALUE + 10000, out);
-        int read = Deserializer.readVariantInt32(new ByteArrayInputStream(out.toByteArray()));
+        int read = ProtoUtil.readVariantInt32(new ByteArrayInputStream(out.toByteArray()));
         assert read == Integer.MAX_VALUE + 10000;
     }
 
@@ -160,7 +160,7 @@ public class ParseProfileTest {
     }
 
     private <T> void testTreeEquality(TestContext context, Tree<T> expected, Tree<T> actual, int idx) {
-        context.assertEquals(expected.get(idx), actual.get(idx));
+        context.assertEquals(expected.getNode(idx), actual.getNode(idx));
         testListEquality(context, expected.getChildren(idx), actual.getChildren(idx), "children for node at id: " + idx + " are not same");
         for(Integer i : expected.getChildren(idx)) {
             testTreeEquality(context, expected, actual, i);

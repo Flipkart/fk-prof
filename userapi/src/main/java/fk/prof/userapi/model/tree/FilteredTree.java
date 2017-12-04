@@ -13,8 +13,9 @@ import java.util.NoSuchElementException;
  * |__1
  * |  |__2
  * |__3
+ *    |__4
  *
- * getChildrenSize(0) will return 1, and getChildren(0) will return [3].
+ * getChildrenCount(0) will return 1, and getChildren(0) will return [3] and getChildren(3) will return [4].
  *
  * Created by gaurav.ashok on 05/06/17.
  */
@@ -25,23 +26,22 @@ public class FilteredTree<T> implements Tree<T> {
 
     public FilteredTree(Tree<T> tree, VisibilityPredicate<T> predicate) {
         this.tree = tree;
-        this.visible = new boolean[getMaxSize()];
-
+        this.visible = new boolean[size()];
         tree.foreach((i, node) -> visible[i] = predicate.testVisibility(i, node));
 
-        treeify(0, false);
+        applyMask(0, false);
     }
 
     @Override
-    public T get(int idx) {
+    public T getNode(int idx) {
         if(visible[idx]) {
-            return tree.get(idx);
+            return tree.getNode(idx);
         }
         throw new NoSuchElementException();
     }
 
     @Override
-    public int getChildrenSize(int idx) {
+    public int getChildrenCount(int idx) {
         int childCount = 0;
         for(Integer i : getChildren(idx)) {
             ++childCount;
@@ -103,8 +103,8 @@ public class FilteredTree<T> implements Tree<T> {
     }
 
     @Override
-    public int getMaxSize() {
-        return tree.getMaxSize();
+    public int size() {
+        return tree.size();
     }
 
     @Override
@@ -116,11 +116,11 @@ public class FilteredTree<T> implements Tree<T> {
         });
     }
 
-    private boolean treeify(int idx, boolean isParentVisible) {
+    private boolean applyMask(int idx, boolean isParentVisible) {
         boolean isNodeVisible = visible[idx] | isParentVisible;
         boolean isChildVisible = false;
         for(Integer i : tree.getChildren(idx)) {
-            isChildVisible |= treeify(i, isNodeVisible);
+            isChildVisible |= applyMask(i, isNodeVisible);
         }
         visible[idx] = isNodeVisible | isChildVisible;
         return visible[idx];

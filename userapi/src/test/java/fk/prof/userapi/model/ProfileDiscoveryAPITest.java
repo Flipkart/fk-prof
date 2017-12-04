@@ -6,7 +6,7 @@ import fk.prof.userapi.Configuration;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
-import fk.prof.userapi.api.cache.ClusterAwareCache;
+import fk.prof.userapi.cache.ClusterAwareCache;
 import fk.prof.userapi.model.json.ProtoSerializers;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.CompositeFuture;

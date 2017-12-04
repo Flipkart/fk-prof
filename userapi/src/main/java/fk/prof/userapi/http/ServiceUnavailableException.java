@@ -1,4 +1,4 @@
-package fk.prof.userapi;
+package fk.prof.userapi.http;
 
 /**
  * Created by gaurav.ashok on 26/06/17.

@@ -1,18 +1,19 @@
-package fk.prof.userapi.api.cache;
+package fk.prof.userapi.cache;
 
 import com.google.common.io.BaseEncoding;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.userapi.Configuration;
-import fk.prof.userapi.Pair;
+import fk.prof.userapi.model.ProfileViewType;
+import fk.prof.userapi.model.tree.CallTreeView;
+import fk.prof.userapi.model.tree.CalleesTreeView;
+import fk.prof.userapi.util.Pair;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.AggregatedProfileLoader;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.api.ProfileViewCreator;
 import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
-import fk.prof.userapi.model.tree.CallTreeView;
-import fk.prof.userapi.model.tree.CalleesTreeView;
 import fk.prof.userapi.proto.LoadInfoEntities;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -54,7 +55,7 @@ public class CacheTest {
     private Vertx vertx;
     private static Configuration config;
     private static TestingServer zookeeper;
-    private static CuratorFramework curator;
+    private static CuratorFramework curatorClient;
     private WorkerExecutor executor;
     private ClusterAwareCache cache;
     private LocalProfileCache localProfileCache;
@@ -68,7 +69,7 @@ public class CacheTest {
         zookeeper = new TestingServer(zkPort, true);
 
         Configuration.CuratorConfig curatorConfig = config.getCuratorConfig();
-        curator = CuratorFrameworkFactory.builder()
+        curatorClient = CuratorFrameworkFactory.builder()
             .connectString("127.0.0.1:" + zkPort)
             .retryPolicy(new ExponentialBackoffRetry(1000, curatorConfig.getMaxRetries()))
             .connectionTimeoutMs(curatorConfig.getConnectionTimeoutMs())
@@ -76,8 +77,8 @@ public class CacheTest {
             .namespace(curatorConfig.getNamespace())
             .build();
 
-        curator.start();
-        curator.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
+        curatorClient.start();
+        curatorClient.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
     }
 
     @AfterClass
@@ -98,7 +99,7 @@ public class CacheTest {
 
     private void setUpCache(TestContext context, LocalProfileCache localCache, AggregatedProfileLoader profileLoader, ProfileViewCreator viewCreator) {
         localProfileCache = localCache;
-        cache = new ClusterAwareCache(curator, executor, profileLoader, viewCreator, config, localProfileCache);
+        cache = new ClusterAwareCache(curatorClient, executor, profileLoader, viewCreator, config, localProfileCache);
         Async async = context.async();
         cache.onClusterJoin().setHandler(ar -> {
             context.assertTrue(ar.succeeded());
@@ -111,7 +112,7 @@ public class CacheTest {
     public void testNodesInfoExistWhenCacheIsCreated(TestContext context) throws Exception {
         setUpDefaultCache(context, null, null);
 
-        byte[] bytes = curator.getData().forPath("/nodesInfo/127.0.0.1:" + config.getHttpConfig().getHttpPort());
+        byte[] bytes = curatorClient.getData().forPath("/nodesInfo/127.0.0.1:" + config.getHttpConfig().getHttpPort());
         Assert.assertNotNull(bytes);
         Assert.assertNotNull(LoadInfoEntities.NodeLoadInfo.parseFrom(bytes));
     }
@@ -173,7 +174,7 @@ public class CacheTest {
             async.countDown();
         });
 
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view = cache.getCallTreeView(profileName, "");
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view = cache.getProfileView(profileName,"", ProfileViewType.CALLERS);
         view.setHandler(ar -> {
             context.assertTrue(ar.failed());
             context.assertTrue(ar.cause() instanceof CachedProfileNotFoundException);
@@ -192,8 +193,8 @@ public class CacheTest {
         setUpDefaultCache(context, null, viewCreator);
         localProfileCache.put(npPair.name, Future.succeededFuture(npPair.profileInfo));
 
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getCallTreeView(npPair.name, "t1");
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view2 = cache.getCallTreeView(npPair.name, "t1");
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view2 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
 
         view1.setHandler(ar -> {
             context.assertTrue(ar.succeeded());
@@ -221,8 +222,8 @@ public class CacheTest {
         setUpDefaultCache(context, null, viewCreator);
         localProfileCache.put(npPair.name, Future.succeededFuture(npPair.profileInfo));
 
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getCallTreeView(npPair.name, "t1");
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view2 = cache.getCallTreeView(npPair.name, "t2");
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view2 = cache.getProfileView(npPair.name,"t2", ProfileViewType.CALLERS);
 
         view1.setHandler(ar -> {
             context.assertTrue(ar.succeeded());
@@ -251,8 +252,8 @@ public class CacheTest {
         setUpDefaultCache(context, null, viewCreator);
         localProfileCache.put(npPair.name, Future.succeededFuture(npPair.profileInfo));
 
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getCallTreeView(npPair.name, "t1");
-        Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> view2 = cache.getCalleesTreeView(npPair.name, "t1");
+        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> view1 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
+        Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> view2 = cache.getProfileView(npPair.name, "t1", ProfileViewType.CALLEES);
 
         view1.setHandler(ar -> {
             context.assertTrue(ar.succeeded());
@@ -296,7 +297,7 @@ public class CacheTest {
         async.awaitSuccess(2000);
 
         Async async2 = context.async(1);
-        Future<?> f = cache.getCalleesTreeView(profileName, "t1");
+        Future<?> f = cache.getProfileView(profileName, "t1", ProfileViewType.CALLEES);
         f.setHandler(ar -> {
             context.assertTrue(ar.failed());
             context.assertTrue(ar.cause() instanceof CachedProfileNotFoundException);
@@ -330,7 +331,7 @@ public class CacheTest {
         async1.awaitSuccess(2000);
 
         Async async2 = context.async();
-        Future<?> view1 = cache.getCallTreeView(npPair.name, "t1");
+        Future<?> view1 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
         view1.setHandler(ar -> {
             context.assertTrue(ar.succeeded());
             async2.countDown();
@@ -342,7 +343,7 @@ public class CacheTest {
 
         // retry fetching
         Async async3 = context.async(1);
-        view1 = cache.getCallTreeView(npPair.name, "t1");
+        view1 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
         view1.setHandler(ar -> {
             context.assertTrue(ar.failed());
             context.assertTrue(ar.cause() instanceof CachedProfileNotFoundException);
@@ -397,7 +398,7 @@ public class CacheTest {
     }
 
     private void createProfileNode(AggregatedProfileNamingStrategy profileName, String ip, int port) throws Exception {
-        curator.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkPathForProfile(profileName),
+        curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkPathForProfile(profileName),
             LoadInfoEntities.ProfileResidencyInfo.newBuilder().setIp(ip).setPort(port).build().toByteArray());
     }
 
@@ -440,18 +441,18 @@ public class CacheTest {
     private void cleanUpZookeeper() throws Exception {
         List<String> profileNodes = new ArrayList<>();
         List<String> nodes = new ArrayList<>();
-        if(curator.checkExists().forPath("/profilesLoadStatus") != null) {
-            profileNodes.addAll(curator.getChildren().forPath("/profilesLoadStatus"));
+        if(curatorClient.checkExists().forPath("/profilesLoadStatus") != null) {
+            profileNodes.addAll(curatorClient.getChildren().forPath("/profilesLoadStatus"));
         }
-        if(curator.checkExists().forPath("/nodesInfo") != null) {
-            nodes.addAll(curator.getChildren().forPath("/nodesInfo"));
+        if(curatorClient.checkExists().forPath("/nodesInfo") != null) {
+            nodes.addAll(curatorClient.getChildren().forPath("/nodesInfo"));
         }
 
         for(String path : profileNodes) {
-            curator.delete().forPath("/profilesLoadStatus/" + path);
+            curatorClient.delete().forPath("/profilesLoadStatus/" + path);
         }
         for(String path : nodes) {
-            curator.delete().forPath("/nodesInfo/" + path);
+            curatorClient.delete().forPath("/nodesInfo/" + path);
         }
     }
 

@@ -29,7 +29,7 @@
         <maven.jar.version>3.0.2</maven.jar.version>
         <jackson.version>2.7.4</jackson.version>
         <hibernate.version>5.4.1.Final</hibernate.version>
-        <curator.version>2.11.1</curator.version>
+        <curator.version>2.12.0</curator.version>
     </properties>
 
     <dependencies>
