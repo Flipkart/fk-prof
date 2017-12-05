@@ -26,10 +26,10 @@ public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Ca
         return hotMethods;
     }
 
-    public List<IndexedTreeNode<FrameNode>> getSubTrees(List<Integer> ids, int maxDepth, boolean autoExpand) {
-        return new Expander(ids, maxDepth, autoExpand).expand();
+    public List<IndexedTreeNode<FrameNode>> getSubTrees(List<Integer> ids, int maxDepth, boolean forceExpand) {
+        return new Expander(ids, maxDepth, forceExpand).expand();
     }
-
+    //TODO: Fix as per the review comment
     private void findOnCpuFrames() {
         hotMethods = new ArrayList<>();
         callTree.foreach((i, node) -> {
@@ -45,15 +45,19 @@ public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Ca
         return ProfileViewType.CALLEES;
     }
 
+    /**
+     * This is a helper class in order to contain variables as field members
+     * which will remain constant in the expand method
+     */
     private class Expander {
         List<Integer> ids;
         int maxDepth;
-        boolean autoExpand;
+        boolean forceExpand;
 
-        Expander(List<Integer> ids, int maxDepth, boolean autoExpand) {
+        Expander(List<Integer> ids, int maxDepth, boolean forceExpand) {
             this.ids = ids;
             this.maxDepth = maxDepth;
-            this.autoExpand = autoExpand;
+            this.forceExpand = forceExpand;
         }
 
         List<IndexedTreeNode<FrameNode>> expand() {
@@ -83,8 +87,8 @@ public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Ca
                         methodIdLineNumSet.add(String.valueOf(fn.getMethodId())+":"+String.valueOf(fn.getLineNo()));
                     }
                 }
-                // if there are > 1 distinct caller, stop autoExpansion
-                if(autoExpand && methodIdLineNumSet.size() > 1) {
+                // if there are > 1 distinct caller, stop expansion
+                if(!forceExpand && methodIdLineNumSet.size() > 1) {
                     return;
                 }
             }

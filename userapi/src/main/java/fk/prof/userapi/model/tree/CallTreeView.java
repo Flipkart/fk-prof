@@ -20,12 +20,11 @@ public class CallTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Cache
     }
 
     public List<IndexedTreeNode<FrameNode>> getRootNodes() {
-        // TODO: fix it. assuming 0 is the root index.
         return Collections.singletonList(new IndexedTreeNode<>(0, tree.getNode(0)));
     }
 
-    public List<IndexedTreeNode<FrameNode>> getSubTrees(List<Integer> ids, int depth, boolean autoExpand) {
-        return new Expander(ids, depth, autoExpand).expand();
+    public List<IndexedTreeNode<FrameNode>> getSubTrees(List<Integer> ids, int maxDepth, boolean forceExpand) {
+        return new Expander(ids, maxDepth, forceExpand).expand();
     }
 
     @Override
@@ -33,15 +32,19 @@ public class CallTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Cache
         return ProfileViewType.CALLERS;
     }
 
+    /**
+     * This is a helper class used to contain variables which remain constant in the expand method
+     * as field members of this class
+     */
     private class Expander {
         final List<Integer> ids;
         final int maxDepth;
-        final boolean autoExpand;
+        final boolean forceExpand;
 
-        Expander(List<Integer> ids, int maxDepth, boolean autoExpand) {
+        Expander(List<Integer> ids, int maxDepth, boolean forceExpand) {
             this.ids = ids;
             this.maxDepth = maxDepth;
-            this.autoExpand = autoExpand;
+            this.forceExpand = forceExpand;
         }
 
         List<IndexedTreeNode<FrameNode>> expand() {
@@ -63,11 +66,11 @@ public class CallTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Cache
                 List<IndexedTreeNode<FrameNode>> children = new ArrayList<>(childrenCount);
                 for(Integer i : tree.getChildren(idx)) {
                     // in case of autoExpansion, if childrenSize > 1, dont expand more
-                    if (autoExpand) {
-                        children.add(new IndexedTreeNode<>(i, tree.getNode(i), childrenCount > 0 ? null : expand(i, curDepth + 1)));
+                    if (!forceExpand && childrenCount > 1) {
+                        children.add(new IndexedTreeNode<>(i, tree.getNode(i)));
                     }
                     else {
-                        children.add(new IndexedTreeNode<>(i, tree.getNode(i)));
+                        children.add(new IndexedTreeNode<>(i, tree.getNode(i), expand(i, curDepth + 1)));
                     }
                 }
                 return children;

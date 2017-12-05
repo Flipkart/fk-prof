@@ -229,7 +229,7 @@ public class HttpVerticle extends AbstractVerticle {
       HttpServerRequest req = routingContext.request();
 
       String appId, clusterId, procId, traceName;
-      Boolean autoExpand;
+      Boolean forceExpand;
       Integer maxDepth, duration;
       ZonedDateTime startTime;
       List<Integer> nodeIds;
@@ -240,7 +240,7 @@ public class HttpVerticle extends AbstractVerticle {
         traceName = extractTypedParam(req, "traceName");
         startTime = HttpRequestUtil.extractTypedParam(req, "start", ZonedDateTime.class);
         duration = HttpRequestUtil.extractTypedParam(req, "duration", Integer.class);
-        autoExpand = MoreObjects.firstNonNull(HttpRequestUtil.extractTypedParam(req, "autoExpand", Boolean.class, false), false);
+        forceExpand = MoreObjects.firstNonNull(HttpRequestUtil.extractTypedParam(req, "forceExpand", Boolean.class, false), false);
         maxDepth = Math.min(maxDepthForTreeExpand, MoreObjects.firstNonNull(HttpRequestUtil.extractTypedParam(req, "maxDepth", Integer.class, false), maxDepthForTreeExpand));
         nodeIds = routingContext.getBodyAsJsonArray().getList();
       }
@@ -255,11 +255,11 @@ public class HttpVerticle extends AbstractVerticle {
 
       AggregatedProfileNamingStrategy profileName = new AggregatedProfileNamingStrategy(baseDir, VERSION, appId, clusterId, procId, startTime, duration, AggregatedProfileModel.WorkType.cpu_sample_work);
 
-      getTreeViewForCpuSampling(routingContext, profileName, traceName, nodeIds, autoExpand, maxDepth, profileViewType);
+      getTreeViewForCpuSampling(routingContext, profileName, traceName, nodeIds, forceExpand, maxDepth, profileViewType);
     }
 
     private <T extends TreeView<IndexedTreeNode<AggregatedProfileModel.FrameNode>>>void getTreeViewForCpuSampling(RoutingContext routingContext, AggregatedProfileNamingStrategy profileName, String traceName,
-                                                                                                                  List<Integer> nodeIds, boolean autoExpand, int maxDepth, ProfileViewType profileViewType) {
+                                                                                                                  List<Integer> nodeIds, boolean forceExpand, int maxDepth, ProfileViewType profileViewType) {
       Future<Pair<AggregatedSamplesPerTraceCtx, T>> treeViewPair = profileStoreAPI.getProfileView(profileName, traceName, profileViewType);
 
       treeViewPair.setHandler(ar -> {
@@ -274,7 +274,7 @@ public class HttpVerticle extends AbstractVerticle {
             originIds = treeView.getRootNodes().stream().map(IndexedTreeNode::getIdx).collect(Collectors.toList());
           }
 
-          List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> subTree = treeView.getSubTrees(originIds, maxDepth, autoExpand);
+          List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> subTree = treeView.getSubTrees(originIds, maxDepth, forceExpand);
           Map<Integer, String> methodLookup = new HashMap<>();
 
           subTree.forEach(e -> e.visit((i, node) -> methodLookup.put(node.getData().getMethodId(), samplesPerTraceCtx.getMethodLookup().get(node.getData().getMethodId()))));
