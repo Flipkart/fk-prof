@@ -1,6 +1,8 @@
 package fk.prof.userapi.model.tree;
 
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
+import fk.prof.userapi.cache.Cacheable;
+import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.model.TreeView;
 import fk.prof.userapi.model.Tree;
 
@@ -9,7 +11,7 @@ import java.util.*;
 /**
  * Created by gaurav.ashok on 05/06/17.
  */
-public class CallTreeView implements TreeView<IndexedTreeNode<FrameNode>> {
+public class CallTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Cacheable {
 
     private Tree<FrameNode> tree;
 
@@ -24,6 +26,11 @@ public class CallTreeView implements TreeView<IndexedTreeNode<FrameNode>> {
 
     public List<IndexedTreeNode<FrameNode>> getSubTrees(List<Integer> ids, int depth, boolean autoExpand) {
         return new Expander(ids, depth, autoExpand).expand();
+    }
+
+    @Override
+    public ProfileViewType getType() {
+        return ProfileViewType.CALLERS;
     }
 
     private class Expander {

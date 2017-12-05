@@ -74,7 +74,7 @@ public interface ProfileStoreAPI {
     void loadSummary(Future<AggregationWindowSummary> future, AggregatedProfileNamingStrategy filename);
 
     /**
-     * Get/Create a TreeView for the provided profile name, trace name of a specific type
+     * Get/Create a ProfileView for the provided profile name, trace name and of a specific type
      *
      * @param profileName       name of the profile file
      * @param traceName         name of the trace context

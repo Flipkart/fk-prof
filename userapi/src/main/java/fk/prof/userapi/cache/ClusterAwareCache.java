@@ -201,11 +201,11 @@ public class ClusterAwareCache {
      */
     public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
         Future<Pair<AggregatedSamplesPerTraceCtx, T >> viewFuture = Future.future();
-        Pair<Future<AggregatedProfileInfo>, T> profileViewPair = cache.getView(profileName, traceName, profileViewType);
+        Pair<Future<AggregatedProfileInfo>, Cacheable> profileViewPair = cache.getView(profileName, traceName, profileViewType);
 
         if(profileViewPair.first != null) {
             if(profileViewPair.second != null) {
-                return Future.succeededFuture(Pair.of(profileViewPair.first.result().getAggregatedSamples(traceName), profileViewPair.second));
+                return Future.succeededFuture(Pair.of(profileViewPair.first.result().getAggregatedSamples(traceName), (T)profileViewPair.second));
             }
             else {
                 workerExecutor.executeBlocking(f -> getOrCreateView(profileName, traceName, f, profileViewType), viewFuture.completer());
@@ -246,7 +246,7 @@ public class ClusterAwareCache {
      * @param profileViewType
      */
     private <T extends ProfileView> void getOrCreateView(AggregatedProfileNamingStrategy profileName, String traceName, Future<Pair<AggregatedSamplesPerTraceCtx, T>> f, ProfileViewType profileViewType) {
-        Pair<Future<AggregatedProfileInfo>, T> profileViewPair = cache.getView(profileName, traceName, profileViewType);
+        Pair<Future<AggregatedProfileInfo>, Cacheable> profileViewPair = cache.getView(profileName, traceName, profileViewType);
         Future<AggregatedProfileInfo> cachedProfileInfo = profileViewPair.first;
 
         if (cachedProfileInfo != null) {
@@ -263,7 +263,7 @@ public class ClusterAwareCache {
 
             AggregatedSamplesPerTraceCtx samplesPerTraceCtx = cachedProfileInfo.result().getAggregatedSamples(traceName);
             if (profileViewPair.second != null) {
-                f.complete(Pair.of(samplesPerTraceCtx, profileViewPair.second));
+                f.complete(Pair.of(samplesPerTraceCtx, (T)profileViewPair.second));
             }
             else {
                 // no cached view, so create a new one
@@ -274,7 +274,7 @@ public class ClusterAwareCache {
                             f.fail(new CachedProfileNotFoundException());
                         }
                         else {
-                            f.complete(Pair.of(profileViewPair.first.result().getAggregatedSamples(traceName), profileViewPair.second));
+                            f.complete(Pair.of(profileViewPair.first.result().getAggregatedSamples(traceName), (T)profileViewPair.second));
                         }
                         break;
                     default:
@@ -287,7 +287,7 @@ public class ClusterAwareCache {
         }
     }
 
-    private <T extends ProfileView> T buildView(AggregatedProfileInfo profile, String traceName, ProfileViewType profileViewType) {
+    private <T extends ProfileView & Cacheable> T buildView(AggregatedProfileInfo profile, String traceName, ProfileViewType profileViewType) {
         if (ProfileViewType.CALLERS.equals(profileViewType)) {
             return (T)viewCreator.buildCallTreeView(profile, traceName);
         }
