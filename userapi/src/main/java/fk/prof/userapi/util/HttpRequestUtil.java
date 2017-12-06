@@ -15,18 +15,19 @@ public class HttpRequestUtil {
         if(required && StringUtils.isNullOrEmpty(value)) {
             throw new IllegalArgumentException(param + " is a required request parameter");
         }
-        if(!StringUtils.isNullOrEmpty(value)) {
-            if(String.class.equals(clazz)) {
-                return (T) value;
-            }
-            else if(Integer.class.equals(clazz)) {
-                return (T) Integer.valueOf(value);
-            }
-            else if(ZonedDateTime.class.equals(clazz)) {
-                return (T) ZonedDateTime.parse(value, DateTimeFormatter.ISO_ZONED_DATE_TIME);
-            }
-            else if(Boolean.class.equals(clazz)) {
-                return (T) Boolean.valueOf(value);
+        if (!StringUtils.isNullOrEmpty(value)) {
+            try {
+                if (String.class.equals(clazz)) {
+                    return (T) value;
+                } else if (Integer.class.equals(clazz)) {
+                    return (T) Integer.valueOf(value);
+                } else if (ZonedDateTime.class.equals(clazz)) {
+                    return (T) ZonedDateTime.parse(value, DateTimeFormatter.ISO_ZONED_DATE_TIME);
+                } else if (Boolean.class.equals(clazz)) {
+                    return (T) Boolean.valueOf(value);
+                }
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Illegal request parameter \"" + param + "\". ", e);
             }
             throw new IllegalArgumentException("Request parameter \"" + param + "\" of type " + clazz.getName() + " is not yet supported");
         }
