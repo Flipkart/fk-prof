@@ -94,12 +94,12 @@ public class CacheTest {
     }
 
     private void setUpDefaultCache(TestContext context, AggregatedProfileLoader profileLoader, ProfileViewCreator viewCreator) {
-        setUpCache(context, new LocalProfileCache(config), profileLoader, viewCreator);
+        setUpCache(context, new LocalProfileCache(config, viewCreator), profileLoader);
     }
 
-    private void setUpCache(TestContext context, LocalProfileCache localCache, AggregatedProfileLoader profileLoader, ProfileViewCreator viewCreator) {
+    private void setUpCache(TestContext context, LocalProfileCache localCache, AggregatedProfileLoader profileLoader) {
         localProfileCache = localCache;
-        cache = new ClusterAwareCache(curatorClient, executor, profileLoader, viewCreator, config, localProfileCache);
+        cache = new ClusterAwareCache(curatorClient, executor, profileLoader, config, localProfileCache);
         Async async = context.async();
         cache.onClusterJoin().setHandler(ar -> {
             context.assertTrue(ar.succeeded());
@@ -209,7 +209,7 @@ public class CacheTest {
         });
 
         async.awaitSuccess(2000);
-        verify(viewCreator, times(1)).buildCallTreeView(same(npPair.profileInfo), eq("t1"));
+        verify(viewCreator, times(1)).buildCacheableView(same(npPair.profileInfo), eq("t1"), eq(ProfileViewType.CALLERS));
     }
 
     @Test(timeout = 2500)
@@ -238,8 +238,8 @@ public class CacheTest {
         });
 
         async.awaitSuccess(2000);
-        verify(viewCreator, times(1)).buildCallTreeView(same(npPair.profileInfo), eq("t1"));
-        verify(viewCreator, times(1)).buildCallTreeView(same(npPair.profileInfo), eq("t2"));
+        verify(viewCreator, times(1)).buildCacheableView(same(npPair.profileInfo), eq("t1"), eq(ProfileViewType.CALLERS));
+        verify(viewCreator, times(1)).buildCacheableView(same(npPair.profileInfo), eq("t2"), eq(ProfileViewType.CALLERS));
     }
 
     @Test(timeout = 2500000)
@@ -268,8 +268,8 @@ public class CacheTest {
         });
 
         async.awaitSuccess(2000000);
-        verify(viewCreator, times(1)).buildCalleesTreeView(same(npPair.profileInfo), eq("t1"));
-        verify(viewCreator, times(1)).buildCallTreeView(same(npPair.profileInfo), eq("t1"));
+        verify(viewCreator, times(1)).buildCacheableView(same(npPair.profileInfo), eq("t1"), eq(ProfileViewType.CALLEES));
+        verify(viewCreator, times(1)).buildCacheableView(same(npPair.profileInfo), eq("t1"), eq(ProfileViewType.CALLERS));
     }
 
 
@@ -317,7 +317,7 @@ public class CacheTest {
         AggregatedProfileLoader loader = mockedProfileLoader(npPair);
         ProfileViewCreator viewCreator = mockedViewCreator(npPair);
 
-        setUpCache(context, new LocalProfileCache(config, ticker), loader, viewCreator);
+        setUpCache(context, new LocalProfileCache(config, viewCreator, ticker), loader);
 
         Async async1 = context.async();
         cache.getAggregatedProfile(npPair.name);
@@ -351,7 +351,7 @@ public class CacheTest {
         });
         async3.awaitSuccess(1000);
 
-        verify(viewCreator, times(1)).buildCallTreeView(same(npPair.profileInfo), eq("t1"));
+        verify(viewCreator, times(1)).buildCacheableView(same(npPair.profileInfo), eq("t1"), eq(ProfileViewType.CALLERS));
         verify(loader, times(1)).load(any(), same(npPair.name));
     }
 
@@ -370,9 +370,9 @@ public class CacheTest {
         ProfileViewCreator foo = mock(ProfileViewCreator.class);
         for(NameProfilePair npPair : npPairs) {
             IntStream.range(0, npPair.callTreeView.size()).forEach(i ->
-                doReturn(npPair.callTreeView.get(i)).when(foo).buildCallTreeView(same(npPair.profileInfo), eq("t" + (i+1))));
+                doReturn(npPair.callTreeView.get(i)).when(foo).buildCacheableView(same(npPair.profileInfo), eq("t" + (i+1)), eq(ProfileViewType.CALLERS)));
             IntStream.range(0, npPair.calleesTreeView.size()).forEach(i ->
-                doReturn(npPair.calleesTreeView.get(i)).when(foo).buildCalleesTreeView(same(npPair.profileInfo), eq("t" + (i+1))));
+                doReturn(npPair.calleesTreeView.get(i)).when(foo).buildCacheableView(same(npPair.profileInfo), eq("t" + (i+1)), eq(ProfileViewType.CALLEES)));
 
         }
         return foo;

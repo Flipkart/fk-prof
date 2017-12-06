@@ -11,7 +11,7 @@ public interface TreeView<T> extends ProfileView {
    * Get the root/s of the tree / forest
    * @return list of root node ids
    */
-  List<Integer> getRootIds();
+  List<Integer> getRoots();
 
   /**
    * Get the subtree roots for each of the provided node ids.

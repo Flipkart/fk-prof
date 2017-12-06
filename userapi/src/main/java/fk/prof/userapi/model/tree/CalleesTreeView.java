@@ -2,6 +2,7 @@ package fk.prof.userapi.model.tree;
 
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
 import fk.prof.userapi.cache.Cacheable;
+import fk.prof.userapi.model.ProfileView;
 import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.model.Tree;
 import fk.prof.userapi.model.TreeView;
@@ -12,7 +13,7 @@ import java.util.stream.Collectors;
 /**
  * Created by gaurav.ashok on 01/06/17.
  */
-public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Cacheable {
+public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Cacheable<ProfileView> {
 
     private Tree<FrameNode> callTree;
     private List<Integer> hotMethodNodeIds;
@@ -22,7 +23,7 @@ public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Ca
         this.hotMethodNodeIds = hotMethodNodeIds;
     }
 
-    public List<Integer> getRootIds() {
+    public List<Integer> getRoots() {
         return hotMethodNodeIds;
     }
 

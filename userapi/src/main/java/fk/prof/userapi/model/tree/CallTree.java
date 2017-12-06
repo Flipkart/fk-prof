@@ -11,7 +11,7 @@ import java.util.*;
 /**
  * Created by gaurav.ashok on 01/06/17.
  */
-public class CallTree implements Tree<FrameNode>{
+public class CallTree implements Tree<FrameNode> {
 
     private List<FrameNode> nodes;
     private int[] subtreeSizes;

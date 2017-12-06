@@ -34,7 +34,7 @@ public class IndexedTreeNode<T> {
         return data;
     }
 
-    public List<IndexedTreeNode<T>> getChildren() {
+    List<IndexedTreeNode<T>> getChildren() {
         return children;
     }
 

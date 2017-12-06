@@ -1,4 +1,4 @@
-package fk.prof.userapi.model;
+package fk.prof.userapi.model.tree;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
@@ -9,9 +9,11 @@ import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.userapi.api.AggregatedProfileLoader;
 import fk.prof.userapi.api.MockAggregationWindow;
+import fk.prof.userapi.model.AggregatedOnCpuSamples;
+import fk.prof.userapi.model.AggregatedProfileInfo;
+import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
 import fk.prof.userapi.model.json.CustomSerializers;
 import fk.prof.userapi.model.json.ProtoSerializers;
-import fk.prof.userapi.model.tree.*;
 import io.vertx.core.Future;
 
 import org.junit.Assert;
@@ -134,7 +136,7 @@ public class CallTreeTest {
     public void testCallTreeView() {
         CallTreeView ctv = new CallTreeView(calltree);
         /* root node */
-        testTreeEquality(ctv.getSubTrees(ctv.getRootIds(), 1, false), toList(expectedTree));
+        testTreeEquality(ctv.getSubTrees(ctv.getRoots(), 1, false), toList(expectedTree));
         /* E -> F -> B
                   -> D
          */
@@ -162,7 +164,7 @@ public class CallTreeTest {
         CallTreeView ctv = new CallTreeView(mt);
 
         /* root node */
-        testTreeEquality(ctv.getSubTrees(ctv.getRootIds(), 1, false), filterTree(toList(expectedTree), hiddenNodes));
+        testTreeEquality(ctv.getSubTrees(ctv.getRoots(), 1, false), filterTree(toList(expectedTree), hiddenNodes));
 
         /* E -> F -> B
            Branch with D() [id:11] will not be visible
@@ -184,7 +186,7 @@ public class CallTreeTest {
         CalleesTreeView hmtv = new CalleesTreeView(calltree, calltree.getHotMethodNodeIds());
 
         // all hotmethods
-        List<IndexedTreeNode<FrameNode>> hm = hmtv.getRootIds().stream().map(idx -> new IndexedTreeNode<>(idx,calltree.getNode(idx))).collect(Collectors.toList());
+        List<IndexedTreeNode<FrameNode>> hm = hmtv.getRoots().stream().map(idx -> new IndexedTreeNode<>(idx,calltree.getNode(idx))).collect(Collectors.toList());
         testTreeEquality(hm, expectedHotMethodsTree);
 
         // get callers of C() [sampleCount:3]
@@ -207,7 +209,7 @@ public class CallTreeTest {
         /* all hotmethods
            only those branches will be visible which has D in it, i.e. 0, 1, 6th element from expectedHotMethodTree
          */
-        List<IndexedTreeNode<FrameNode>> hm = hmtv.getRootIds().stream().map(idx -> new IndexedTreeNode<>(idx,calltree.getNode(idx))).collect(Collectors.toList());
+        List<IndexedTreeNode<FrameNode>> hm = hmtv.getRoots().stream().map(idx -> new IndexedTreeNode<>(idx,calltree.getNode(idx))).collect(Collectors.toList());
         testTreeEquality(hm,
             Arrays.asList(expectedHotMethodsTree.get(0), expectedHotMethodsTree.get(1), expectedHotMethodsTree.get(6)));
 
@@ -219,7 +221,7 @@ public class CallTreeTest {
     @Test
     public void testIndexedTreeNodeSerialize() throws Exception {
         CallTreeView ctv = new CallTreeView(calltree);
-        List<IndexedTreeNode<FrameNode>> subtree = ctv.getSubTrees(ctv.getRootIds(), 1, false);
+        List<IndexedTreeNode<FrameNode>> subtree = ctv.getSubTrees(ctv.getRoots(), 1, false);
 
         Assert.assertEquals("{\"method_lookup\":{},\"nodes\":{\"0\":{\"d\":[0,0,23],\"c\":{\"1\":{\"d\":[1,0,0]},\"2\":{\"d\":[2,0,14]},\"7\":{\"d\":[7,0,9]}}}}}",
             mapper.writeValueAsString(new CpuSamplingCallTreeViewResponse(subtree, new HashMap<>())));

@@ -4,6 +4,8 @@ import com.google.common.cache.RemovalListener;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.userapi.Configuration;
+import fk.prof.userapi.api.ProfileViewCreator;
+import fk.prof.userapi.model.ProfileView;
 import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.model.tree.CallTreeView;
 import fk.prof.userapi.util.Pair;
@@ -37,12 +39,14 @@ public class LocalProfileCacheTest {
     private Configuration config;
     private LocalProfileCache cache;
     private TestTicker ticker;
+    private ProfileViewCreator viewCreator;
 
     @Before
     public void beforeTest() throws Exception {
         config = UserapiConfigManager.loadConfig(ProfileStoreAPIImpl.class.getClassLoader().getResource("userapi-conf.json").getFile());
         ticker = new TestTicker();
-        cache = new LocalProfileCache(config, ticker);
+        viewCreator = Mockito.mock(ProfileViewCreator.class);
+        cache = new LocalProfileCache(config, viewCreator, ticker);
     }
 
     @Test
@@ -65,11 +69,14 @@ public class LocalProfileCacheTest {
         AggregatedProfileInfo profile = Mockito.mock(AggregatedProfileInfo.class);
         CallTreeView view = Mockito.mock(CallTreeView.class);
 
+        doReturn(view).when(viewCreator).buildCacheableView(any(), anyString(), any());
+
+
         cache.put(profileName, Future.succeededFuture(profile));
         Assert.assertSame(profile, cache.get(profileName).result());
 
-        cache.computeViewIfAbsent(profileName,  "view1", ProfileViewType.CALLERS, p -> view);
-        Pair<Future<AggregatedProfileInfo>, Cacheable> profileViewPair = cache.getView(profileName, "view1", ProfileViewType.CALLERS);
+        cache.computeViewIfAbsent(profileName,  "view1", ProfileViewType.CALLERS);
+        Pair<Future<AggregatedProfileInfo>, Cacheable<ProfileView>> profileViewPair = cache.getView(profileName, "view1", ProfileViewType.CALLERS);
         Assert.assertSame(view, profileViewPair.second);
         Assert.assertSame(profile, profileViewPair.first.result());
 
@@ -85,14 +92,15 @@ public class LocalProfileCacheTest {
         AggregatedProfileInfo profile = Mockito.mock(AggregatedProfileInfo.class);
         CallTreeView view = Mockito.mock(CallTreeView.class);
         RemovalListener<AggregatedProfileNamingStrategy, Future<AggregatedProfileInfo>> listener = Mockito.mock(RemovalListener.class);
+        doReturn(view).when(viewCreator).buildCacheableView(any(), anyString(), any());
 
         cache.setRemovalListener(listener);
         cache.put(profileName, Future.succeededFuture(profile));
-        cache.computeViewIfAbsent(profileName,  "view1", ProfileViewType.CALLERS, p -> view);
+        cache.computeViewIfAbsent(profileName,  "view1", ProfileViewType.CALLERS);
 
         ticker.advance(config.getProfileRetentionDurationMin() + 1, TimeUnit.MINUTES);
         Assert.assertNull(cache.get(profileName));
-        Pair<Future<AggregatedProfileInfo>, Cacheable> profileViewPair = cache.getView(profileName, "view1", ProfileViewType.CALLERS);
+        Pair<Future<AggregatedProfileInfo>, Cacheable<ProfileView>> profileViewPair = cache.getView(profileName, "view1", ProfileViewType.CALLERS);
         Assert.assertNull(profileViewPair.first);
         Assert.assertNull(profileViewPair.second);
 
@@ -106,18 +114,21 @@ public class LocalProfileCacheTest {
     public void testExpiryDueToResourceUtilization() {
         config = spy(config);
         doReturn(1).when(config).getMaxProfilesToCache();
-        cache = new LocalProfileCache(config, ticker);
+        ProfileViewCreator profileViewCreator = Mockito.mock(ProfileViewCreator.class);
+        cache = new LocalProfileCache(config, profileViewCreator, ticker);
 
         AggregatedProfileNamingStrategy profileName = pn("proc1", dt(0));
         AggregatedProfileNamingStrategy profileName2 = pn("proc2", dt(0));
 
         AggregatedProfileInfo profile = Mockito.mock(AggregatedProfileInfo.class);
         CallTreeView view = Mockito.mock(CallTreeView.class);
+        doReturn(view).when(profileViewCreator).buildCacheableView(any(), anyString(), any());
+
         RemovalListener<AggregatedProfileNamingStrategy, Future<AggregatedProfileInfo>> listener = Mockito.mock(RemovalListener.class);
 
         cache.setRemovalListener(listener);
         cache.put(profileName, Future.succeededFuture(profile));
-        cache.computeViewIfAbsent(profileName, "view1", ProfileViewType.CALLERS, p -> view);
+        cache.computeViewIfAbsent(profileName, "view1", ProfileViewType.CALLERS);
 
         // let some time pass
         ticker.advance(config.getProfileRetentionDurationMin() - 1, TimeUnit.MINUTES);
@@ -126,11 +137,11 @@ public class LocalProfileCacheTest {
 
         // put another one
         cache.put(profileName2, Future.succeededFuture(profile));
-        cache.computeViewIfAbsent(profileName2, "view2", ProfileViewType.CALLERS, p -> view);
+        cache.computeViewIfAbsent(profileName2, "view2", ProfileViewType.CALLERS);
 
         // should evict the previous key
         Assert.assertNull(cache.get(profileName));
-        Pair<Future<AggregatedProfileInfo>, Cacheable> profileViewPair = cache.getView(profileName, "view1", ProfileViewType.CALLERS);
+        Pair<Future<AggregatedProfileInfo>, Cacheable<ProfileView>> profileViewPair = cache.getView(profileName, "view1", ProfileViewType.CALLERS);
         Assert.assertNull(profileViewPair.first);
         Assert.assertNull(profileViewPair.second);
 

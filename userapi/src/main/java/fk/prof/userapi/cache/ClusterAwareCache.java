@@ -35,7 +35,6 @@ public class ClusterAwareCache {
 
     private final WorkerExecutor workerExecutor;
     private final AggregatedProfileLoader profileLoader;
-    private final ProfileViewCreator viewCreator;
 
     private ZkLoadInfoStore zkLoadInfoStore;
     private final String myIp;
@@ -43,22 +42,12 @@ public class ClusterAwareCache {
 
     public ClusterAwareCache(CuratorFramework curatorClient, WorkerExecutor workerExecutor,
                              AggregatedProfileLoader profileLoader, ProfileViewCreator viewCreator, Configuration config) {
-        this.myIp = config.getIpAddress();
-        this.port = config.getHttpConfig().getHttpPort();
-
-        this.cache = new LocalProfileCache(config);
-        this.cache.setRemovalListener(this::doCleanUpOnEviction);
-
-        this.profileLoader = profileLoader;
-        this.viewCreator = viewCreator;
-        this.zkLoadInfoStore = new ZkLoadInfoStore(curatorClient, myIp, port, this.cache::invalidateCache);
-
-        this.workerExecutor = workerExecutor;
+        this(curatorClient, workerExecutor, profileLoader, config, new LocalProfileCache(config, viewCreator));
     }
 
     @VisibleForTesting
     ClusterAwareCache(CuratorFramework curatorClient, WorkerExecutor workerExecutor,
-                             AggregatedProfileLoader profileLoader, ProfileViewCreator viewCreator, Configuration config, LocalProfileCache localCache) {
+                             AggregatedProfileLoader profileLoader, Configuration config, LocalProfileCache localCache) {
         this.myIp = config.getIpAddress();
         this.port = config.getHttpConfig().getHttpPort();
 
@@ -66,8 +55,7 @@ public class ClusterAwareCache {
         this.cache.setRemovalListener(this::doCleanUpOnEviction);
 
         this.profileLoader = profileLoader;
-        this.viewCreator = viewCreator;
-        this.zkLoadInfoStore = new ZkLoadInfoStore(curatorClient, myIp, port, this.cache::cachedProfiles);
+        this.zkLoadInfoStore = new ZkLoadInfoStore(curatorClient, myIp, port, this.cache::invalidateCache);
 
         this.workerExecutor = workerExecutor;
     }
@@ -201,7 +189,7 @@ public class ClusterAwareCache {
      */
     public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
         Future<Pair<AggregatedSamplesPerTraceCtx, T >> viewFuture = Future.future();
-        Pair<Future<AggregatedProfileInfo>, Cacheable> profileViewPair = cache.getView(profileName, traceName, profileViewType);
+        Pair<Future<AggregatedProfileInfo>, Cacheable<ProfileView>> profileViewPair = cache.getView(profileName, traceName, profileViewType);
 
         if(profileViewPair.first != null) {
             if(profileViewPair.second != null) {
@@ -246,7 +234,7 @@ public class ClusterAwareCache {
      * @param profileViewType
      */
     private <T extends ProfileView> void getOrCreateView(AggregatedProfileNamingStrategy profileName, String traceName, Future<Pair<AggregatedSamplesPerTraceCtx, T>> f, ProfileViewType profileViewType) {
-        Pair<Future<AggregatedProfileInfo>, Cacheable> profileViewPair = cache.getView(profileName, traceName, profileViewType);
+        Pair<Future<AggregatedProfileInfo>, Cacheable<ProfileView>> profileViewPair = cache.getView(profileName, traceName, profileViewType);
         Future<AggregatedProfileInfo> cachedProfileInfo = profileViewPair.first;
 
         if (cachedProfileInfo != null) {
@@ -269,7 +257,7 @@ public class ClusterAwareCache {
                 // no cached view, so create a new one
                 switch (profileName.workType) {
                     case cpu_sample_work:
-                        profileViewPair = cache.computeViewIfAbsent(profileName, traceName, profileViewType, p -> buildView(p, traceName, profileViewType));
+                        profileViewPair = cache.computeViewIfAbsent(profileName, traceName, profileViewType);
                         if(profileViewPair.second == null) {
                             f.fail(new CachedProfileNotFoundException());
                         }
@@ -287,14 +275,6 @@ public class ClusterAwareCache {
         }
     }
 
-    private <T extends ProfileView & Cacheable> T buildView(AggregatedProfileInfo profile, String traceName, ProfileViewType profileViewType) {
-        if (ProfileViewType.CALLERS.equals(profileViewType)) {
-            return (T)viewCreator.buildCallTreeView(profile, traceName);
-        }
-        else {
-            return (T)viewCreator.buildCalleesTreeView(profile, traceName);
-        }
-    }
 
     interface BlockingTask<T> {
         void getResult(Future<T> future) throws Exception;

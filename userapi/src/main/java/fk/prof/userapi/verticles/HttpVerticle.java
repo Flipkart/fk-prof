@@ -270,7 +270,7 @@ public class HttpVerticle extends AbstractVerticle {
           T treeView = ar.result().second;
           List<Integer> originIds = nodeIds;
           if(originIds == null || originIds.isEmpty()) {
-            originIds = treeView.getRootIds();
+            originIds = treeView.getRoots();
           }
 
           List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> subTree = treeView.getSubTrees(originIds, maxDepth, forceExpand);
