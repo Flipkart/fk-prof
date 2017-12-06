@@ -33,7 +33,7 @@ public class HttpRequestUtil {
         return null;
     }
 
-    public static String extractTypedParam(HttpServerRequest request, String param) {
+    public static String extractStringParam(HttpServerRequest request, String param) {
         return extractTypedParam(request, param, String.class);
     }
 

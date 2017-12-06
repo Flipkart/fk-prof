@@ -233,10 +233,10 @@ public class HttpVerticle extends AbstractVerticle {
       ZonedDateTime startTime;
       List<Integer> nodeIds;
       try {
-        appId = extractTypedParam(req, "appId");
-        clusterId = extractTypedParam(req, "clusterId");
-        procId = extractTypedParam(req, "procId");
-        traceName = extractTypedParam(req, "traceName");
+        appId = HttpRequestUtil.extractStringParam(req, "appId");
+        clusterId = HttpRequestUtil.extractStringParam(req, "clusterId");
+        procId = HttpRequestUtil.extractStringParam(req, "procId");
+        traceName = HttpRequestUtil.extractStringParam(req, "traceName");
         startTime = HttpRequestUtil.extractTypedParam(req, "start", ZonedDateTime.class);
         duration = HttpRequestUtil.extractTypedParam(req, "duration", Integer.class);
         forceExpand = MoreObjects.firstNonNull(HttpRequestUtil.extractTypedParam(req, "forceExpand", Boolean.class, false), false);
