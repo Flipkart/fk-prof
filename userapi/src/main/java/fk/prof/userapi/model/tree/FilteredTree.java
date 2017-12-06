@@ -26,10 +26,11 @@ public class FilteredTree<T> implements Tree<T> {
     private final List<Integer> hotMethodNodeIds;
     private Tree<T> tree;
     private boolean[] visible;
+    private int filteredTreeSize = 0;
 
     public FilteredTree(Tree<T> tree, List<Integer> hotMethodNodeIds, VisibilityPredicate<T> predicate) {
         this.tree = tree;
-        this.visible = new boolean[size()];
+        this.visible = new boolean[tree.size()];
         this.hotMethodNodeIds = hotMethodNodeIds;
         tree.foreach((i, node) -> visible[i] = predicate.testVisibility(i, node));
 
@@ -108,7 +109,7 @@ public class FilteredTree<T> implements Tree<T> {
 
     @Override
     public int size() {
-        return tree.size();
+        return filteredTreeSize;
     }
 
     @Override
@@ -127,6 +128,9 @@ public class FilteredTree<T> implements Tree<T> {
             isChildVisible |= applyMask(i, isNodeVisible);
         }
         visible[idx] = isNodeVisible | isChildVisible;
+        if (visible[idx]) {
+            filteredTreeSize++;
+        }
         return visible[idx];
     }
 
