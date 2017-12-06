@@ -39,7 +39,6 @@ import proto.PolicyDTO;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static fk.prof.userapi.http.UserapiApiPathConstants.*;
 import static fk.prof.userapi.util.HttpRequestUtil.extractTypedParam;
@@ -271,7 +270,7 @@ public class HttpVerticle extends AbstractVerticle {
           T treeView = ar.result().second;
           List<Integer> originIds = nodeIds;
           if(originIds == null || originIds.isEmpty()) {
-            originIds = treeView.getRootNodes().stream().map(IndexedTreeNode::getIdx).collect(Collectors.toList());
+            originIds = treeView.getRootIds();
           }
 
           List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> subTree = treeView.getSubTrees(originIds, maxDepth, forceExpand);

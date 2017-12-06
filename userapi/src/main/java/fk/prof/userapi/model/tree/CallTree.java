@@ -6,10 +6,7 @@ import fk.prof.userapi.model.Tree;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 /**
  * Created by gaurav.ashok on 01/06/17.
@@ -19,6 +16,7 @@ public class CallTree implements Tree<FrameNode>{
     private List<FrameNode> nodes;
     private int[] subtreeSizes;
     private int[] parentIds;
+    private List<Integer> hotMethodNodeIds;
 
     /**
      * Constructor for creating a CallTree from a list of FrameNodes orders in a dfs manner. i.e.
@@ -107,6 +105,11 @@ public class CallTree implements Tree<FrameNode>{
         return parentIds[idx];
     }
 
+
+    public List<Integer> getHotMethodNodeIds() {
+        return Collections.unmodifiableList(hotMethodNodeIds);
+    }
+
     /**
      * Populates the member fields subTreeSizes, parentIds of callTree object using
      * nodes list
@@ -114,6 +117,7 @@ public class CallTree implements Tree<FrameNode>{
     private void treeify() {
         subtreeSizes = new int[nodes.size()];
         parentIds = new int[nodes.size()];
+        hotMethodNodeIds = new ArrayList<>() ;
 
         int treeSize = 0;
         if (nodes.size() > 0) {
@@ -134,6 +138,10 @@ public class CallTree implements Tree<FrameNode>{
     private int buildTree(int idx, int parentIdx) {
         int treeSize = 1;
         AggregatedProfileModel.FrameNode curr = nodes.get(idx);
+        int cpuSampleCount = curr.getCpuSamplingProps().getOnCpuSamples();
+        if(cpuSampleCount > 0) {
+            hotMethodNodeIds.add(idx);
+        }
         parentIds[idx] = parentIdx;
         for(int i = 0; i < curr.getChildCount(); ++i) {
             treeSize += buildTree(idx + treeSize, idx);

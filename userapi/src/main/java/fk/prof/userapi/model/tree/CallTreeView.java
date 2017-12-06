@@ -19,8 +19,8 @@ public class CallTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Cache
         this.tree = tree;
     }
 
-    public List<IndexedTreeNode<FrameNode>> getRootNodes() {
-        return Collections.singletonList(new IndexedTreeNode<>(0, tree.getNode(0)));
+    public List<Integer> getRootIds() {
+        return Collections.singletonList(0);
     }
 
     public List<IndexedTreeNode<FrameNode>> getSubTrees(List<Integer> ids, int maxDepth, boolean forceExpand) {

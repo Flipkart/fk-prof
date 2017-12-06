@@ -28,7 +28,7 @@ public class ProfileViewCreator {
         ProcessGroupTag pgTag = new ProcessGroupTag(profile.getAppId(), profile.getClusterId(), profile.getProcId());
         try(Timer.Context ctx = Util.timer(calleeTreeViewCreationTimerPrefix, pgTag.toString()).time()) {
             AggregatedOnCpuSamples samplesData = (AggregatedOnCpuSamples) profile.getAggregatedSamples(traceName).getAggregatedSamples();
-            return new CalleesTreeView(samplesData.getCallTree());
+            return new CalleesTreeView(samplesData.getCallTree(), samplesData.getCallTree().getHotMethodNodeIds());
         }
     }
 }

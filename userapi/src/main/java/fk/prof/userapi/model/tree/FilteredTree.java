@@ -3,7 +3,9 @@ package fk.prof.userapi.model.tree;
 import fk.prof.userapi.model.Tree;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 /**
  * FilteredTree applies a visibility mask on the tree.
@@ -21,12 +23,14 @@ import java.util.NoSuchElementException;
  */
 public class FilteredTree<T> implements Tree<T> {
 
-    Tree<T> tree;
-    boolean[] visible;
+    private final List<Integer> hotMethodNodeIds;
+    private Tree<T> tree;
+    private boolean[] visible;
 
-    public FilteredTree(Tree<T> tree, VisibilityPredicate<T> predicate) {
+    public FilteredTree(Tree<T> tree, List<Integer> hotMethodNodeIds, VisibilityPredicate<T> predicate) {
         this.tree = tree;
         this.visible = new boolean[size()];
+        this.hotMethodNodeIds = hotMethodNodeIds;
         tree.foreach((i, node) -> visible[i] = predicate.testVisibility(i, node));
 
         applyMask(0, false);
@@ -124,6 +128,10 @@ public class FilteredTree<T> implements Tree<T> {
         }
         visible[idx] = isNodeVisible | isChildVisible;
         return visible[idx];
+    }
+
+    public List<Integer> getHotMethodNodeIds() {
+        return hotMethodNodeIds.stream().filter(id -> visible[id]).collect(Collectors.toList());
     }
 
     public interface VisibilityPredicate<T> {

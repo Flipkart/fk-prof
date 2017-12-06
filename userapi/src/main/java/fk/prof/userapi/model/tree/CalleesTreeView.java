@@ -15,29 +15,19 @@ import java.util.stream.Collectors;
 public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Cacheable {
 
     private Tree<FrameNode> callTree;
-    private List<IndexedTreeNode<FrameNode>> hotMethods;
+    private List<Integer> hotMethodNodeIds;
 
-    public CalleesTreeView(Tree<FrameNode> callTree) {
+    public CalleesTreeView(Tree<FrameNode> callTree, List<Integer> hotMethodNodeIds) {
         this.callTree = callTree;
-        findOnCpuFrames();
+        this.hotMethodNodeIds = hotMethodNodeIds;
     }
 
-    public List<IndexedTreeNode<FrameNode>> getRootNodes() {
-        return hotMethods;
+    public List<Integer> getRootIds() {
+        return hotMethodNodeIds;
     }
 
     public List<IndexedTreeNode<FrameNode>> getSubTrees(List<Integer> ids, int maxDepth, boolean forceExpand) {
         return new Expander(ids, maxDepth, forceExpand).expand();
-    }
-    //TODO: Fix as per the review comment
-    private void findOnCpuFrames() {
-        hotMethods = new ArrayList<>();
-        callTree.foreach((i, node) -> {
-            int cpuSampleCount = node.getCpuSamplingProps().getOnCpuSamples();
-            if(cpuSampleCount > 0) {
-                hotMethods.add(new IndexedTreeNode<>(i, node));
-            }
-        });
     }
 
     @Override

@@ -10,7 +10,7 @@ import java.util.Objects;
  * Created by gaurav.ashok on 01/06/17.
  */
 public class IndexedTreeNode<T> {
-    IndexedTreeNode(int idx, T data) {
+    public IndexedTreeNode(int idx, T data) {
         this(idx, data, null);
     }
 

@@ -134,7 +134,7 @@ public class CallTreeTest {
     public void testCallTreeView() {
         CallTreeView ctv = new CallTreeView(calltree);
         /* root node */
-        testTreeEquality(ctv.getSubTrees(toList(ctv.getRootNodes().get(0).getIdx()), 1, false), toList(expectedTree));
+        testTreeEquality(ctv.getSubTrees(ctv.getRootIds(), 1, false), toList(expectedTree));
         /* E -> F -> B
                   -> D
          */
@@ -158,11 +158,11 @@ public class CallTreeTest {
         int b_id = mId("B()");
         List<Integer> hiddenNodes = Arrays.asList(1, 3, 11);
 
-        FilteredTree<FrameNode> mt = new FilteredTree<>(calltree, (i, fn) -> fn.getMethodId() == b_id);
+        FilteredTree<FrameNode> mt = new FilteredTree<>(calltree, calltree.getHotMethodNodeIds(), (i, fn) -> fn.getMethodId() == b_id);
         CallTreeView ctv = new CallTreeView(mt);
 
         /* root node */
-        testTreeEquality(ctv.getSubTrees(toList(ctv.getRootNodes().get(0).getIdx()), 1, false), filterTree(toList(expectedTree), hiddenNodes));
+        testTreeEquality(ctv.getSubTrees(ctv.getRootIds(), 1, false), filterTree(toList(expectedTree), hiddenNodes));
 
         /* E -> F -> B
            Branch with D() [id:11] will not be visible
@@ -181,10 +181,10 @@ public class CallTreeTest {
 
     @Test
     public void testHotMethodView() {
-        CalleesTreeView hmtv = new CalleesTreeView(calltree);
+        CalleesTreeView hmtv = new CalleesTreeView(calltree, calltree.getHotMethodNodeIds());
 
         // all hotmethods
-        List<IndexedTreeNode<FrameNode>> hm = hmtv.getRootNodes();
+        List<IndexedTreeNode<FrameNode>> hm = hmtv.getRootIds().stream().map(idx -> new IndexedTreeNode<>(idx,calltree.getNode(idx))).collect(Collectors.toList());
         testTreeEquality(hm, expectedHotMethodsTree);
 
         // get callers of C() [sampleCount:3]
@@ -201,13 +201,13 @@ public class CallTreeTest {
         // subtree that contains D() in its branches.
         int d_id = mId("D()");
 
-        FilteredTree<FrameNode> mt = new FilteredTree<>(calltree, (i, fn) -> fn.getMethodId() == d_id);
-        CalleesTreeView hmtv = new CalleesTreeView(mt);
+        FilteredTree<FrameNode> mt = new FilteredTree<>(calltree, calltree.getHotMethodNodeIds(), (i, fn) -> fn.getMethodId() == d_id);
+        CalleesTreeView hmtv = new CalleesTreeView(mt, mt.getHotMethodNodeIds());
 
         /* all hotmethods
            only those branches will be visible which has D in it, i.e. 0, 1, 6th element from expectedHotMethodTree
          */
-        List<IndexedTreeNode<FrameNode>> hm = hmtv.getRootNodes();
+        List<IndexedTreeNode<FrameNode>> hm = hmtv.getRootIds().stream().map(idx -> new IndexedTreeNode<>(idx,calltree.getNode(idx))).collect(Collectors.toList());
         testTreeEquality(hm,
             Arrays.asList(expectedHotMethodsTree.get(0), expectedHotMethodsTree.get(1), expectedHotMethodsTree.get(6)));
 
@@ -219,7 +219,7 @@ public class CallTreeTest {
     @Test
     public void testIndexedTreeNodeSerialize() throws Exception {
         CallTreeView ctv = new CallTreeView(calltree);
-        List<IndexedTreeNode<FrameNode>> subtree = ctv.getSubTrees(toList(ctv.getRootNodes().get(0).getIdx()), 1, false);
+        List<IndexedTreeNode<FrameNode>> subtree = ctv.getSubTrees(ctv.getRootIds(), 1, false);
 
         Assert.assertEquals("{\"method_lookup\":{},\"nodes\":{\"0\":{\"d\":[0,0,23],\"c\":{\"1\":{\"d\":[1,0,0]},\"2\":{\"d\":[2,0,14]},\"7\":{\"d\":[7,0,9]}}}}}",
             mapper.writeValueAsString(new CpuSamplingCallTreeViewResponse(subtree, new HashMap<>())));

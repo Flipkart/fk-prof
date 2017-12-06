@@ -8,10 +8,10 @@ import java.util.List;
  */
 public interface TreeView<T> extends ProfileView {
   /**
-   * Get the root node of the tree. Can be multiple in case of a forest
-   * @return list of root nodes
+   * Get the root/s of the tree / forest
+   * @return list of root node ids
    */
-  List<T> getRootNodes();
+  List<Integer> getRootIds();
 
   /**
    * Get the subtree roots for each of the provided node ids.
