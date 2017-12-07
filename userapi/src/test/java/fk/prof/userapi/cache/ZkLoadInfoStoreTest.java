@@ -6,6 +6,7 @@ import fk.prof.userapi.Configuration;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.proto.LoadInfoEntities;
+import fk.prof.userapi.testutil.MultiThreadedStressTester;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.listen.ListenerContainer;
@@ -101,6 +102,26 @@ public class ZkLoadInfoStoreTest {
         zkLoadInfoStore.removeProfileResidencyInfo(profileName1, true);
         Assert.assertEquals(0, zkLoadInfoStore.readNodeLoadInfo().getProfilesLoaded());
         Assert.assertNull(zkLoadInfoStore.readProfileResidencyInfo(profileName1));
+    }
+
+    private int counter = 0;
+
+    @Test(timeout = 6000)
+    public void testInterProcessLockWorksWithSameProcessMultipleThreads() throws Exception{
+
+        MultiThreadedStressTester stressTester = new MultiThreadedStressTester(2);
+        stressTester.stress(() -> {
+            try(AutoCloseable ignored = zkLoadInfoStore.getLock()) {
+                counter++;
+                Thread.sleep(5000);
+            } catch (Exception e) {
+                //one thread should throw this exception
+                System.out.println("Exception occurred in thread: " + Thread.currentThread().getName() + ", ex: " + e.getMessage());
+            }
+        });
+        stressTester.shutdown();
+        //Only one thread should be able to increment the counter
+        Assert.assertEquals(counter, 1);
     }
 
     @Test(timeout = 10000)
