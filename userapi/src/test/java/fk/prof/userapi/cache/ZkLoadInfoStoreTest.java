@@ -6,7 +6,6 @@ import fk.prof.userapi.Configuration;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.proto.LoadInfoEntities;
-import fk.prof.userapi.testutil.MultiThreadedStressTester;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.listen.ListenerContainer;
@@ -106,20 +105,26 @@ public class ZkLoadInfoStoreTest {
 
     private int counter = 0;
 
-    @Test(timeout = 6000)
+    @Test(timeout = 1000)
     public void testInterProcessLockWorksWithSameProcessMultipleThreads() throws Exception{
 
-        MultiThreadedStressTester stressTester = new MultiThreadedStressTester(2);
-        stressTester.stress(() -> {
-            try(AutoCloseable ignored = zkLoadInfoStore.getLock()) {
-                counter++;
-                Thread.sleep(5000);
-            } catch (Exception e) {
-                //one thread should throw this exception
-                System.out.println("Exception occurred in thread: " + Thread.currentThread().getName() + ", ex: " + e.getMessage());
-            }
-        });
-        stressTester.shutdown();
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        final CountDownLatch finished = new CountDownLatch(2);
+
+        for (int i=0; i<2; i++) {
+            executorService.execute(() -> {
+                try (AutoCloseable ignored = zkLoadInfoStore.getLock()) {
+                    Thread.sleep(500);
+                    counter++;
+                } catch (Exception e) {
+                    //one thread should throw this exception
+                    System.out.println("Exception occurred in thread: " + Thread.currentThread().getName() + ", ex: " + e.getMessage());
+                } finally {
+                    finished.countDown();
+                }
+            });
+        }
+        Assert.assertEquals(finished.await(600, TimeUnit.MILLISECONDS), false);
         //Only one thread should be able to increment the counter
         Assert.assertEquals(counter, 1);
     }
