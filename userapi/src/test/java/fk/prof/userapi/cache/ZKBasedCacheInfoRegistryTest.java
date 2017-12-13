@@ -20,12 +20,15 @@ import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by gaurav.ashok on 14/08/17.
  */
-public class ZkLoadInfoStoreTest {
+public class ZKBasedCacheInfoRegistryTest {
 
     static {
         UserapiConfigManager.setDefaultSystemProperties();
@@ -38,9 +41,10 @@ public class ZkLoadInfoStoreTest {
     private static TestingServer zookeeper;
     private static CuratorFramework curatorClient;
 
-    private ZkLoadInfoStore zkLoadInfoStore;
+    private ZKBasedCacheInfoRegistry zkBasedCacheInfoRegistry;
     private Runnable loadedProfiles = Mockito.mock(Runnable.class);
     private boolean zkDown = false;
+    private int counter = 0;
 
     @BeforeClass
     public static void beforeClass() throws Exception {
@@ -70,8 +74,8 @@ public class ZkLoadInfoStoreTest {
 
     @Before
     public void beforeTest() throws Exception {
-        zkLoadInfoStore = new ZkLoadInfoStore(curatorClient, "127.0.0.1", 8080, loadedProfiles);
-        zkLoadInfoStore.init();
+        zkBasedCacheInfoRegistry = new ZKBasedCacheInfoRegistry(curatorClient, "127.0.0.1", 8080, loadedProfiles);
+        zkBasedCacheInfoRegistry.init();
     }
 
     @After
@@ -79,7 +83,7 @@ public class ZkLoadInfoStoreTest {
         if(curatorClient.getZookeeperClient().isConnected()) {
             cleanUpZookeeper();
         }
-        //Clearing all connection listeners added to curatorClient in beforeTest zkLoadInfoStore creation
+        //Clearing all connection listeners added to curatorClient in beforeTest zkBasedCacheInfoRegistry creation
         ((ListenerContainer<ConnectionStateListener>) curatorClient.getConnectionStateListenable()).clear();
     }
 
@@ -87,44 +91,44 @@ public class ZkLoadInfoStoreTest {
     public void testBasic() throws Exception {
         AggregatedProfileNamingStrategy profileName1 = pn("proc1", dt(0));
 
-        try(AutoCloseable ignored = zkLoadInfoStore.getLock()) {
-            zkLoadInfoStore.updateProfileResidencyInfo(profileName1, false);
+        try{
+            zkBasedCacheInfoRegistry.claimOwnership(profileName1);
+        } catch (CachedProfileNotFoundException ex) {
+            Assert.fail("Since there is no owner before this call, claimOwnership should have succeeded, got exception: " + ex);
         }
 
-        LoadInfoEntities.NodeLoadInfo loadInfo = zkLoadInfoStore.readNodeLoadInfo();
-        LoadInfoEntities.ProfileResidencyInfo residencyInfo = zkLoadInfoStore.readProfileResidencyInfo(profileName1);
+        LoadInfoEntities.NodeLoadInfo loadInfo = zkBasedCacheInfoRegistry.getNodeLoadInfo();
+        LoadInfoEntities.ProfileResidencyInfo residencyInfo = zkBasedCacheInfoRegistry.getProfileResidencyInfo(profileName1);
 
         Assert.assertEquals(1, loadInfo.getProfilesLoaded());
         Assert.assertEquals("127.0.0.1", residencyInfo.getIp());
         Assert.assertEquals(8080, residencyInfo.getPort());
 
-        zkLoadInfoStore.removeProfileResidencyInfo(profileName1, true);
-        Assert.assertEquals(0, zkLoadInfoStore.readNodeLoadInfo().getProfilesLoaded());
-        Assert.assertNull(zkLoadInfoStore.readProfileResidencyInfo(profileName1));
+        zkBasedCacheInfoRegistry.releaseOwnership(profileName1);
+        Assert.assertEquals(0, zkBasedCacheInfoRegistry.getNodeLoadInfo().getProfilesLoaded());
+        Assert.assertNull(zkBasedCacheInfoRegistry.getProfileResidencyInfo(profileName1));
     }
 
-    private int counter = 0;
-
     @Test(timeout = 1000)
-    public void testInterProcessLockWorksWithSameProcessMultipleThreads() throws Exception{
+    public void testInterProcessLockWorksWithSameProcessMultipleThreads() throws Exception {
 
         ExecutorService executorService = Executors.newFixedThreadPool(2);
-        final CountDownLatch finished = new CountDownLatch(2);
+        final CountDownLatch latch = new CountDownLatch(2);
 
         for (int i=0; i<2; i++) {
             executorService.execute(() -> {
-                try (AutoCloseable ignored = zkLoadInfoStore.getLock()) {
+                try (AutoCloseable ignored = zkBasedCacheInfoRegistry.getLock()) {
                     Thread.sleep(500);
                     counter++;
                 } catch (Exception e) {
                     //one thread should throw this exception
                     System.out.println("Exception occurred in thread: " + Thread.currentThread().getName() + ", ex: " + e.getMessage());
                 } finally {
-                    finished.countDown();
+                    latch.countDown();
                 }
             });
         }
-        Assert.assertEquals(finished.await(600, TimeUnit.MILLISECONDS), false);
+        Assert.assertEquals(latch.await(600, TimeUnit.MILLISECONDS), false);
         //Only one thread should be able to increment the counter
         Assert.assertEquals(counter, 1);
     }
@@ -133,18 +137,17 @@ public class ZkLoadInfoStoreTest {
     public void testConnectionStateTransition() throws Exception {
         AggregatedProfileNamingStrategy profileName1 = pn("proc1", dt(0)),
             profileName2 = pn("proc2", dt(0));
-
-        zkLoadInfoStore.updateProfileResidencyInfo(profileName1, false);
-        zkLoadInfoStore.updateProfileResidencyInfo(profileName2, false);
-
+        zkBasedCacheInfoRegistry.claimOwnership(profileName1);
+        zkBasedCacheInfoRegistry.claimOwnership(profileName2);
         try {
             bringDownZk();
             Thread.sleep(500);
             Exception caughtEx = null;
             try {
-                zkLoadInfoStore.updateProfileResidencyInfo(profileName1, false);
-            }
-            catch (Exception e) {
+                zkBasedCacheInfoRegistry.claimOwnership(profileName1);
+            } catch (CachedProfileNotFoundException ex) {
+                Assert.fail("Since there is no owner before this call, claimOwnership should have succeeded, got exception: " + ex);
+            } catch (Exception e) {
                 caughtEx = e;
             }
 
@@ -159,13 +162,13 @@ public class ZkLoadInfoStoreTest {
         }
         // after connection lost we still expect the data to be reset to be 0
         int retry = 2 * curatorClient.getZookeeperClient().getZooKeeper().getSessionTimeout() / 1000;
-        while(retry > 0 && zkLoadInfoStore.getState() == ZkLoadInfoStore.ConnectionState.Disconnected) {
+        while(retry > 0 && zkBasedCacheInfoRegistry.getState() == ZKBasedCacheInfoRegistry.ConnectionState.Disconnected) {
             Thread.sleep(1000);
             retry--;
         }
 
-        Assert.assertEquals(ZkLoadInfoStore.ConnectionState.Connected, zkLoadInfoStore.getState());
-        Assert.assertEquals(0, zkLoadInfoStore.readNodeLoadInfo().getProfilesLoaded());
+        Assert.assertEquals(ZKBasedCacheInfoRegistry.ConnectionState.Connected, zkBasedCacheInfoRegistry.getState());
+        Assert.assertEquals(0, zkBasedCacheInfoRegistry.getNodeLoadInfo().getProfilesLoaded());
     }
 
     private void bringDownZk() throws Exception {

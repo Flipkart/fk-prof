@@ -11,7 +11,6 @@ import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
 import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.model.ProfileView;
-import fk.prof.userapi.proto.LoadInfoEntities.ProfileResidencyInfo;
 import fk.prof.userapi.util.Pair;
 import io.vertx.core.Future;
 import io.vertx.core.WorkerExecutor;
@@ -24,7 +23,7 @@ import org.apache.curator.framework.CuratorFramework;
  * shared store (zookeeper in this case).
  *
  * @see LocalProfileCache
- * @see ZkLoadInfoStore
+ * @see ZKBasedCacheInfoRegistry
  *
  * Created by gaurav.ashok on 21/06/17.
  */
@@ -36,7 +35,7 @@ public class ClusterAwareCache {
     private final WorkerExecutor workerExecutor;
     private final AggregatedProfileLoader profileLoader;
 
-    private ZkLoadInfoStore zkLoadInfoStore;
+    private CacheInfoRegistry cacheInfoRegistry;
     private final String myIp;
     private final int port;
 
@@ -55,7 +54,7 @@ public class ClusterAwareCache {
         this.cache.setRemovalListener(this::doCleanUpOnEviction);
 
         this.profileLoader = profileLoader;
-        this.zkLoadInfoStore = new ZkLoadInfoStore(curatorClient, myIp, port, this.cache::invalidateCache);
+        this.cacheInfoRegistry = new ZKBasedCacheInfoRegistry(curatorClient, myIp, port, this.cache::invalidateCache);
 
         this.workerExecutor = workerExecutor;
     }
@@ -63,7 +62,7 @@ public class ClusterAwareCache {
     public Future<Void> onClusterJoin() {
         return doAsync(f -> {
             try {
-                zkLoadInfoStore.init();
+                cacheInfoRegistry.init();
                 f.complete();
             } catch (Exception e) {
                 f.fail(e);
@@ -85,59 +84,85 @@ public class ClusterAwareCache {
      */
     public Future<AggregatedProfileInfo> getAggregatedProfile(AggregatedProfileNamingStrategy profileName) {
         Future<AggregatedProfileInfo> profileFuture = Future.future();
-
-        Future<AggregatedProfileInfo> cachedProfileInfo = cache.get(profileName);
-        if (cachedProfileInfo != null) {
-            completeFuture(profileName, cachedProfileInfo, profileFuture);
-        }
+        getFromLocalCache(profileName, profileFuture);
+        if(profileFuture.isComplete()) return profileFuture;
         else {
             // check zookeeper if it is loaded somewhere else
             doAsync((Future<AggregatedProfileInfo> f) -> {
-                    try (AutoCloseable ignored = zkLoadInfoStore.getLock()) {
-                    Future<AggregatedProfileInfo> _cachedProfileInfo = cache.get(profileName);
-                    if (_cachedProfileInfo != null) {
-                        completeFuture(profileName, _cachedProfileInfo, f);
+                synchronized (this) {
+                    getFromLocalCache(profileName, f);            //synchronized double check
+                    if (f.isComplete()) return;
+
+                    try {
+                        cacheInfoRegistry.claimOwnership(profileName);
+                    } catch (CachedProfileNotFoundException ex) {
+                        f.fail(ex);
                         return;
                     }
+                    Future<AggregatedProfileInfo> loadProfileFuture = Future.future();  // start the loading process
+                    loadProfile(profileName, loadProfileFuture);
+                    if (loadProfileFuture.isComplete()) f.complete(loadProfileFuture.result());
 
-                    // still no cached profile. read zookeeper for remotely cached profile
-                    ProfileResidencyInfo residencyInfo = zkLoadInfoStore.readProfileResidencyInfo(profileName);
-                    // stale node exists. will update instead of create
-                    boolean staleNodeExists = false;
-                    if(residencyInfo != null) {
-                        if(residencyInfo.getIp().equals(myIp) && residencyInfo.getPort() == port) {
-                            staleNodeExists = true;
-                        }
-                        else {
-                            f.fail(new CachedProfileNotFoundException(residencyInfo.getIp(), residencyInfo.getPort()));
-                            return;
-                        }
-                    }
-
-                    // profile not cached anywhere
-                    // start the loading process
-                    Future<AggregatedProfileInfo> loadProfileFuture = Future.future();
-                    workerExecutor.executeBlocking(f2 -> profileLoader.load(f2, profileName), loadProfileFuture.completer());
-
-                    // update LOADING status in zookeeper
-                    zkLoadInfoStore.updateProfileResidencyInfo(profileName, staleNodeExists);
-                    cache.put(profileName, loadProfileFuture);
-
-                    loadProfileFuture.setHandler(ar -> {
-                        logger.info("Profile load complete. file: {}", profileName);
-                        // load_profile might fail, regardless reinsert to take the new utilization into account.
-                        cache.put(profileName, loadProfileFuture);
-                    });
-
-                    if(loadProfileFuture.isComplete()) {
-                        f.complete(loadProfileFuture.result());
-                    }
-                    f.fail(new ProfileLoadInProgressException(profileName));
+                    f.fail(new ProfileLoadInProgressException(profileName));    //fail because loading is still not complete
                 }
             }, "Error while interacting with zookeeper for file: {}", profileName).setHandler(profileFuture.completer());
         }
         return profileFuture;
     }
+
+    /**
+     * Main method to get the already cached view / create view for the cached profile. If the profile is not cached,
+     * the return future will fail according to {@code getAggregatedProfile}.
+     *
+     * @param profileName
+     * @param traceName
+     * @param profileViewType
+     * @return Future containing a pair of trace specific aggregated samples and its view.
+     */
+    public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
+        Future<Pair<AggregatedSamplesPerTraceCtx, T >> viewFuture = Future.future();
+        Pair<Future<AggregatedProfileInfo>, Cacheable<ProfileView>> profileViewPair = cache.getView(profileName, traceName, profileViewType);
+
+        if (profileViewPair.first != null) {
+            if (profileViewPair.second != null) {
+                return Future.succeededFuture(Pair.of(profileViewPair.first.result().getAggregatedSamples(traceName), (T) profileViewPair.second));
+            } else {
+                workerExecutor.executeBlocking(f -> getOrCreateView(profileName, traceName, f, profileViewType), viewFuture.completer());
+            }
+        } else {
+            // else check into zookeeper if this is cached in another node
+            doAsync((Future<Pair<AggregatedSamplesPerTraceCtx, T>> f) -> {
+                synchronized (this) {
+                    try {
+                        cacheInfoRegistry.claimOwnership(profileName);
+                    } catch (CachedProfileNotFoundException ex) {
+                        f.fail(ex);
+                        return;
+                    }
+                    getOrCreateView(profileName, traceName, f, profileViewType);
+                }
+            }).setHandler(viewFuture.completer());
+        }
+        return viewFuture;
+    }
+
+    private void loadProfile(AggregatedProfileNamingStrategy profileName, Future<AggregatedProfileInfo> loadProfileFuture) {
+        workerExecutor.executeBlocking(f2 -> profileLoader.load(f2, profileName), loadProfileFuture.completer());
+        cache.put(profileName, loadProfileFuture);
+        loadProfileFuture.setHandler(ar -> {
+            logger.info("Profile load complete. file: {}", profileName);
+            // load_profile might fail, regardless reinsert to take the new utilization into account.
+            cache.put(profileName, loadProfileFuture);
+        });
+    }
+
+    private void getFromLocalCache(AggregatedProfileNamingStrategy profileName, Future<AggregatedProfileInfo> profileFuture) {
+        Future<AggregatedProfileInfo> cachedProfileInfo = cache.get(profileName);
+        if (cachedProfileInfo != null) {
+            completeFuture(profileName, cachedProfileInfo, profileFuture);
+        }
+    }
+
 
     /**
      * Event handler for evicted profiles. Deletes the profile -> ip:port mapping fom shared store.
@@ -147,14 +172,7 @@ public class ClusterAwareCache {
         if(!RemovalCause.REPLACED.equals(onRemoval.getCause()) && onRemoval.wasEvicted()) {
             AggregatedProfileNamingStrategy profileName = onRemoval.getKey();
             doAsync(f -> {
-                try(AutoCloseable ignored = zkLoadInfoStore.getLock()) {
-                    ProfileResidencyInfo residencyInfo = zkLoadInfoStore.readProfileResidencyInfo(profileName);
-                    boolean deleteProfileNode = false;
-                    if(residencyInfo != null && (myIp.equals(residencyInfo.getIp()) && port == residencyInfo.getPort()) && cache.get(profileName) == null) {
-                        deleteProfileNode = true;
-                    }
-                    zkLoadInfoStore.removeProfileResidencyInfo(profileName, deleteProfileNode);
-                }
+                cacheInfoRegistry.releaseOwnership(profileName);
                 f.complete();
             }, "Error while cleaning for file: {}", profileName.toString());
         }
@@ -176,54 +194,6 @@ public class ClusterAwareCache {
         else {
             profileFuture.complete(cachedProfileInfo.result());
         }
-    }
-
-    /**
-     * Main method to get the already cached view / create view for the cached profile. If the profile is not cached,
-     * the return future will fail according to {@code getAggregatedProfile}.
-     *
-     * @param profileName
-     * @param traceName
-     * @param profileViewType
-     * @return Future containing a pair of trace specific aggregated samples and its view.
-     */
-    public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
-        Future<Pair<AggregatedSamplesPerTraceCtx, T >> viewFuture = Future.future();
-        Pair<Future<AggregatedProfileInfo>, Cacheable<ProfileView>> profileViewPair = cache.getView(profileName, traceName, profileViewType);
-
-        if(profileViewPair.first != null) {
-            if(profileViewPair.second != null) {
-                return Future.succeededFuture(Pair.of(profileViewPair.first.result().getAggregatedSamples(traceName), (T)profileViewPair.second));
-            }
-            else {
-                workerExecutor.executeBlocking(f -> getOrCreateView(profileName, traceName, f, profileViewType), viewFuture.completer());
-            }
-        }
-        else {
-            // else check into zookeeper if this is cached in another node
-            doAsync((Future<Pair<AggregatedSamplesPerTraceCtx, T>> f) -> {
-                ProfileResidencyInfo residencyInfo;
-                try(AutoCloseable ignored = zkLoadInfoStore.getLock()) {
-                    residencyInfo = zkLoadInfoStore.readProfileResidencyInfo(profileName);
-                }
-
-                if(residencyInfo != null) {
-                    // by the time we got the lock, it is possible a profile load has started
-                    if (residencyInfo.getIp().equals(myIp) && residencyInfo.getPort() == port) {
-                        getOrCreateView(profileName, traceName, f, profileViewType);
-                    }
-                    else {
-                        // cached in another node
-                        f.fail(new CachedProfileNotFoundException(residencyInfo.getIp(), residencyInfo.getPort()));
-                    }
-                }
-                else {
-                    f.fail(new CachedProfileNotFoundException());
-                }
-            }).setHandler(viewFuture.completer());
-        }
-
-        return viewFuture;
     }
 
     /**

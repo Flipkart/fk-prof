@@ -9,10 +9,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * Created by gaurav.ashok on 11/08/17.
  */
 public class TestTicker extends Ticker {
-    final long beginTime;
-    final AtomicLong currTime;
+    private final long beginTime;
+    private final AtomicLong currTime;
 
-    public TestTicker() {
+    TestTicker() {
         beginTime = System.nanoTime();
         currTime = new AtomicLong(beginTime);
     }

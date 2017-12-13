@@ -1,6 +1,7 @@
 package fk.prof.userapi.cache;
 
 import com.codahale.metrics.Counter;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.AbstractMessage;
@@ -20,6 +21,7 @@ import org.apache.zookeeper.KeeperException;
 
 import java.nio.charset.Charset;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,11 +44,11 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * Created by gaurav.ashok on 01/08/17.
  */
-class ZkLoadInfoStore implements LoadInfoStore {
-    private static final Logger logger = LoggerFactory.getLogger(ZkLoadInfoStore.class);
+class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
+    private static final Logger logger = LoggerFactory.getLogger(ZKBasedCacheInfoRegistry.class);
     private static final String distributedLockPath = "/global_mutex";
 
-    private final String zkNodesInfoPath;
+    private final String zkNodesLoadInfoPath;
     private final CuratorFramework curatorClient;
     private final InterProcessLock interProcessLock;
 
@@ -54,21 +56,22 @@ class ZkLoadInfoStore implements LoadInfoStore {
     private final AtomicReference<LocalDateTime> lastZkLostTime;
     private final AtomicBoolean recentlyZkConnectionLost;
 
-    private final byte[] myResidencyInfo;
+    private final byte[] myResidencyInfoInBytes;
+    private final ProfileResidencyInfo myProfileResidencyInfo;
     private Runnable cacheInvalidator;
 
     private Counter lockAcquireTimeoutCounter = Util.counter("zk.lock.timeouts");
     private Counter onReconnectFailures = Util.counter("zk.onreconnect.failures");
 
-    ZkLoadInfoStore(CuratorFramework curatorClient, String myIp, int port, Runnable cacheInvalidator) {
+    ZKBasedCacheInfoRegistry(CuratorFramework curatorClient, String myIp, int port, Runnable cacheInvalidator) {
         this.curatorClient = curatorClient;
 
-        this.zkNodesInfoPath = "/nodesInfo/" + myIp + ":" + port;
+        this.zkNodesLoadInfoPath = "/nodesInfo/" + myIp + ":" + port;
         this.interProcessLock = new InterProcessMutex(curatorClient, distributedLockPath);
         this.lastZkLostTime = new AtomicReference<>(LocalDateTime.MIN);
         this.recentlyZkConnectionLost = new AtomicBoolean(false);
-        this.myResidencyInfo = ProfileResidencyInfo.newBuilder().setIp(myIp).setPort(port).build().toByteArray();
-
+        this.myProfileResidencyInfo = ProfileResidencyInfo.newBuilder().setIp(myIp).setPort(port).build();
+        this.myResidencyInfoInBytes = this.myProfileResidencyInfo.toByteArray();
         this.curatorClient.getConnectionStateListenable().addListener(this::zkStateChangeListener,
             Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("curator-state-listener").build()));
 
@@ -85,19 +88,31 @@ class ZkLoadInfoStore implements LoadInfoStore {
     }
 
     @Override
-    public boolean profileResidencyInfoExists(AggregatedProfileNamingStrategy profileName) throws Exception {
-        ensureConnected();
-        return pathExists(zkPathForProfile(profileName));
+    public void releaseOwnership(AggregatedProfileNamingStrategy profileName) throws Exception {
+        try(AutoCloseable ignored = getLock()) {
+            ProfileResidencyInfo residencyInfo = getProfileResidencyInfo(profileName);
+            if(residencyInfo != null && Objects.equals(residencyInfo, myProfileResidencyInfo)) {
+                removeProfileResidencyInfo(profileName);
+            }
+        }
     }
 
     @Override
-    public boolean nodeLoadInfoExists() throws Exception {
-        ensureConnected();
-        return pathExists(zkNodesInfoPath);
+    public void claimOwnership(AggregatedProfileNamingStrategy profileName) throws Exception {
+        try (AutoCloseable ignored = getLock()){
+            ProfileResidencyInfo residencyInfo = getProfileResidencyInfo(profileName);
+            if (residencyInfo == null) {
+                putProfileResidencyInfo(profileName, false);
+            } else if(Objects.equals(residencyInfo, myProfileResidencyInfo) && sessionIdMatches(profileName)) {
+                putProfileResidencyInfo(profileName, true);
+            } else {
+              throw new CachedProfileNotFoundException(residencyInfo.getIp(), residencyInfo.getPort());
+            }
+        }
     }
 
-    @Override
-    public ProfileResidencyInfo readProfileResidencyInfo(AggregatedProfileNamingStrategy profileName) throws Exception {
+    @VisibleForTesting
+    ProfileResidencyInfo getProfileResidencyInfo(AggregatedProfileNamingStrategy profileName) throws Exception {
         ensureConnected();
         try {
             return readFrom(zkPathForProfile(profileName), ProfileResidencyInfo.parser());
@@ -106,46 +121,51 @@ class ZkLoadInfoStore implements LoadInfoStore {
         }
     }
 
-    @Override
-    public NodeLoadInfo readNodeLoadInfo() throws Exception {
+    @VisibleForTesting
+    NodeLoadInfo getNodeLoadInfo() throws Exception {
         ensureConnected();
         try {
-            return readFrom(zkNodesInfoPath, NodeLoadInfo.parser());
+            return readFrom(zkNodesLoadInfoPath, NodeLoadInfo.parser());
         } catch (KeeperException.NoNodeException e) {
             return null;
         }
     }
 
-    @Override
-    public void updateProfileResidencyInfo(AggregatedProfileNamingStrategy profileName, boolean profileResidencyInfoNodeExists) throws Exception {
+    /**
+     * Create profile residency node for the provided profile name, along with incrementing the owner node's load
+     * Note : This method deletes the existing profile node before creating it
+     * @param profileName name of the profile
+     * @param profileNodeExists whether a profile residency node already exists
+     * @throws Exception zookeeper exception
+     */
+    private void putProfileResidencyInfo(AggregatedProfileNamingStrategy profileName, boolean profileNodeExists) throws Exception {
         ensureConnected();
-        NodeLoadInfo nodeLoadInfo = readFrom(zkNodesInfoPath, NodeLoadInfo.parser());
-        int profileLoadedCount = nodeLoadInfo.getProfilesLoaded() + (profileResidencyInfoNodeExists ? 0 : 1);
-        CuratorTransactionFinal transaction = curatorClient.inTransaction().setData().forPath(zkNodesInfoPath, buildNodeLoadInfo(profileLoadedCount).toByteArray()).and();
-        if(profileResidencyInfoNodeExists) {
-            transaction = transaction.setData().forPath(zkPathForProfile(profileName), myResidencyInfo).and();
+        NodeLoadInfo nodeLoadInfo = readFrom(zkNodesLoadInfoPath, NodeLoadInfo.parser());
+        int profileLoadedCount = nodeLoadInfo.getProfilesLoaded() + 1;
+        CuratorTransactionFinal transaction = curatorClient.inTransaction().setData().forPath(zkNodesLoadInfoPath, buildNodeLoadInfo(profileLoadedCount).toByteArray()).and();
+        if (profileNodeExists) {
+            transaction = transaction.delete().forPath(zkPathForProfile(profileName)).and();
         }
-        else {
-            transaction = transaction.create().withMode(CreateMode.EPHEMERAL).forPath(zkPathForProfile(profileName), myResidencyInfo).and();
-        }
+        transaction = transaction.create().withMode(CreateMode.EPHEMERAL).forPath(zkPathForProfile(profileName), myResidencyInfoInBytes).and();
         transaction.commit();
     }
 
-    @Override
-    public void removeProfileResidencyInfo(AggregatedProfileNamingStrategy profileName, boolean deleteProfileResidencyInfoNode) throws Exception {
+    /**
+     * Deletes profile residency node for the provided profile name, along with decrementing the owner node's load
+     * Note: This method deletes the node only if it owns it
+     * @param profileName name of the profile
+     * @throws Exception zookeeper exception
+     */
+    private void removeProfileResidencyInfo(AggregatedProfileNamingStrategy profileName) throws Exception {
         ensureConnected();
-        NodeLoadInfo nodeLoadInfo = readFrom(zkNodesInfoPath, NodeLoadInfo.parser());
+        NodeLoadInfo nodeLoadInfo = readFrom(zkNodesLoadInfoPath, NodeLoadInfo.parser());
         byte[] newData = buildNodeLoadInfo(nodeLoadInfo.getProfilesLoaded() - 1).toByteArray();
-        if(deleteProfileResidencyInfoNode) {
-            curatorClient.inTransaction().setData().forPath(zkNodesInfoPath, newData)
-                .and().delete().forPath(zkPathForProfile(profileName))
-                .and().commit();
-        }
-        else {
-            curatorClient.setData().forPath(zkNodesInfoPath, newData);
-        }
+        curatorClient.inTransaction().setData().forPath(zkNodesLoadInfoPath, newData)
+            .and().delete().forPath(zkPathForProfile(profileName))
+            .and().commit();
     }
 
+    @VisibleForTesting
     AutoCloseable getLock() throws Exception {
         ensureConnected();
         return new CloseableSharedLock();
@@ -153,6 +173,20 @@ class ZkLoadInfoStore implements LoadInfoStore {
 
     ConnectionState getState() {
         return connectionState.get();
+    }
+
+    private class CloseableSharedLock implements AutoCloseable {
+        CloseableSharedLock() throws Exception {
+            if (!interProcessLock.acquire(5, TimeUnit.SECONDS)) {
+                lockAcquireTimeoutCounter.inc();
+                throw new ZkStoreUnavailableException("Could not acquire lock in the given time.");
+            }
+        }
+
+        @Override
+        public void close() throws Exception {
+            interProcessLock.release();
+        }
     }
 
     public enum ConnectionState {
@@ -166,35 +200,19 @@ class ZkLoadInfoStore implements LoadInfoStore {
         }
     }
 
-    private boolean pathExists(String path) throws  Exception {
-        return curatorClient.checkExists().forPath(path) != null;
-    }
-
-    private class CloseableSharedLock implements AutoCloseable {
-
-        CloseableSharedLock() throws Exception {
-            if(!interProcessLock.acquire(5, TimeUnit.SECONDS)) {
-                lockAcquireTimeoutCounter.inc();
-                throw new ZkStoreUnavailableException("Could not acquire lock in the given time.");
-            }
-        }
-
-        @Override
-        public void close() throws Exception {
-            interProcessLock.release();
-        }
-    }
-
-    @Override
-    public NodeLoadInfo buildNodeLoadInfo(int profileCount) {
+    private NodeLoadInfo buildNodeLoadInfo(int profileCount) {
         return NodeLoadInfo.newBuilder().setProfilesLoaded(profileCount).build();
+    }
+
+    private boolean sessionIdMatches(AggregatedProfileNamingStrategy profileName) throws Exception {
+        return curatorClient.getZookeeperClient().getZooKeeper().getSessionId() !=                 // am I not the "session" owner of the ephemeral node
+            curatorClient.checkExists().forPath(zkPathForProfile(profileName)).getEphemeralOwner();
     }
 
     private <T extends AbstractMessage> T readFrom(String path, Parser<T> parser) throws Exception {
         byte[] bytes = curatorClient.getData().forPath(path);
         return parser.parseFrom(bytes);
     }
-
 
     private String zkPathForProfile(AggregatedProfileNamingStrategy profileName) {
         return "/profilesLoadStatus/" +  BaseEncoding.base32().encode(profileName.toString().getBytes(Charset.forName("utf-8")));
@@ -227,12 +245,11 @@ class ZkLoadInfoStore implements LoadInfoStore {
 
     private void ensureRequiredZkNodesPresent() throws Exception {
         try {
-            curatorClient.delete().forPath(zkNodesInfoPath);
-
+            curatorClient.delete().forPath(zkNodesLoadInfoPath);
         } catch (KeeperException.NoNodeException e){
             logger.info("Node does not exist while deleting zkNodeInfoPath Node, exception: ", e);
         }
-        curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkNodesInfoPath, buildNodeLoadInfo(0).toByteArray());
+        curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkNodesLoadInfoPath, buildNodeLoadInfo(0).toByteArray());
 
         if (curatorClient.checkExists().forPath("/profilesLoadStatus") == null) {
             curatorClient.create().withMode(CreateMode.PERSISTENT).forPath("/profilesLoadStatus");
