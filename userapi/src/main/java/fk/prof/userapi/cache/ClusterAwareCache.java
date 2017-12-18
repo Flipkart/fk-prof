@@ -67,7 +67,6 @@ public class ClusterAwareCache {
             } catch (Exception e) {
                 f.fail(e);
             }
-
         });
     }
 

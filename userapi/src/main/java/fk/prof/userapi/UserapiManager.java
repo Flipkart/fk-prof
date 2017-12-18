@@ -92,8 +92,8 @@ public class UserapiManager {
         return future;
     }
 
-    public Future<Void> launch() {
-        Future<Object> result = Future.future();
+    Future<Void> launch() {
+        Future result = Future.future();
         // register serializers
         registerSerializers(Json.mapper);
         registerSerializers(Json.prettyMapper);
@@ -101,13 +101,14 @@ public class UserapiManager {
         ProfileStoreAPI profileStoreAPI = new ProfileStoreAPIImpl(vertx, this.storage, cache, config);
         VerticleDeployer userapiHttpVerticleDeployer = new UserapiHttpVerticleDeployer(vertx, config, profileStoreAPI);
 
-        return cache.onClusterJoin().setHandler(ar -> {
+        cache.onClusterJoin().setHandler(ar -> {
             if (ar.failed()) {
                 result.fail(ar.cause());
             } else {
-                userapiHttpVerticleDeployer.deploy().map(r -> (Object) r).setHandler(result.completer());
+                userapiHttpVerticleDeployer.deploy().setHandler(result.completer());
             }
         });
+        return result;
     }
 
     private void registerSerializers(ObjectMapper mapper) {
