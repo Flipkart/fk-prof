@@ -59,7 +59,7 @@ class MethodTreeComponent extends Component {
 
   initTreeStore() {
     const {app, cluster, proc, workType, selectedWorkType, profileStart, profileDuration} = this.props.location.query;
-    const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration, autoExpand: true});
+    const queryParams = objectToQueryParams({start: profileStart, duration: profileDuration});
     const treeType = this.props.nextNodesAccessorField === 'parent' ? 'callees' : 'callers';
     this.url = `/api/${treeType}/${app}/${cluster}/${proc}/${MethodTreeComponent.workTypeMap[workType || selectedWorkType]}/${this.props.traceName}` + ((queryParams) ? '?' + queryParams : '');
     this.currTreeStore = this.cachedTreeStores.get(this.url);

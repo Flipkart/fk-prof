@@ -205,7 +205,7 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
     }
 
     private boolean sessionIdMatches(AggregatedProfileNamingStrategy profileName) throws Exception {
-        return curatorClient.getZookeeperClient().getZooKeeper().getSessionId() !=                 // am I not the "session" owner of the ephemeral node
+        return curatorClient.getZookeeperClient().getZooKeeper().getSessionId() ==                 // am I not the "session" owner of the ephemeral node
             curatorClient.checkExists().forPath(zkPathForProfile(profileName)).getEphemeralOwner();
     }
 
