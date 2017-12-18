@@ -19,6 +19,7 @@ message RecordingPolicy {
     required uint32 coverage_pct = 2;
     repeated Work work = 3;
     required string description = 4;
+    optional uint32 min_healthy = 5;
 }
 
 enum WorkType {

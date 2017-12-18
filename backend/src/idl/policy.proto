@@ -1,5 +1,5 @@
 syntax = "proto2";
-package fk.prof.backend.proto;
+package proto;
 option java_outer_classname = "PolicyDTO";
 
 
@@ -17,13 +17,15 @@ message PolicyDetails {
 
 message Policy {
     required Schedule schedule = 1;
-    repeated Work work = 2;
+    required string description = 2;
+    repeated Work work = 3;
 }
 
 message Schedule {
     required uint32 duration = 1;
     required uint32 pg_cov_pct = 2;
     required string after = 3;
+    optional uint32 min_healthy = 5;
 }
 
 enum WorkType {

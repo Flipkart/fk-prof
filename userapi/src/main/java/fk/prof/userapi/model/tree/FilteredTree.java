@@ -3,35 +3,50 @@ package fk.prof.userapi.model.tree;
 import fk.prof.userapi.model.Tree;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 /**
+ * FilteredTree applies a visibility mask on the tree.
+ * For example:
+ * After applying the visibility mask of [3] on the tree below,
+ * 0
+ * |__1
+ * |  |__2
+ * |__3
+ *    |__4
+ *
+ * getChildrenCount(0) will return 1, and getChildren(0) will return [3] and getChildren(3) will return [4].
+ *
  * Created by gaurav.ashok on 05/06/17.
  */
 public class FilteredTree<T> implements Tree<T> {
 
-    Tree<T> tree;
-    boolean[] visible;
+    private final List<Integer> hotMethodNodeIds;
+    private Tree<T> tree;
+    private boolean[] visible;
+    private int filteredTreeSize = 0;
 
-    public FilteredTree(Tree<T> tree, VisibilityPredicate<T> predicate) {
+    public FilteredTree(Tree<T> tree, List<Integer> hotMethodNodeIds, VisibilityPredicate<T> predicate) {
         this.tree = tree;
-        this.visible = new boolean[getMaxSize()];
-
+        this.visible = new boolean[tree.size()];
+        this.hotMethodNodeIds = hotMethodNodeIds;
         tree.foreach((i, node) -> visible[i] = predicate.testVisibility(i, node));
 
-        treeify(0, false);
+        applyMask(0, false);
     }
 
     @Override
-    public T get(int idx) {
+    public T getNode(int idx) {
         if(visible[idx]) {
-            return tree.get(idx);
+            return tree.getNode(idx);
         }
         throw new NoSuchElementException();
     }
 
     @Override
-    public int getChildrenSize(int idx) {
+    public int getChildrenCount(int idx) {
         int childCount = 0;
         for(Integer i : getChildren(idx)) {
             ++childCount;
@@ -93,8 +108,8 @@ public class FilteredTree<T> implements Tree<T> {
     }
 
     @Override
-    public int getMaxSize() {
-        return tree.getMaxSize();
+    public int size() {
+        return filteredTreeSize;
     }
 
     @Override
@@ -106,14 +121,21 @@ public class FilteredTree<T> implements Tree<T> {
         });
     }
 
-    private boolean treeify(int idx, boolean isParentVisible) {
+    private boolean applyMask(int idx, boolean isParentVisible) {
         boolean isNodeVisible = visible[idx] | isParentVisible;
         boolean isChildVisible = false;
         for(Integer i : tree.getChildren(idx)) {
-            isChildVisible |= treeify(i, isNodeVisible);
+            isChildVisible |= applyMask(i, isNodeVisible);
         }
         visible[idx] = isNodeVisible | isChildVisible;
+        if (visible[idx]) {
+            filteredTreeSize++;
+        }
         return visible[idx];
+    }
+
+    public List<Integer> getHotMethodNodeIds() {
+        return hotMethodNodeIds.stream().filter(id -> visible[id]).collect(Collectors.toList());
     }
 
     public interface VisibilityPredicate<T> {

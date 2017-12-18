@@ -1,12 +1,9 @@
 package fk.prof.userapi.api;
 
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
-import fk.prof.userapi.Pair;
-import fk.prof.userapi.model.AggregatedProfileInfo;
-import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
-import fk.prof.userapi.model.AggregationWindowSummary;
-import fk.prof.userapi.model.tree.CallTreeView;
-import fk.prof.userapi.model.tree.CalleesTreeView;
+import fk.prof.userapi.model.ProfileView;
+import fk.prof.userapi.model.*;
+import fk.prof.userapi.util.Pair;
 import io.vertx.core.Future;
 
 import java.time.ZonedDateTime;
@@ -20,6 +17,7 @@ import java.util.Set;
 public interface ProfileStoreAPI {
     /**
      * Returns completable future which returns set of appIds from the DataStore filtered by the specified prefix
+     * Returns future with all appIds if prefix is null, else filters based on prefix
      *
      * @param appIdPrefix prefix to filter the appIds
      * @return completable future which returns set containing app ids
@@ -28,6 +26,7 @@ public interface ProfileStoreAPI {
 
     /**
      * Returns set of clusterIds of specified appId from the DataStore filtered by the specified prefix
+     * Returns future with all clusterIds if prefix is null, else filters based on prefix
      *
      * @param appId           appId of which the clusterIds are required
      * @param clusterIdPrefix prefix to filter the clusterIds
@@ -36,14 +35,15 @@ public interface ProfileStoreAPI {
     void getClusterIdsWithPrefix(Future<Set<String>> clusterIds, String baseDir, String appId, String clusterIdPrefix);
 
     /**
-     * Returns set of processes of specified appId and clusterId from the DataStore filtered by the specified prefix
+     * Returns set of procNames of specified appId and clusterId from the DataStore filtered by the specified prefix
+     * Returns future with all procNames if prefix is null, else filters based on prefix
      *
      * @param appId      appId of which the processes are required
      * @param clusterId  clusterId of which the processes are required
      * @param procPrefix prefix to filter the processes
      * @return completable future which returns set containing process names
      */
-    void getProcsWithPrefix(Future<Set<String>> procIds, String baseDir, String appId, String clusterId, String procPrefix);
+    void getProcNamesWithPrefix(Future<Set<String>> procNames, String baseDir, String appId, String clusterId, String procPrefix);
 
     /**
      * Returns set of profiles of specified appId, clusterId and process from the DataStore filtered by the specified time interval and duration
@@ -58,32 +58,29 @@ public interface ProfileStoreAPI {
     void getProfilesInTimeWindow(Future<List<AggregatedProfileNamingStrategy>> profiles, String baseDir, String appId, String clusterId, String proc, ZonedDateTime startTime, int durationInSeconds);
 
     /**
-     * Returns aggregated profile for the provided header
-     * @param future
-     * @param filename
+     * Returns aggregated profile info for the provided filename in a future
+     *
+     * @param future    future containing aggregated profile info for the provided filename
+     * @param filename  name of the profile file constructed from a header
      */
     void load(Future<AggregatedProfileInfo> future, AggregatedProfileNamingStrategy filename);
 
     /**
-     * Returns aggregated profile for the provided header
-     * @param future
-     * @param filename
+     * Returns aggregation window summary for the provided filename in a future
+     *
+     * @param future    future containing aggregation window summary of the provided filename
+     * @param filename  name of the profile file constructed from a header
      */
     void loadSummary(Future<AggregationWindowSummary> future, AggregatedProfileNamingStrategy filename);
 
     /**
-     * Get/Create a callerTree view for the trace
-     * @param profileName
-     * @param traceName
-     * @return Future containing calltree view and the associated aggregated samples.
+     * Get/Create a ProfileView for the provided profile name, trace name and of a specific type
+     *
+     * @param profileName       name of the profile file
+     * @param traceName         name of the trace context
+     * @param profileViewType   type of the profile view intended to be get
+     * @param <T>               type implementing the TreeView interface
+     * @return Future containing pair of aggregated samples and TreeView of type T
      */
-    Future<Pair<AggregatedSamplesPerTraceCtx,CallTreeView>> getCpuSamplingCallersTreeView(AggregatedProfileNamingStrategy profileName, String traceName);
-
-    /**
-     * Get/Create a calleeTree view for the trace
-     * @param profileName
-     * @param traceName
-     * @return Future containing calleetree view and the associated aggregated samples.
-     */
-    Future<Pair<AggregatedSamplesPerTraceCtx,CalleesTreeView>> getCpuSamplingCalleesTreeView(AggregatedProfileNamingStrategy profileName, String traceName);
+    <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx,T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType);
 }

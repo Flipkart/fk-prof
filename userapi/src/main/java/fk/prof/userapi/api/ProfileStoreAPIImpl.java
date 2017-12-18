@@ -5,14 +5,12 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.io.BaseEncoding;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.storage.AsyncStorage;
-import fk.prof.userapi.Cacheable;
 import fk.prof.userapi.Configuration;
-import fk.prof.userapi.Pair;
-import fk.prof.userapi.api.cache.CachedProfileNotFoundException;
+import fk.prof.userapi.cache.CachedProfileNotFoundException;
+import fk.prof.userapi.cache.ClusterAwareCache;
+import fk.prof.userapi.model.ProfileView;
 import fk.prof.userapi.model.*;
-import fk.prof.userapi.api.cache.ClusterAwareCache;
-import fk.prof.userapi.model.tree.CallTreeView;
-import fk.prof.userapi.model.tree.CalleesTreeView;
+import fk.prof.userapi.util.Pair;
 import io.vertx.core.*;
 
 import java.nio.charset.Charset;
@@ -28,7 +26,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
- * Interacts with the {@link AsyncStorage} based on invocations from controller
+ * Interacts with the {@link AsyncStorage} and the {@link ClusterAwareCache} based on invocations from controller.
  * Created by rohit.patiyal on 19/01/17.
  */
 public class ProfileStoreAPIImpl implements ProfileStoreAPI {
@@ -49,7 +47,7 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
 
     /* stores all requested futures that are waiting on file to be loaded from S3. If a file loading
     * is in progress, this map will contain its corresponding key */
-    private final Map<String, FuturesList<Cacheable>> filesBeingLoaded;
+    private final Map<String, FuturesList<AggregationWindowSummary>> filesBeingLoaded;
 
     public ProfileStoreAPIImpl(Vertx vertx, AsyncStorage asyncStorage, ClusterAwareCache clusterAwareCache, Configuration config) {
         this.asyncStorage = asyncStorage;
@@ -77,7 +75,8 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
     @Override
     public void getAppIdsWithPrefix(Future<Set<String>> appIds, String baseDir, String appIdPrefix) {
         /* TODO: move this prefix creation to {@link AggregatedProfileNamingStrategy} */
-        getListingAtLevelWithPrefix(appIds, baseDir + DELIMITER + VERSION + DELIMITER, appIdPrefix, true);
+        String filterPrefix = (appIdPrefix == null) ? "" : appIdPrefix;
+        getListingAtLevelWithPrefix(appIds, baseDir + DELIMITER + VERSION + DELIMITER, filterPrefix, true);
     }
 
     private void getListingAtLevelWithPrefix(Future<Set<String>> listings, String level, String objPrefix, boolean encoded) {
@@ -98,14 +97,16 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
 
     @Override
     public void getClusterIdsWithPrefix(Future<Set<String>> clusterIds, String baseDir, String appId, String clusterIdPrefix) {
+        String filterPrefix = (clusterIdPrefix == null) ? "" : clusterIdPrefix;
         getListingAtLevelWithPrefix(clusterIds, baseDir + DELIMITER + VERSION + DELIMITER + encode(appId) + DELIMITER,
-                clusterIdPrefix, true);
+                filterPrefix, true);
     }
 
     @Override
-    public void getProcsWithPrefix(Future<Set<String>> procIds, String baseDir, String appId, String clusterId, String procPrefix) {
-        getListingAtLevelWithPrefix(procIds, baseDir + DELIMITER + VERSION + DELIMITER + encode(appId) + DELIMITER + encode(clusterId) + DELIMITER,
-                procPrefix, true);
+    public void getProcNamesWithPrefix(Future<Set<String>> procNames, String baseDir, String appId, String clusterId, String procPrefix) {
+        String filterPrefix = (procPrefix == null) ? "" : procPrefix;
+        getListingAtLevelWithPrefix(procNames, baseDir + DELIMITER + VERSION + DELIMITER + encode(appId) + DELIMITER + encode(clusterId) + DELIMITER,
+                filterPrefix, true);
     }
 
     @Override
@@ -161,10 +162,10 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
         AggregationWindowSummary cachedProfileInfo = summaryCache.getIfPresent(fileNameKey);
         if(cachedProfileInfo == null) {
             boolean fileLoadInProgress = filesBeingLoaded.containsKey(fileNameKey);
-            saveRequestedFuture(fileNameKey, future);
+            saveRequestedFutureInMap(fileNameKey, future, filesBeingLoaded);
 
             // set the timeout for this future
-            vertx.setTimer(loadTimeout, timerId -> timeoutRequestedFuture(fileNameKey, future));
+            vertx.setTimer(loadTimeout, timerId -> timeoutRequestedFutureInMap(fileNameKey, future, filesBeingLoaded));
 
             if(!fileLoadInProgress) {
                 workerExecutor.executeBlocking((Future<AggregationWindowSummary> f) -> profileLoader.loadSummary(f, filename),
@@ -182,59 +183,41 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
     }
 
     @Override
-    public Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> getCpuSamplingCallersTreeView(AggregatedProfileNamingStrategy profileName, String traceName) {
-        Future<Pair<AggregatedSamplesPerTraceCtx, CallTreeView>> result = Future.future();
+    public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
+        Future<Pair<AggregatedSamplesPerTraceCtx, T>> result = Future.future();
 
-        clusterAwareCache.getCallTreeView(profileName, traceName).setHandler(ar -> {
-            if(ar.failed() && ar.cause() instanceof CachedProfileNotFoundException && !((CachedProfileNotFoundException) ar.cause()).isCachedRemotely()) {
+        Future<Pair<AggregatedSamplesPerTraceCtx, T>> f = clusterAwareCache.getProfileView(profileName, traceName, profileViewType);
+        f.setHandler(ar -> {
+            if (ar.failed() && ar.cause() instanceof CachedProfileNotFoundException && !((CachedProfileNotFoundException) ar.cause()).isCachedRemotely()) {
                 // initiate the load locally
                 Future<AggregatedProfileInfo> profileLoad = Future.future();
                 load(profileLoad, profileName);
 
-                profileLoad.setHandler(ar2 -> clusterAwareCache.getCallTreeView(profileName, traceName).setHandler(result.completer()));
-            }
-            else {
+                profileLoad.setHandler(ar2 -> {
+                    Future<Pair<AggregatedSamplesPerTraceCtx, T>> f2 = clusterAwareCache.getProfileView(profileName, traceName, profileViewType);
+                    f2.setHandler(result.completer());
+                });
+            } else {
                 result.handle(ar);
             }
         });
-
         return result;
     }
 
-    @Override
-    public Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> getCpuSamplingCalleesTreeView(AggregatedProfileNamingStrategy profileName, String traceName) {
-        Future<Pair<AggregatedSamplesPerTraceCtx, CalleesTreeView>> result = Future.future();
-
-        clusterAwareCache.getCalleesTreeView(profileName, traceName).setHandler(ar -> {
-            if(ar.failed() && ar.cause() instanceof CachedProfileNotFoundException && !((CachedProfileNotFoundException) ar.cause()).isCachedRemotely()) {
-                // initiate the load locally
-                Future<AggregatedProfileInfo> profileLoad = Future.future();
-                load(profileLoad, profileName);
-
-                profileLoad.setHandler(ar2 -> clusterAwareCache.getCalleesTreeView(profileName, traceName).setHandler(result.completer()));
-            }
-            else {
-                result.handle(ar);
-            }
-        });
-
-        return result;
-    }
-
-    private <T> void saveRequestedFuture(String filename, Future<T> future) {
-        FuturesList futures = filesBeingLoaded.get(filename);
+    private <T> void saveRequestedFutureInMap(String filename, Future<T> future, Map<String, FuturesList<T>> futuresListMap) {
+        FuturesList<T> futures = futuresListMap.get(filename);
         if (futures == null) {
-            futures = new FuturesList();
-            filesBeingLoaded.put(filename, futures);
+            futures = new FuturesList<>();
+            futuresListMap.put(filename, futures);
         }
         futures.addFuture(future);
     }
 
-    private <T> void timeoutRequestedFuture(String filename, Future<T> future) {
+    private <T> void timeoutRequestedFutureInMap(String filename, Future<T> future, Map<String, FuturesList<T>> filesBeingLoaded) {
         if (future.isComplete()) {
             return;
         }
-        FuturesList futures = filesBeingLoaded.get(filename);
+        FuturesList<T> futures = filesBeingLoaded.get(filename);
         futures.removeFuture(future);
         future.fail(new TimeoutException("timeout while waiting for file to loadFromInputStream from store: " + filename));
     }
@@ -255,16 +238,16 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
         return new String(BaseEncoding.base32().decode(str), Charset.forName("utf-8"));
     }
 
-    private static class FuturesList<T extends Cacheable> {
+    private static class FuturesList<T> {
         List<Future<T>> futures = new ArrayList<>(2);
 
-        synchronized public void addFuture(Future<T> future) {
+        synchronized void addFuture(Future<T> future) {
             if (!exists(future)) {
                 futures.add(future);
             }
         }
 
-        synchronized public void removeFuture(Future<T> future) {
+        synchronized void removeFuture(Future<T> future) {
             futures.removeIf(f -> f == future);
         }
 

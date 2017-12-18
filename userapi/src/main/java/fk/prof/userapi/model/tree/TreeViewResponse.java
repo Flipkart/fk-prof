@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ * Response class as the response for getCPUSamplingTreeView http api.
+ * @see fk.prof.userapi.model.json.CustomSerializers.TreeViewResponseSerializer A custom serializer for this class.
+ *
  * Created by gaurav.ashok on 07/08/17.
  */
 public class TreeViewResponse<T> {
@@ -26,27 +29,4 @@ public class TreeViewResponse<T> {
         return methodLookup;
     }
 
-    public static class CpuSampleCallersTreeViewResponse extends TreeViewResponse<FrameNode> {
-
-        public CpuSampleCallersTreeViewResponse(List<IndexedTreeNode<FrameNode>> tree, Map<Integer, String> methodLookup) {
-            super(tree, methodLookup);
-        }
-
-        @Override
-        public List<IndexedTreeNode<FrameNode>> getTree() {
-            return super.getTree();
-        }
-    }
-
-    public static class CpuSampleCalleesTreeViewResponse extends TreeViewResponse<FrameNode> {
-
-        public CpuSampleCalleesTreeViewResponse(List<IndexedTreeNode<FrameNode>> tree, Map<Integer, String> methodLookup) {
-            super(tree, methodLookup);
-        }
-
-        @Override
-        public List<IndexedTreeNode<FrameNode>> getTree() {
-            return super.getTree();
-        }
-    }
 }

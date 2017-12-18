@@ -1,9 +1,9 @@
 package fk.prof.userapi.util;
 
 import fk.prof.storage.StreamTransformer;
-import fk.prof.userapi.ServiceUnavailableException;
-import fk.prof.userapi.api.cache.CachedProfileNotFoundException;
-import fk.prof.userapi.api.cache.ProfileLoadInProgressException;
+import fk.prof.userapi.http.ServiceUnavailableException;
+import fk.prof.userapi.cache.CachedProfileNotFoundException;
+import fk.prof.userapi.cache.ProfileLoadInProgressException;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.buffer.Buffer;
