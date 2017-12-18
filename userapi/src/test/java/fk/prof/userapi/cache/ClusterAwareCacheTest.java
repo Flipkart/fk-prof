@@ -45,7 +45,7 @@ import static org.mockito.Mockito.*;
  * Created by gaurav.ashok on 14/07/17.
  */
 @RunWith(VertxUnitRunner.class)
-public class CacheTest {
+public class ClusterAwareCacheTest {
     private static final int zkPort = 2191;
 
     static {

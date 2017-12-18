@@ -50,13 +50,13 @@ public class ClusterAwareCache {
         this.myIp = config.getIpAddress();
         this.port = config.getHttpConfig().getHttpPort();
 
+        this.workerExecutor = workerExecutor;
+        this.profileLoader = profileLoader;
+
         this.cache = localCache;
         this.cache.setRemovalListener(this::doCleanUpOnEviction);
 
-        this.profileLoader = profileLoader;
         this.cacheInfoRegistry = new ZKBasedCacheInfoRegistry(curatorClient, myIp, port, this.cache::invalidateCache);
-
-        this.workerExecutor = workerExecutor;
     }
 
     public Future<Void> onClusterJoin() {
@@ -78,7 +78,7 @@ public class ClusterAwareCache {
      * - {@link CachedProfileNotFoundException} if found on other node.
      * - {@link ProfileLoadInProgressException} if the profile load is in progress.
      *
-     * @param profileName
+     * @param profileName name of the profile
      * @return Future of AggregatedProfileInfo
      *
      */
@@ -114,9 +114,9 @@ public class ClusterAwareCache {
      * Main method to get the already cached view / create view for the cached profile. If the profile is not cached,
      * the return future will fail according to {@code getAggregatedProfile}.
      *
-     * @param profileName
-     * @param traceName
-     * @param profileViewType
+     * @param profileName name of the profile
+     * @param traceName name of the trace
+     * @param profileViewType type of profileView
      * @return Future containing a pair of trace specific aggregated samples and its view.
      */
     public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>> getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
@@ -163,10 +163,9 @@ public class ClusterAwareCache {
         }
     }
 
-
     /**
      * Event handler for evicted profiles. Deletes the profile -> ip:port mapping fom shared store.
-     * @param onRemoval
+     * @param onRemoval the on removal notification received on an entry removal
      */
     private void doCleanUpOnEviction(RemovalNotification<AggregatedProfileNamingStrategy, Future<AggregatedProfileInfo>> onRemoval) {
         if(!RemovalCause.REPLACED.equals(onRemoval.getCause()) && onRemoval.wasEvicted()) {
@@ -180,9 +179,9 @@ public class ClusterAwareCache {
 
     /**
      * Helper method to complete the future depending upon the state of the cached profile.
-     * @param profileName
-     * @param cachedProfileInfo
-     * @param profileFuture
+     * @param profileName name of the profile
+     * @param cachedProfileInfo future containing the profile
+     * @param profileFuture resulting future to be completed/failed based on cachedProfileInfo's status
      */
     private void completeFuture(AggregatedProfileNamingStrategy profileName, Future<AggregatedProfileInfo> cachedProfileInfo, Future<AggregatedProfileInfo> profileFuture) {
         if (!cachedProfileInfo.isComplete()) {
@@ -198,10 +197,10 @@ public class ClusterAwareCache {
 
     /**
      * Helper method to get/create the view once it has been established that the profile is cached locally.
-     * @param profileName
-     * @param traceName
-     * @param f
-     * @param profileViewType
+     * @param profileName name of the profile
+     * @param traceName name of the trace
+     * @param f future containing the profile and its to be get/created view as a pair
+     * @param profileViewType type of the profileView to be get/created
      */
     private <T extends ProfileView> void getOrCreateView(AggregatedProfileNamingStrategy profileName, String traceName, Future<Pair<AggregatedSamplesPerTraceCtx, T>> f, ProfileViewType profileViewType) {
         Pair<Future<AggregatedProfileInfo>, Cacheable<ProfileView>> profileViewPair = cache.getView(profileName, traceName, profileViewType);
