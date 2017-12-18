@@ -80,7 +80,7 @@ class MethodTreeComponent extends Component {
       if (currUrl === this.url) {
         this.renderData = subTreeRenderData;
         this.asyncStatus = 'SUCCESS';
-        this.forceUpdate(); //Not adviced, but using to avoid a background async completion of a different traceName to update the current state
+        this.forceUpdate(); //Not advised, but using to avoid a background async completion of a different traceName to update the current state
       }
     });
   }
@@ -97,7 +97,7 @@ class MethodTreeComponent extends Component {
         if (currUrl === this.url) {
           this.renderData = subTreeRenderData;
           this.asyncStatus = 'SUCCESS';
-          this.forceUpdate(); //Not adviced, but using to avoid a background async completion of a different traceName to update the current state
+          this.forceUpdate(); //Not advised, but using to avoid a background async completion of a different traceName to update the current state
         }
       });
     }

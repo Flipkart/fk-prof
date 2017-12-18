@@ -8,12 +8,10 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
 import fk.prof.userapi.model.Tree;
-import fk.prof.userapi.model.tree.IndexedTreeNode;
-import fk.prof.userapi.model.tree.TreeViewResponse;
 import fk.prof.userapi.model.tree.CpuSamplingCallTreeViewResponse;
 import fk.prof.userapi.model.tree.CpuSamplingCalleesTreeViewResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import fk.prof.userapi.model.tree.IndexedTreeNode;
+import fk.prof.userapi.model.tree.TreeViewResponse;
 
 import java.io.IOException;
 import java.util.List;
@@ -23,8 +21,6 @@ import java.util.List;
  * Created by gaurav.ashok on 07/08/17.
  */
 public class CustomSerializers {
-    private static final Logger logger = LoggerFactory.getLogger(CustomSerializers.class);
-
     public static void registerSerializers(ObjectMapper om) {
         SimpleModule module = new SimpleModule("customSerializers", new Version(1, 0, 0, null, null, null));
         module.addSerializer(CpuSamplingCallTreeViewResponse.class, new TreeViewResponseSerializer(new IndexedNodeSerializer(new ProtoSerializers.CpuSampleFrameNodeWithStackSampleSerializer())));

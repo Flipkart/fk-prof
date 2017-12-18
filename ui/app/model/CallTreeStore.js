@@ -8,34 +8,23 @@ export default class CallTreeStore {
   }
 
   flatten(respRoot, bodyRoot, parent) {
-    //sorting logic on Object.entries if any
+    //add sorting logic on Object.entries if any
     Object.entries(respRoot).forEach(([k, v]) => {
-      if (k !== 'method_lookup') {
-        this.nodes[parseInt(k)] = [v['data'], v['chld'] ? Object.keys(v['chld']).map(c => parseInt(c)) : (bodyRoot ? [] : undefined), parent];    //nodes at bodyRoot level are guaranteed to have their children in the response
-        if (v['chld']) {
-          this.flatten(v['chld'], false, parseInt(k));
-        }
+      this.nodes[parseInt(k)] = [v['d'], v['c'] ? Object.keys(v['c']).map(c => parseInt(c)) : (bodyRoot ? [] : undefined), parent];    //nodes at bodyRoot level are guaranteed to have their children in the response
+      if (v['c']) {
+        this.flatten(v['c'], false, parseInt(k));
       }
     });
   }
 
   handleResponse(resp, uniqueId) {
-    this.flatten(resp, true, uniqueId === -1? uniqueId: this.nodes[uniqueId][2]);
-    Object.entries(resp['method_lookup']).forEach(([k,v])=>{
-      const splits = v.split(" ");
-      if (splits.length === 2) {
-        resp['method_lookup'][k] = splits;
-      } else {
-        resp['method_lookup'][k] = [v, ""];
-      }
-    });
-    Object.assign(this.methodLookup, resp['method_lookup']);
+    this.flatten(resp, true, uniqueId === -1 ? uniqueId : this.nodes[uniqueId][2]);
     if (uniqueId === -1) {
-      const rootKey = Object.keys(resp).filter(k => k !== 'method_lookup')[0]; // array should be of size 1
-      const rootChld = resp[rootKey]['chld'];
-      delete resp[rootKey];
+      const rootKey = Object.keys(resp)[0]; // array should be of size 1
+      const rootChld = resp[rootKey]['c'];
+      delete resp[rootKey];                 // removing the root of the calltree
       Object.assign(resp, rootChld);
-      this.nodes[uniqueId] = [null, Object.keys(resp).filter((k) => k !== 'method_lookup').map(k => parseInt(k)), undefined];
+      this.nodes[uniqueId] = [null, Object.keys(resp).map(k => parseInt(k)), undefined];
     }
     return this.nodes[uniqueId][1];
   }
@@ -48,7 +37,14 @@ export default class CallTreeStore {
       return Promise.resolve(this.nodes[uniqueId][1]);
     }
     const body = (uniqueId === -1) ? [] : [uniqueId];
-    return postWithRetryOnAccept(this.url, body, 5).then((resp) => this.handleResponse(resp, uniqueId), (err) => Promise.reject((err.response && (err.response.message || err.response.error)) || err));
+    return postWithRetryOnAccept(this.url, body, 5).then((resp) => {
+      Object.entries(resp['method_lookup']).forEach(([k, v]) => {
+        const splits = v.split(" ");
+        resp['method_lookup'][k] = splits.length === 2 ? splits : [v, ""];
+      });
+      Object.assign(this.methodLookup, resp['method_lookup']); //Merging new method names from the response
+      return this.handleResponse(resp['nodes'], uniqueId);
+    }, (err) => Promise.reject((err.response && (err.response.message || err.response.error)) || err));
   }
 
   getMethodName(uniqueId, showLineNo) {

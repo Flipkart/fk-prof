@@ -14,6 +14,8 @@ import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
 import fk.prof.userapi.model.AggregationWindowSummary;
 import fk.prof.userapi.model.ProfileViewType;
 import fk.prof.userapi.model.TreeView;
+import fk.prof.userapi.model.tree.CpuSamplingCallTreeViewResponse;
+import fk.prof.userapi.model.tree.CpuSamplingCalleesTreeViewResponse;
 import fk.prof.userapi.model.tree.IndexedTreeNode;
 import fk.prof.userapi.model.tree.TreeViewResponse;
 import fk.prof.userapi.util.HttpRequestUtil;
@@ -41,7 +43,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static fk.prof.userapi.http.UserapiApiPathConstants.*;
-import static fk.prof.userapi.util.HttpRequestUtil.extractTypedParam;
 import static fk.prof.userapi.util.HttpResponseUtil.setResponse;
 
 /**
@@ -278,7 +279,7 @@ public class HttpVerticle extends AbstractVerticle {
 
           subTree.forEach(e -> e.visit((i, node) -> methodLookup.put(node.getData().getMethodId(), samplesPerTraceCtx.getMethodLookup().get(node.getData().getMethodId()))));
 
-          setResponse(Future.succeededFuture(new TreeViewResponse<>(subTree, methodLookup)), routingContext, true);
+          setResponse(Future.succeededFuture(getTreeViewResponse(profileViewType, subTree, methodLookup)), routingContext, true);
         }
       });
     }
@@ -355,6 +356,14 @@ public class HttpVerticle extends AbstractVerticle {
             UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ar.cause());
             UserapiHttpHelper.handleFailure(context, httpFailure);
         }
+    }
+
+    private TreeViewResponse<AggregatedProfileModel.FrameNode> getTreeViewResponse(ProfileViewType profileViewType, List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> subTree, Map<Integer, String> methodLookup) {
+      switch (profileViewType) {
+        case CALLERS: return new CpuSamplingCallTreeViewResponse(subTree, methodLookup);
+        case CALLEES: return new CpuSamplingCalleesTreeViewResponse(subTree, methodLookup);
+        default: return new TreeViewResponse<>(subTree, methodLookup);
+      }
     }
 
     private void handleGetHealth(RoutingContext routingContext) {

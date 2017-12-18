@@ -8,21 +8,19 @@ export default class HotMethodStore {
   }
 
   deDup(root, topLevel, parent) {
-    //input: {k: {data:{}, chld:{}},...]
+    //input: {k: {d:{}, c:{}},...]
     return Object.entries(root).reduce((accumNodes, [k, v]) => {
-      if (k !== 'method_lookup') {
-        let key = v['data'][0];      //method id
+        let key = v['d'][0];      //method id
         if (!topLevel) {
-          key = key + ':' + v['data'][1];       //add line number if this layer is top layer of hot-method tree
+          key = key + ':' + v['d'][1];       //add line number if this layer is top layer of hot-method tree
         }
         if (accumNodes[key]) {
-          accumNodes[key][3].push([k, v, v['data'][2]]);        //[data, chld, parts]
-          accumNodes[key][0][2] = accumNodes[key][0][2] + v['data'][2];       //adding up the sample count
+          accumNodes[key][3].push([k, v, v['d'][2]]);        //[data, chld, parts]
+          accumNodes[key][0][2] = accumNodes[key][0][2] + v['d'][2];       //adding up the sample count
         } else {
-          const data = Array.from(v['data']);
+          const data = Array.from(v['d']);
           accumNodes[key] = [data, undefined, parent, [[k, v, data[2]]]];        //[data, chld, parent, parts]
         }
-      }
       return accumNodes;
     }, {});
     //output: {name/name:line: [data*, chld*, part]} where parts = [[k, v]...]], data contains aggregated data of same name:line nodes, chld is undefined to be populated later
@@ -42,12 +40,12 @@ export default class HotMethodStore {
       //Try next layer for this aggregated/deDuped node
       const nextLayerNodes = {};
       if (!topLevel) {
-        v[3].filter(([k, v, d]) => v['chld']).forEach(([k, v, d]) => {
-          if (Object.keys(v['chld']).length === 1) {
-            Object.values(v['chld'])[0]['data'][2] = d;
-            Object.assign(nextLayerNodes, v['chld']);
+        v[3].filter(([k, v, d]) => v['c']).forEach(([k, v, d]) => {
+          if (Object.keys(v['c']).length === 1) {
+            Object.values(v['c'])[0]['d'][2] = d;
+            Object.assign(nextLayerNodes, v['c']);
           } else {
-            console.error('hotMethod node should never happen more than one child/hotMethod parent, this has : ', v['chld']);
+            console.error('hotMethod node should never happen more than one child/hotMethod parent, this has : ', v['c']);
           }
         });
         bodyRoot = false;
@@ -70,35 +68,26 @@ export default class HotMethodStore {
 
   handleResponse(resp, uniqueId) {
     if (uniqueId === -1) {
-      this.nodes[uniqueId] = [null, undefined, Object.entries(resp).filter(([k, v]) => k !== 'method_lookup'), undefined];
+      this.nodes[uniqueId] = [null, undefined, Object.entries(resp), undefined];
       this.nodes[uniqueId][1] = this.flatten(resp, uniqueId === -1, true, -1);
     } else {
       const nextLayerNodes = {};
-      this.nodes[uniqueId][3].map(([k, v, d]) => [k, resp[k], d]).filter(([k, v, d]) => v['chld']).forEach(([k, v, d]) => {
-        if (Object.keys(v['chld']).length === 1) {
-          Object.values(v['chld'])[0]['data'][2] = d;
-          Object.assign(nextLayerNodes, v['chld']);
+      this.nodes[uniqueId][3].map(([k, v, d]) => [k, resp[k], d]).filter(([k, v, d]) => v['c']).forEach(([k, v, d]) => {
+        if (Object.keys(v['c']).length === 1) {
+          Object.values(v['c'])[0]['d'][2] = d;
+          Object.assign(nextLayerNodes, v['c']);
         } else {
-          console.error('hotMethod node should never happen more than one child/hotMethod parent, this has : ', v['chld']);
+          console.error('hotMethod node should never happen more than one child/hotMethod parent, this has : ', v['c']);
         }
       });
       this.nodes[uniqueId][1] = this.flatten(nextLayerNodes, uniqueId === -1, true, uniqueId);
     }
-    if (!this.nodes[uniqueId][1]){     //because bodyRoot is true here, see flatten second last if block
+    if (!this.nodes[uniqueId][1]) {     //because bodyRoot is true here, see flatten second last if block
       this.nodes[uniqueId][1] = [];
     }
     if (this.nodes[uniqueId][1] && this.nodes[uniqueId].length === 4) {
       this.nodes[uniqueId].pop();        //if chld is populated then remove parts
     }
-    Object.entries(resp['method_lookup']).forEach(([k,v])=>{
-      const splits = v.split(" ");
-      if (splits.length === 2) {
-        resp['method_lookup'][k] = splits;
-      } else {
-        resp['method_lookup'][k] = [v, ""];
-      }
-    });
-    Object.assign(this.methodLookup, resp['method_lookup']);
     return this.nodes[uniqueId][1];
   }
 
@@ -112,7 +101,14 @@ export default class HotMethodStore {
     }
     //else fetch from api
     const body = (uniqueId === -1) ? [] : this.nodes[uniqueId][3].map(([k, v]) => parseInt(k));    //body contains the parts of the aggregated node at uniqueId
-    return postWithRetryOnAccept(this.url, body, 5).then((resp) => this.handleResponse(resp, uniqueId), (err) => Promise.reject((err.response && (err.response.message || err.response.error)) || err));
+    return postWithRetryOnAccept(this.url, body, 5).then((resp) => {
+        Object.entries(resp['method_lookup']).forEach(([k, v]) => {
+          const splits = v.split(" ");
+          resp['method_lookup'][k] = splits.length === 2 ? splits : [v, ""];
+        });
+        Object.assign(this.methodLookup, resp['method_lookup']); //Merging new method names from the response
+        return this.handleResponse(resp['nodes'], uniqueId);
+      }, (err) => Promise.reject((err.response && (err.response.message || err.response.error)) || err));
   }
 
   getMethodName(uniqueId, showLineNo) {
