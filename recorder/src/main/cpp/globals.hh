@@ -54,6 +54,7 @@ namespace GlobalCtx {
 Profiler *getProfiler();
 void setProfiler(Profiler *p);
 
+const int DEFAULT_FLUSH_BATCH_SIZE = 100;
 const int DEFAULT_SAMPLING_INTERVAL = 1;
 const int DEFAULT_MAX_FRAMES_TO_CAPTURE = 128;
 const int MAX_FRAMES_TO_CAPTURE = 2048;

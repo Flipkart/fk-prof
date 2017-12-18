@@ -18,12 +18,15 @@ public:
     virtual void write_unbuffered(const std::uint8_t* data, std::uint32_t sz, std::uint32_t offset) = 0;
 };
 
+// Writes individual protobuf messages to a byte array
 class ProfileWriter {
 private:
     //MIN_FREE_BUFF should accomodate atleast 4 varint32 values
     static const std::uint32_t MIN_FREE_BUFF = 64;
 
+    // raw bytes writer. can be a http / file writer
     std::shared_ptr<RawWriter> w;
+    
     Checksum chksum;
     Buff &data;
     bool header_written;
@@ -50,26 +53,36 @@ public:
     void flush();
 };
 
-typedef std::uint32_t FlushCtr;
 
 struct SerializationFlushThresholds {
+    
+    typedef std::uint32_t FlushCtr;
+    
     FlushCtr cpu_samples;
+    FlushCtr io_trace_evts;
 
-    SerializationFlushThresholds() : cpu_samples(100) {}
+    SerializationFlushThresholds() : cpu_samples(DEFAULT_FLUSH_BATCH_SIZE), io_trace_evts(DEFAULT_FLUSH_BATCH_SIZE) {
+    }
     ~SerializationFlushThresholds() {}
 };
 
-typedef std::uint32_t TruncationCap;
-
 struct TruncationThresholds {
+    
+    typedef std::uint32_t TruncationCap;
+    
     TruncationCap cpu_samples_max_stack_sz;
+    TruncationCap io_trace_max_stack_sz;
 
-    TruncationThresholds(TruncationCap _cpu_samples_max_stack_sz) : cpu_samples_max_stack_sz(_cpu_samples_max_stack_sz) {}
-    TruncationThresholds() : cpu_samples_max_stack_sz(DEFAULT_MAX_FRAMES_TO_CAPTURE) {}
+    TruncationThresholds(
+            TruncationCap _cpu_samples_max_stack_sz = DEFAULT_MAX_FRAMES_TO_CAPTURE,
+            TruncationCap _io_trace_max_stack_sz = DEFAULT_MAX_FRAMES_TO_CAPTURE)
+    : cpu_samples_max_stack_sz(_cpu_samples_max_stack_sz), io_trace_max_stack_sz(_io_trace_max_stack_sz) {
+    }
     ~TruncationThresholds() {}
 };
 
-class ProfileSerializingWriter : public QueueListener, public SiteResolver::MethodListener {
+// Serializes profiling data by listening to cpu_sample events.
+class ProfileSerializingWriter : public cpu::Queue::Listener, public SiteResolver::MethodListener {
 private:
     jvmtiEnv* jvmti;
     
@@ -95,7 +108,7 @@ private:
     CtxId next_ctx_id;
 
     const SerializationFlushThresholds& sft;
-    FlushCtr cpu_samples_flush_ctr;
+    SerializationFlushThresholds::FlushCtr cpu_samples_flush_ctr;
 
     const TruncationThresholds& trunc_thresholds;
 
@@ -133,7 +146,7 @@ public:
 
     ~ProfileSerializingWriter();
 
-    virtual void record(const Backtrace &trace, ThreadBucket *info = nullptr, std::uint8_t ctx_len = 0, PerfCtx::ThreadTracker::EffectiveCtx* ctx = nullptr, bool default_ctx = false);
+    virtual void record(const cpu::Sample& entry);
 
     virtual MthId recordNewMethod(const jmethodID method_id, const char *file_name, const char *class_name, const char *method_name, const char *method_signature);
 

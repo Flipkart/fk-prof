@@ -26,6 +26,12 @@ pom.xml.versionsBackup
 *.ipr
 *.iws
 *.iml
+*.cproject
+*.classpath
+*.project
+compile_commands.json
+*.vscode
+nbproject
 
 logs/*
 !.gitkeep

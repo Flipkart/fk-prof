@@ -186,7 +186,7 @@ std::tuple<F_mid, F_bci, F_line> fr(F_mid mid, F_bci bci, F_line line) {
     }
 
 
-CircularQueue* bt_q = nullptr;
+cpu::Queue* bt_q = nullptr;
 ThreadBucket* bt_tinfo = nullptr;
 BacktraceError bt_err;
 std::uint32_t native_bt_max_depth = 6;
@@ -198,10 +198,11 @@ std::uniform_int_distribution<int> dist(0, 10000);
 void bt_pusher() {
     STATIC_ARRAY(frames, NativeFrame, native_bt_max_depth, native_bt_max_depth);
     auto len = Stacktraces::fill_backtrace(frames, native_bt_max_depth);
-    bt_q->push(frames, len, bt_err, mark_default_ctx, bt_tinfo);
+    cpu::InMsg m(frames, len, bt_tinfo, bt_err, mark_default_ctx);
+    bt_q->push(m);
 }
 
-void push_native_backtrace(ThreadBucket* t, BacktraceError err, CircularQueue& q, bool default_ctx = false, int capture_bt_at = 4) {
+void push_native_backtrace(ThreadBucket* t, BacktraceError err, cpu::Queue& q, bool default_ctx = false, int capture_bt_at = 4) {
     bt_q = &q;
     bt_err = err;
     bt_tinfo = t;
@@ -252,7 +253,7 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
     TruncationThresholds tts(7);
     ProfileSerializingWriter ps(ti, pw, test_mthd_info_resolver, test_line_no_resolver, reg, sft, tts, 15);
 
-    CircularQueue q(ps, 10);
+    cpu::Queue q(ps, 10);
     
     STATIC_ARRAY(frames, JVMPI_CallFrame, 7, 7);
     JVMPI_CallTrace ct;
@@ -274,7 +275,11 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
 
     t25.ctx_tracker.enter(ctx_foo);
     t25.ctx_tracker.enter(ctx_bar);
-    q.push(ct, BacktraceError::Fkp_no_error, false, ThreadBucket::acq_bucket(&t25));
+    {
+        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+        q.push(m);
+    }
+    
     t25.ctx_tracker.exit(ctx_bar);
     push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q);
     t25.ctx_tracker.exit(ctx_foo);
@@ -296,7 +301,10 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
     ThreadBucket tmain(42, "main thread", 10, false);
     tmain.ctx_tracker.enter(ctx_bar);
     tmain.ctx_tracker.enter(ctx_baz);
-    q.push(ct, BacktraceError::Fkp_no_error, false, ThreadBucket::acq_bucket(&tmain));
+    {
+        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&tmain), BacktraceError::Fkp_no_error, false);
+        q.push(m);
+    }    
     tmain.ctx_tracker.exit(ctx_baz);
 
     frames[0].method_id = mid(c);
@@ -312,13 +320,18 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
     frames[5].method_id = mid(y);
     frames[5].lineno = 30;
     ct.num_frames = 6;
-    q.push(ct, BacktraceError::Fkp_no_error, false, ThreadBucket::acq_bucket(&tmain));
-    
+    {
+        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&tmain), BacktraceError::Fkp_no_error, false);
+        q.push(m);
+    }
     tmain.ctx_tracker.exit(ctx_bar);
 
     frames[0].method_id = mid(c);
     frames[0].lineno = 40;
-    q.push(ct, BacktraceError::Fkp_no_error, true, nullptr);
+    {
+        cpu::InMsg m(ct, nullptr, BacktraceError::Fkp_no_error, true);
+        q.push(m);
+    }
     push_native_backtrace(nullptr, BacktraceError::Fkp_no_jni_env, q, true, 2);
 
     CHECK(q.pop());
@@ -442,7 +455,7 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
     TruncationThresholds tts(7);
     ProfileSerializingWriter ps(ti, pw, test_mthd_info_resolver, test_line_no_resolver, reg, sft, tts, 0);
 
-    CircularQueue q(ps, 10);
+    cpu::Queue q(ps, 10);
     
     //const JVMPI_CallTrace item, ThreadBucket *info = nullptr, std::uint8_t ctx_len = 0, PerfCtx::ThreadTracker::EffectiveCtx* ctx = nullptr
 
@@ -460,7 +473,10 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
     t25.ctx_tracker.enter(ctx_foo);
     t25.ctx_tracker.enter(ctx_bar);
     push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q, false, 0);
-    q.push(ct, BacktraceError::Fkp_no_error, false, ThreadBucket::acq_bucket(&t25));
+    {
+        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+        q.push(m);
+    }
     t25.ctx_tracker.exit(ctx_bar);
     t25.ctx_tracker.exit(ctx_foo);
 
@@ -472,7 +488,10 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
 
     t25.ctx_tracker.enter(ctx_bar);
     t25.ctx_tracker.enter(ctx_foo);
-    q.push(ct, BacktraceError::Fkp_no_error, false, ThreadBucket::acq_bucket(&t25));
+    {
+        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+        q.push(m);
+    }
     t25.ctx_tracker.exit(ctx_foo);
     t25.ctx_tracker.exit(ctx_bar);
 
@@ -566,7 +585,7 @@ TEST(ProfileSerializer__should_auto_flush__at_buffering_threshold) {
     TruncationThresholds tts(7);
     ProfileSerializingWriter ps(ti, pw, test_mthd_info_resolver, test_line_no_resolver, reg, sft, tts, 0);
 
-    CircularQueue q(ps, 10);
+    cpu::Queue q(ps, 10);
     
     STATIC_ARRAY(frames, JVMPI_CallFrame, 7, 7);
     JVMPI_CallTrace ct;
@@ -582,7 +601,8 @@ TEST(ProfileSerializer__should_auto_flush__at_buffering_threshold) {
     t25.ctx_tracker.enter(ctx_foo);
     for (auto i = 0; i < 10; i++) {
         if (i < 5) {
-            q.push(ct, BacktraceError::Fkp_no_error, false, ThreadBucket::acq_bucket(&t25));
+            cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+            q.push(m);
         } else {
             push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q, false, 0);
         }
@@ -591,7 +611,8 @@ TEST(ProfileSerializer__should_auto_flush__at_buffering_threshold) {
         std::uint8_t tmp;
         CHECK_EQUAL(0, buff.read(&tmp, 0, 1, false));
     }
-    q.push(ct, BacktraceError::Fkp_no_error, false, ThreadBucket::acq_bucket(&t25));
+    cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+    q.push(m);
     t25.ctx_tracker.exit(ctx_foo);
     CHECK(q.pop());
 
@@ -681,7 +702,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     TruncationThresholds tts(7);
     ProfileSerializingWriter ps(ti, pw, test_mthd_info_resolver, test_line_no_resolver, reg, sft, tts, 0);
 
-    CircularQueue q(ps, 10);
+    cpu::Queue q(ps, 10);
     
     STATIC_ARRAY(frames0, JVMPI_CallFrame, 7, 7);
     JVMPI_CallTrace ct0;
@@ -711,9 +732,11 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
             ps.flush();//check manual flush interleving
         }
         if (i < 15) {
-            q.push(ct0, BacktraceError::Fkp_no_error, false, ThreadBucket::acq_bucket(&t25));
+            cpu::InMsg m(ct0, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+            q.push(m);
         } else {
-            q.push(ct1, BacktraceError::Fkp_no_error, false, ThreadBucket::acq_bucket(&t10));
+            cpu::InMsg m(ct1, ThreadBucket::acq_bucket(&t10), BacktraceError::Fkp_no_error, false);
+            q.push(m);
         }
         CHECK(q.pop());
     }
@@ -855,7 +878,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     TruncationThresholds tts(7);
     ProfileSerializingWriter ps(ti, pw, test_mthd_info_resolver, test_line_no_resolver, reg, sft, tts, 0);
 
-    CircularQueue q(ps, 10);
+    cpu::Queue q(ps, 10);
 
     ThreadBucket t25(25, "some thread", 8, false);
     ThreadBucket t10(10, "some other thread", 6, true);
@@ -1006,7 +1029,7 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_forte_error) {
     TruncationThresholds tts(7);
     ProfileSerializingWriter ps(ti, pw, test_mthd_info_resolver, test_line_no_resolver, reg, sft, tts, 0);
 
-    CircularQueue q(ps, 10);
+    cpu::Queue q(ps, 10);
     
     //const JVMPI_CallTrace item, ThreadBucket *info = nullptr, std::uint8_t ctx_len = 0, PerfCtx::ThreadTracker::EffectiveCtx* ctx = nullptr
 
@@ -1020,7 +1043,8 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_forte_error) {
         ct.num_frames = 0;
         bool default_ctx = ((i % 2) == 0);
         if (i < 5) {
-            q.push(ct, static_cast<BacktraceError>(i), default_ctx, nullptr);
+            cpu::InMsg m(ct, nullptr, static_cast<BacktraceError>(i), default_ctx);
+            q.push(m);
         } else {
             push_native_backtrace(nullptr, static_cast<BacktraceError>(i), q, default_ctx, 0);
         }
@@ -1109,7 +1133,7 @@ TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
     TruncationThresholds tts(4);
     ProfileSerializingWriter ps(ti, pw, test_mthd_info_resolver, test_line_no_resolver, reg, sft, tts, 0);
 
-    CircularQueue q(ps, 10);
+    cpu::Queue q(ps, 10);
     
     STATIC_ARRAY(frames, JVMPI_CallFrame, 7, 7);
     JVMPI_CallTrace ct;
@@ -1129,7 +1153,8 @@ TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
 
     ThreadBucket t25(25, "Thread No. 25", 5, true);
     t25.ctx_tracker.enter(ctx_foo);
-    q.push(ct, BacktraceError::Fkp_no_error, false, ThreadBucket::acq_bucket(&t25));
+    cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+    q.push(m);
     push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q);//default is 6 frames
     t25.ctx_tracker.exit(ctx_foo);
 
@@ -1254,10 +1279,11 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
 
         ProfileSerializingWriter ps(ti, pw, test_mthd_info_resolver, test_line_no_resolver, reg, sft, tts, 0);
 
-        CircularQueue q(ps, 10);
+        cpu::Queue q(ps, 10);
 
         for (auto i = 0; i < 10 + additional_traces; i++) {
-            q.push(ct0, BacktraceError::Fkp_no_error, false, ThreadBucket::acq_bucket(&t25));
+            cpu::InMsg m(ct0, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+            q.push(m);
             CHECK(q.pop());
         }
         if (additional_traces == 0) {

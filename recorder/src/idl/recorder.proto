@@ -74,14 +74,16 @@ enum WorkType {
   thread_sample_work = 1;
   monitor_contention_work = 2;
   monitor_wait_work = 3;
+  io_trace_work = 4;
 }
 
 message Work {
   required WorkType w_type = 1;
   optional CpuSampleWork cpu_sample = 2;
-  optional ThreadSampleWork thd_sample = 3;
-  optional MonitorContentionWork monitor_block = 4;
-  optional MonitorWaitWork monitor_wait = 5;
+  optional IOTraceWork io_trace = 3;
+  optional ThreadSampleWork thd_sample = 4;
+  optional MonitorContentionWork monitor_block = 5;
+  optional MonitorWaitWork monitor_wait = 6;
 }
 
 message RecordingHeader {
@@ -99,6 +101,7 @@ message Wse {
   optional StackSampleWse thread_sample_entry = 4;
   optional MonitorReportWse monitor_contention_entry = 5;
   optional MonitorReportWse monitor_wait_entry = 6;
+  optional IOTraceWse iotrace_entry = 7;
 }
 
 /* indexed data, incrementally sent  */
@@ -107,6 +110,7 @@ message IndexedData {
   repeated MethodInfo method_info = 2;
   repeated ThreadInfo thread_info = 3;
   repeated MonitorInfo monitor_info = 4;
+  repeated FDInfo fd_info = 5;
 }
 
 message TraceContext {
@@ -159,6 +163,12 @@ message CpuSampleWork {
   optional uint32 serialization_flush_threshold = 3 [default = 100];
 }
 
+message IOTraceWork {
+  required uint32 max_frames = 1;
+  required uint32 stacktrace_latency_threshold_ms = 2;
+  optional uint32 serialization_flush_threshold = 3 [default = 100];
+}
+
 message ThreadSampleWork {
   required uint32 frequency = 1;
   required uint32 max_frames = 2;
@@ -197,6 +207,71 @@ message Frame {
   required int32 bci = 2;
   required int32 line_no = 3;
 }
+
+// File/socket IO
+
+enum FDType {
+  file = 0;
+  filenio = 1;
+  socket = 2;
+  socketnio = 3;
+}
+
+message FileInfo {
+  required string filename = 1;
+  optional string flags = 2;
+}
+
+message SocketInfo {
+  required string address = 1;                  // ip:port
+  required bool connect = 2;                    // to distinguish between accept/connect
+  optional bool blocking = 3 [default = true];
+}
+
+message FDInfo {
+  required uint32 id = 1;
+  required int64 fd = 2;
+  required FDType fd_type = 3;
+  optional FileInfo file_info = 4;
+  optional SocketInfo socket_info = 5;
+}
+
+message IOTraceWse {
+  repeated IOTrace traces = 1;
+}
+
+message IOTrace {
+  required uint32 fd_id = 1;
+  required uint64 ts = 2;
+  required uint64 latency_ns = 3;
+  required IOTraceInfo info = 4;
+  optional StackSample stack = 5;
+}
+
+enum IOTraceType {
+  file_read = 1;
+  file_write = 2;
+  socket_read = 3;
+  socket_write = 4;
+  select = 5;
+}
+
+message FdRead {
+  required uint32 count = 1;
+  optional bool timeout = 2 [default = false];
+}
+
+message FdWrite {
+  required uint32 count = 1;
+}
+
+message IOTraceInfo {
+  required IOTraceType type = 1;
+  optional FdRead read = 2;
+  optional FdWrite write = 3;
+}
+
+// Monitor
 
 message MonitorContentionWork {
   required uint32 max_monitors = 1;

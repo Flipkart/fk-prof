@@ -43,8 +43,6 @@ private:
 
     ThdProcP thd_proc;
 
-    void startCallback(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg);
-
     DISALLOW_COPY_AND_ASSIGN(Processor);
 };
 

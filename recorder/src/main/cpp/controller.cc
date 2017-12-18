@@ -583,11 +583,9 @@ void Controller::retire_work(const std::uint64_t work_id) {
         });
 }
 
-bool has_cpu_sample_work_p(const recording::Work& work) {
-    if (work.has_cpu_sample()) return true;
-    logger->error("Work of CPU-sampling-type {} doesn't have a definition", work.w_type());
-    return false;
-}
+#define has_work_desc(work, worktype)                       \
+    (work.has_##worktype() ? true :                         \
+        (logger->error("work of type: {} doesn't have a definition", work.w_type()), false))
 
 bool Controller::capable(const W& w) {
     for (auto i = 0; i < w.work_size(); i++) {
@@ -600,52 +598,71 @@ bool Controller::capable(const W& w) {
 bool Controller::capable(const recording::Work& work) {
     auto w_type = work.w_type();
     switch(w_type) {
-    case recording::WorkType::cpu_sample_work:
-        return has_cpu_sample_work_p(work) && capable(work.cpu_sample());
-    default:
-        logger->error("Encountered unknown work type {}", w_type);
-        return false;
+        case recording::WorkType::cpu_sample_work:
+            return has_work_desc(work, cpu_sample) && capable(work.cpu_sample());
+        case recording::WorkType::io_trace_work:
+            return has_work_desc(work, io_trace) && capable(work.io_trace());
+        default:
+            logger->error("Encountered unknown work type {}", w_type);
+            return false;
     }
 }
 
 void Controller::prep(const recording::Work& work) {
     auto w_type = work.w_type();
     switch(w_type) {
-    case recording::WorkType::cpu_sample_work:
-        if (has_cpu_sample_work_p(work)) {
-            prep(work.cpu_sample());
-        }
-        return;
-    default:
-        assert(false);
+        case recording::WorkType::cpu_sample_work:
+            if (work.has_cpu_sample()) {
+                prep(work.cpu_sample());
+            }
+            return;
+        case recording::WorkType::io_trace_work:
+            if (work.has_io_trace()) {
+                prep(work.io_trace());
+            }
+            return;
+        default:
+            assert(false);
     }
 }
 
 void Controller::issue(const recording::Work& work, Processes& processes, JNIEnv* env) {
     auto w_type = work.w_type();
     switch(w_type) {
-    case recording::WorkType::cpu_sample_work:
-        if (has_cpu_sample_work_p(work)) {
-            issue(work.cpu_sample(), processes, env);
-            s_v_work_cpu_sampling.update(1);
-        }
-        return;
-    default:
-        assert(false);
+        case recording::WorkType::cpu_sample_work:
+            if (work.has_cpu_sample()) {
+                issue(work.cpu_sample(), processes, env);
+                s_v_work_cpu_sampling.update(1);
+            }
+            return;
+        case recording::WorkType::io_trace_work:
+            if(work.has_io_trace()) {
+                issue(work.io_trace(), processes, env);
+                // TODO: gauge for current running io_trace work
+            }
+            return;
+        default:
+            assert(false);
     }
 }
 
 void Controller::retire(const recording::Work& work) {
     auto w_type = work.w_type();
     switch(w_type) {
-    case recording::WorkType::cpu_sample_work:
-        if (has_cpu_sample_work_p(work)) {
-            retire(work.cpu_sample());
-            s_v_work_cpu_sampling.update(0);
-        }
-        return;
-    default:
-        assert(false);
+        case recording::WorkType::cpu_sample_work:
+            if (work.has_cpu_sample()) {
+                retire(work.cpu_sample());
+                s_v_work_cpu_sampling.update(0);
+            }
+            return;
+        case recording::WorkType::io_trace_work:
+            if(work.has_io_trace()) {
+                retire(work.io_trace());
+                // TODO: update gauge to 0 for io_trace
+            }
+            return;
+        default:
+            assert(false);
     }
 }
 
@@ -694,6 +711,21 @@ void Controller::retire(const recording::CpuSampleWork& csw) {
     logger->info("Stopping cpu-sampling");
     GlobalCtx::recording.cpu_profiler.reset();
 }
+
+bool Controller::capable(const recording::IOTraceWork& csw) {
+    //TODO: check how java agent is loaded. Put a variable that enables/checks instrumentation.
+    return false;
+}
+
+void Controller::prep(const recording::IOTraceWork& csw) {
+    sft.io_trace_evts = csw.serialization_flush_threshold();
+    tts.io_trace_max_stack_sz = Profiler::calculate_max_stack_depth(csw.max_frames());
+    //TODO: 
+}
+
+void Controller::issue(const recording::IOTraceWork& csw, Processes& processes, JNIEnv* env) {}
+
+void Controller::retire(const recording::IOTraceWork& csw) {}
 
 namespace GlobalCtx {
     GlobalCtx::Rec recording;

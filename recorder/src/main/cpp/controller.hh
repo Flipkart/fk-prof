@@ -105,7 +105,12 @@ private:
     void prep(const recording::CpuSampleWork& csw);
     void issue(const recording::CpuSampleWork& csw, Processes& processes, JNIEnv* env);
     void retire(const recording::CpuSampleWork& csw);
-
+    
+    bool capable(const recording::IOTraceWork& csw);
+    void prep(const recording::IOTraceWork& csw);
+    void issue(const recording::IOTraceWork& csw, Processes& processes, JNIEnv* env);
+    void retire(const recording::IOTraceWork& csw);
+    
     static std::uint32_t sampling_freq_to_itvl(std::uint32_t sampling_freq);
 };
 

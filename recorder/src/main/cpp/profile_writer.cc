@@ -112,7 +112,13 @@ ProfileSerializingWriter::CtxId ProfileSerializingWriter::report_ctx(PerfCtx::Tr
     }
 }
 
-void ProfileSerializingWriter::record(const Backtrace &trace, ThreadBucket *info, std::uint8_t ctx_len, PerfCtx::ThreadTracker::EffectiveCtx* ctx, bool default_ctx) {
+void ProfileSerializingWriter::record(const cpu::Sample& entry) {
+    auto& trace = entry.trace;
+    auto info = entry.info;
+    auto ctx_len = entry.ctx_len;
+    auto ctx = &entry.ctx;
+    auto default_ctx = entry.default_ctx;
+    
     if (cpu_samples_flush_ctr >= sft.cpu_samples) flush();
     cpu_samples_flush_ctr++;
     
@@ -169,7 +175,7 @@ void ProfileSerializingWriter::record(const Backtrace &trace, ThreadBucket *info
     }
 
     auto bt_type = trace.type;
-    for (auto i = 0; i < Util::min(static_cast<TruncationCap>(trace.num_frames), trunc_thresholds.cpu_samples_max_stack_sz); i++) {
+    for (auto i = 0; i < Util::min(static_cast<TruncationThresholds::TruncationCap>(trace.num_frames), trunc_thresholds.cpu_samples_max_stack_sz); i++) {
         auto f = ss->add_frame();
         switch (bt_type) {
         case BacktraceType::Java:

@@ -12,7 +12,7 @@ static void handle_profiling_signal(int signum, siginfo_t *info, void *context) 
 }
 
 void Profiler::handle(int signum, siginfo_t *info, void *context) {
-    IMPLICITLY_USE(signum);//TODO: make this reenterant or implement try_lock+backoff
+    IMPLICITLY_USE(signum);
     IMPLICITLY_USE(info);//TODO: put a timer here after perf-tuning medida heavily, we'd dearly love a timer here, but the overhead makes it a no-go as of now.
     s_c_cpu_samp_total.inc();
     JNIEnv *jniEnv = getJNIEnv(jvm);
@@ -48,13 +48,15 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
 
     if (jniEnv != NULL) {
         STATIC_ARRAY(frames, JVMPI_CallFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
+        
         JVMPI_CallTrace trace;
         trace.env_id = jniEnv;
         trace.frames = frames;
         ASGCTType asgct = Asgct::GetAsgct();
         (*asgct)(&trace, capture_stack_depth(), context);
         if (trace.num_frames > 0) {
-            buffer->push(trace, err, default_ctx, thread_info);
+            cpu::InMsg m(trace, thread_info, err, default_ctx);
+            buffer->push(m);
             return; // we got java trace, so bail-out
         }
         if (trace.num_frames <= 0) {
@@ -73,7 +75,8 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
     STATIC_ARRAY(native_trace, NativeFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
 
     auto bt_len = Stacktraces::fill_backtrace(native_trace, capture_stack_depth());
-    buffer->push(native_trace, bt_len, err, default_ctx, thread_info);
+    cpu::InMsg m(native_trace, bt_len, thread_info, err, default_ctx);
+    buffer->push(m);
 }
 
 bool Profiler::start(JNIEnv *jniEnv) {
@@ -113,7 +116,7 @@ std::uint32_t Profiler::calculate_max_stack_depth(std::uint32_t _max_stack_depth
 }
 
 void Profiler::configure() {
-    buffer = new CircularQueue(serializer, capture_stack_depth());
+    buffer = new cpu::Queue(serializer, capture_stack_depth());
 
     handler = new SignalHandler(itvl_min, itvl_max);
     //int processor_interval = Size * itvl_min / 1000 / 2;

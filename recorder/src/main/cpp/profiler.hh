@@ -80,7 +80,7 @@ private:
 
     std::shared_ptr<ProfileWriter> writer;
 
-    CircularQueue *buffer;
+    cpu::Queue *buffer;
 
     SignalHandler* handler;
 
