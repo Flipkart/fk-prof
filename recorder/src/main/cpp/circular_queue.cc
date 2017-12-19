@@ -110,7 +110,7 @@ void cpu::Queue::write(cpu::Sample& entry, StackFrame* fb, const cpu::InMsg& in_
     entry.trace.type = in_msg.type;
     entry.trace.error = in_msg.error;
     entry.info = in_msg.info;
-    entry.ctx_len = (entry.info == nullptr) ? 0 : entry.info->ctx_tracker.current(entry.ctx);
+    entry.ctx_len = (entry.info == nullptr) ? 0 : entry.info->data.ctx_tracker.current(entry.ctx);
     entry.default_ctx = in_msg.default_ctx;
 }
 
@@ -138,7 +138,7 @@ iotrace::InMsg::InMsg(const blocking::BlockingEvt& evt, ThreadBucket* info, cons
 void iotrace::Queue::write(iotrace::Sample& entry, StackFrame* fb, const iotrace::InMsg& in_msg) {
     entry.evt = in_msg.evt;
     entry.info = in_msg.info;
-    entry.ctx_len = (entry.info == nullptr) ? 0 : entry.info->ctx_tracker.current(entry.ctx);
+    entry.ctx_len = (entry.info == nullptr) ? 0 : entry.info->data.ctx_tracker.current(entry.ctx);
     entry.default_ctx = in_msg.default_ctx;
     fb = nullptr;
 }

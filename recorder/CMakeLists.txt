@@ -136,6 +136,8 @@ set(SOURCE_FILES
     ${SRC}/trace.hh
     ${SRC}/thread_map.hh
     ${SRC}/thread_map.cc
+    ${SRC}/fd_map.hh
+    ${SRC}/fd_map.cc
     ${SRC}/concurrent_map.hh
     ${SRC}/concurrent_map.cc
     ${SRC}/profile_writer.cc

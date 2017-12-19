@@ -18,9 +18,9 @@ public class IOTrace {
 
     public static class Socket {
 
-        public static native void accept(int fd, String ip, int port, long ts, long elapsed);
+        public static native void accept(int fd, String address, long ts, long elapsed);
 
-        public static native void connect(int fd, String ip, int port, long ts, long elapsed);
+        public static native void connect(int fd, String address, long ts, long elapsed);
 
         public static native void read(int fd, int count, long ts, long elapsed);
 

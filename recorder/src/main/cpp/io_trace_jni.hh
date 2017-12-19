@@ -21,10 +21,10 @@ extern "C" {
 /*
  * Class:     fk_prof_trace_IOTrace_File
  * Method:    open
- * Signature: (ILjava/lang/String;IJJ)V
+ * Signature: (ILjava/lang/String;JJ)V
  */
 JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File_open
-  (JNIEnv *, jclass, jint, jstring, jint, jlong, jlong);
+  (JNIEnv *, jclass, jint, jstring, jlong, jlong);
 
 /*
  * Class:     fk_prof_trace_IOTrace_File
@@ -56,18 +56,18 @@ extern "C" {
 /*
  * Class:     fk_prof_trace_IOTrace_Socket
  * Method:    accept
- * Signature: (ILjava/lang/String;IJJ)V
+ * Signature: (ILjava/lang/String;JJ)V
  */
 JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_accept
-  (JNIEnv *, jclass, jint, jstring, jint, jlong, jlong);
+  (JNIEnv *, jclass, jint, jstring, jlong, jlong);
 
 /*
  * Class:     fk_prof_trace_IOTrace_Socket
  * Method:    connect
- * Signature: (ILjava/lang/String;IJJ)V
+ * Signature: (ILjava/lang/String;JJ)V
  */
 JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_connect
-  (JNIEnv *, jclass, jint, jstring, jint, jlong, jlong);
+  (JNIEnv *, jclass, jint, jstring, jlong, jlong);
 
 /*
  * Class:     fk_prof_trace_IOTrace_Socket

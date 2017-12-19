@@ -273,16 +273,16 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
 
     ThreadBucket t25(25, "Thread No. 25", 5, true);
 
-    t25.ctx_tracker.enter(ctx_foo);
-    t25.ctx_tracker.enter(ctx_bar);
+    t25.data.ctx_tracker.enter(ctx_foo);
+    t25.data.ctx_tracker.enter(ctx_bar);
     {
-        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+        cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
         q.push(m);
     }
     
-    t25.ctx_tracker.exit(ctx_bar);
-    push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q);
-    t25.ctx_tracker.exit(ctx_foo);
+    t25.data.ctx_tracker.exit(ctx_bar);
+    push_native_backtrace(t25.acquire(), BacktraceError::Fkp_no_error, q);
+    t25.data.ctx_tracker.exit(ctx_foo);
 
     frames[0].method_id = mid(d);
     frames[0].lineno = 10;
@@ -299,13 +299,13 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
     ct.num_frames = 6;
 
     ThreadBucket tmain(42, "main thread", 10, false);
-    tmain.ctx_tracker.enter(ctx_bar);
-    tmain.ctx_tracker.enter(ctx_baz);
+    tmain.data.ctx_tracker.enter(ctx_bar);
+    tmain.data.ctx_tracker.enter(ctx_baz);
     {
-        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&tmain), BacktraceError::Fkp_no_error, false);
+        cpu::InMsg m(ct, tmain.acquire(), BacktraceError::Fkp_no_error, false);
         q.push(m);
     }    
-    tmain.ctx_tracker.exit(ctx_baz);
+    tmain.data.ctx_tracker.exit(ctx_baz);
 
     frames[0].method_id = mid(c);
     frames[0].lineno = 10;
@@ -321,10 +321,10 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
     frames[5].lineno = 30;
     ct.num_frames = 6;
     {
-        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&tmain), BacktraceError::Fkp_no_error, false);
+        cpu::InMsg m(ct, tmain.acquire(), BacktraceError::Fkp_no_error, false);
         q.push(m);
     }
-    tmain.ctx_tracker.exit(ctx_bar);
+    tmain.data.ctx_tracker.exit(ctx_bar);
 
     frames[0].method_id = mid(c);
     frames[0].lineno = 40;
@@ -470,15 +470,15 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
     ct.num_frames = 2;
 
     ThreadBucket t25(25, "some thread", 8, false);
-    t25.ctx_tracker.enter(ctx_foo);
-    t25.ctx_tracker.enter(ctx_bar);
-    push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q, false, 0);
+    t25.data.ctx_tracker.enter(ctx_foo);
+    t25.data.ctx_tracker.enter(ctx_bar);
+    push_native_backtrace(t25.acquire(), BacktraceError::Fkp_no_error, q, false, 0);
     {
-        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+        cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
         q.push(m);
     }
-    t25.ctx_tracker.exit(ctx_bar);
-    t25.ctx_tracker.exit(ctx_foo);
+    t25.data.ctx_tracker.exit(ctx_bar);
+    t25.data.ctx_tracker.exit(ctx_foo);
 
     frames[0].method_id = mid(y);
     frames[0].lineno = 10;
@@ -486,14 +486,14 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
     frames[1].lineno = 20;
     ct.num_frames = 2;
 
-    t25.ctx_tracker.enter(ctx_bar);
-    t25.ctx_tracker.enter(ctx_foo);
+    t25.data.ctx_tracker.enter(ctx_bar);
+    t25.data.ctx_tracker.enter(ctx_foo);
     {
-        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+        cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
         q.push(m);
     }
-    t25.ctx_tracker.exit(ctx_foo);
-    t25.ctx_tracker.exit(ctx_bar);
+    t25.data.ctx_tracker.exit(ctx_foo);
+    t25.data.ctx_tracker.exit(ctx_bar);
 
     CHECK(q.pop());
     CHECK(q.pop());
@@ -598,22 +598,22 @@ TEST(ProfileSerializer__should_auto_flush__at_buffering_threshold) {
     ct.num_frames = 2;
 
     ThreadBucket t25(25, "some thread", 8, false);
-    t25.ctx_tracker.enter(ctx_foo);
+    t25.data.ctx_tracker.enter(ctx_foo);
     for (auto i = 0; i < 10; i++) {
         if (i < 5) {
-            cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+            cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
             q.push(m);
         } else {
-            push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q, false, 0);
+            push_native_backtrace(t25.acquire(), BacktraceError::Fkp_no_error, q, false, 0);
         }
         CHECK(q.pop());
 
         std::uint8_t tmp;
         CHECK_EQUAL(0, buff.read(&tmp, 0, 1, false));
     }
-    cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+    cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
     q.push(m);
-    t25.ctx_tracker.exit(ctx_foo);
+    t25.data.ctx_tracker.exit(ctx_foo);
     CHECK(q.pop());
 
     const std::size_t one_meg = 1024 * 1024;
@@ -725,23 +725,23 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
 
     ThreadBucket t25(25, "some thread", 8, false);
     ThreadBucket t10(10, "some other thread", 6, true);
-    t25.ctx_tracker.enter(ctx_foo);
-    t10.ctx_tracker.enter(ctx_bar);
+    t25.data.ctx_tracker.enter(ctx_foo);
+    t10.data.ctx_tracker.enter(ctx_bar);
     for (auto i = 0; i < 26; i++) {
         if (i == 15) {
             ps.flush();//check manual flush interleving
         }
         if (i < 15) {
-            cpu::InMsg m(ct0, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+            cpu::InMsg m(ct0, t25.acquire(), BacktraceError::Fkp_no_error, false);
             q.push(m);
         } else {
-            cpu::InMsg m(ct1, ThreadBucket::acq_bucket(&t10), BacktraceError::Fkp_no_error, false);
+            cpu::InMsg m(ct1, t10.acquire(), BacktraceError::Fkp_no_error, false);
             q.push(m);
         }
         CHECK(q.pop());
     }
-    t25.ctx_tracker.exit(ctx_foo);
-    t10.ctx_tracker.exit(ctx_bar);
+    t25.data.ctx_tracker.exit(ctx_foo);
+    t10.data.ctx_tracker.exit(ctx_bar);
 
     const std::size_t one_meg = 1024 * 1024;
     std::shared_ptr<std::uint8_t> tmp_buff(new std::uint8_t[one_meg], std::default_delete<std::uint8_t[]>());
@@ -882,21 +882,21 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
 
     ThreadBucket t25(25, "some thread", 8, false);
     ThreadBucket t10(10, "some other thread", 6, true);
-    t25.ctx_tracker.enter(ctx_foo);
-    t10.ctx_tracker.enter(ctx_bar);
+    t25.data.ctx_tracker.enter(ctx_foo);
+    t10.data.ctx_tracker.enter(ctx_bar);
     for (auto i = 0; i < 26; i++) {
         if (i == 15) {
             ps.flush();//check manual flush interleving
         }
         if (i < 15) {
-            push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q, false, 0);
+            push_native_backtrace(t25.acquire(), BacktraceError::Fkp_no_error, q, false, 0);
         } else {
-            push_native_backtrace(ThreadBucket::acq_bucket(&t10), BacktraceError::Fkp_no_error, q, false, 1);
+            push_native_backtrace(t10.acquire(), BacktraceError::Fkp_no_error, q, false, 1);
         }
         CHECK(q.pop());
     }
-    t25.ctx_tracker.exit(ctx_foo);
-    t10.ctx_tracker.exit(ctx_bar);
+    t25.data.ctx_tracker.exit(ctx_foo);
+    t10.data.ctx_tracker.exit(ctx_bar);
 
     const std::size_t one_meg = 1024 * 1024;
     std::shared_ptr<std::uint8_t> tmp_buff(new std::uint8_t[one_meg], std::default_delete<std::uint8_t[]>());
@@ -1152,11 +1152,11 @@ TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
     ct.num_frames = 5;
 
     ThreadBucket t25(25, "Thread No. 25", 5, true);
-    t25.ctx_tracker.enter(ctx_foo);
-    cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+    t25.data.ctx_tracker.enter(ctx_foo);
+    cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
     q.push(m);
-    push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q);//default is 6 frames
-    t25.ctx_tracker.exit(ctx_foo);
+    push_native_backtrace(t25.acquire(), BacktraceError::Fkp_no_error, q);//default is 6 frames
+    t25.data.ctx_tracker.exit(ctx_foo);
 
     CHECK(q.pop());
     CHECK(q.pop());
@@ -1272,7 +1272,7 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
     ct0.num_frames = 2;
 
     ThreadBucket t25(25, "some thread", 8, false);
-    t25.ctx_tracker.enter(ctx_foo);
+    t25.data.ctx_tracker.enter(ctx_foo);
     {
         //destructor is the cue for EoF
         ProfileWriter pw(raw_w_ptr, pw_buff);
@@ -1282,7 +1282,7 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
         cpu::Queue q(ps, 10);
 
         for (auto i = 0; i < 10 + additional_traces; i++) {
-            cpu::InMsg m(ct0, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+            cpu::InMsg m(ct0, t25.acquire(), BacktraceError::Fkp_no_error, false);
             q.push(m);
             CHECK(q.pop());
         }
@@ -1290,7 +1290,7 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
             ps.flush();
         }
     }
-    t25.ctx_tracker.exit(ctx_foo);
+    t25.data.ctx_tracker.exit(ctx_foo);
 
     buff.readonly();
 

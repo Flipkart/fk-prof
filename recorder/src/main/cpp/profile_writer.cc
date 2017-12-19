@@ -136,10 +136,10 @@ void ProfileSerializingWriter::record(const cpu::Sample& entry) {
             known_threads.insert({local_thd_id, thd_id});
             auto ti = idx_dat->add_thread_info();
             ti->set_thread_id(thd_id);
-            ti->set_thread_name(info->name);
-            ti->set_priority(info->priority);
-            ti->set_is_daemon(info->is_daemon);
-            ti->set_tid(info->tid);
+            ti->set_thread_name(info->data.name);
+            ti->set_priority(info->data.priority);
+            ti->set_is_daemon(info->data.is_daemon);
+            ti->set_tid(info->data.tid);
             ss->set_thread_id(thd_id);
             s_c_new_thd_info.inc();
         } else {

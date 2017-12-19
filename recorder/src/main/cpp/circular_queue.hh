@@ -67,7 +67,7 @@ namespace cpu {
     struct Sample {
         std::atomic<int> is_committed;
         Backtrace trace;
-        ThreadBucket *info;
+        ThreadBucket* info;
         PerfCtx::ThreadTracker::EffectiveCtx ctx;
         std::uint8_t ctx_len;
         bool default_ctx;
@@ -113,7 +113,7 @@ namespace iotrace {
     struct Sample {
         std::atomic<int> is_committed;
         blocking::BlockingEvt evt;
-        ThreadBucket *info;
+        ThreadBucket* info;
         PerfCtx::ThreadTracker::EffectiveCtx ctx;
         std::uint8_t ctx_len;
         bool default_ctx;

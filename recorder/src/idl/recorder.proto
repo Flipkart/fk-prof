@@ -24,6 +24,9 @@ message RecorderCapabilities {
   optional bool can_trace_elapsed_time = 2 [default = false];
   optional bool can_trace_offcpu_time = 3 [default = false];
   optional bool can_trace_alloc = 4 [default = false];
+  optional bool can_trace_io = 5 [default = false];
+  optional bool can_trace_monitor = 6 [default = false];
+  optional bool can_instrument_java = 7 [default = false];
 };
 
 message AssignedBackend {
@@ -101,7 +104,7 @@ message Wse {
   optional StackSampleWse thread_sample_entry = 4;
   optional MonitorReportWse monitor_contention_entry = 5;
   optional MonitorReportWse monitor_wait_entry = 6;
-  optional IOTraceWse iotrace_entry = 7;
+  optional IOTraceWse io_trace_entry = 7;
 }
 
 /* indexed data, incrementally sent  */
@@ -163,12 +166,6 @@ message CpuSampleWork {
   optional uint32 serialization_flush_threshold = 3 [default = 100];
 }
 
-message IOTraceWork {
-  required uint32 max_frames = 1;
-  required uint32 stacktrace_latency_threshold_ms = 2;
-  optional uint32 serialization_flush_threshold = 3 [default = 100];
-}
-
 message ThreadSampleWork {
   required uint32 frequency = 1;
   required uint32 max_frames = 2;
@@ -210,6 +207,12 @@ message Frame {
 
 // File/socket IO
 
+message IOTraceWork {
+  required uint32 max_frames = 1;
+  required uint32 latency_threshold_ms = 2;
+  optional uint32 serialization_flush_threshold = 3 [default = 100];
+}
+
 enum FDType {
   file = 0;
   filenio = 1;
@@ -241,11 +244,13 @@ message IOTraceWse {
 }
 
 message IOTrace {
-  required uint32 fd_id = 1;
-  required uint64 ts = 2;
-  required uint64 latency_ns = 3;
-  required IOTraceInfo info = 4;
-  optional StackSample stack = 5;
+  required IOTraceType type = 1;
+  required uint32 fd_id = 2;
+  required uint64 ts = 3;
+  required uint64 latency_ns = 4;
+  optional FdRead read = 5;
+  optional FdWrite write = 6;
+  optional StackSample stack = 7;
 }
 
 enum IOTraceType {
@@ -263,12 +268,6 @@ message FdRead {
 
 message FdWrite {
   required uint32 count = 1;
-}
-
-message IOTraceInfo {
-  required IOTraceType type = 1;
-  optional FdRead read = 2;
-  optional FdWrite write = 3;
 }
 
 // Monitor
