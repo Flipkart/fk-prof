@@ -14,37 +14,12 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
   private static final Map<String, ClassInstrumentHooks> INSTRUMENTED_CLASSES = new HashMap<>();
   private ClassPool pool;
 
-  private static class MethodInstrumentHooks {
-    public final MethodBciHook entry;
-    public final MethodBciHook exit;
-
-    public MethodInstrumentHooks(MethodBciHook entry, MethodBciHook exit) {
-      this.entry = entry;
-      this.exit = exit;
-    }
-  }
-
-  private static class ConstructorInstrumentHooks {
-    public final ConstructorBciHook entry;
-    public final ConstructorBciHook exit;
-
-    public ConstructorInstrumentHooks(ConstructorBciHook entry, ConstructorBciHook exit) {
-      this.entry = entry;
-      this.exit = exit;
-    }
-  }
-
-  private static class ClassInstrumentHooks {
-    public final Map<String, MethodInstrumentHooks> methods = new HashMap<>();
-    public final Map<String, ConstructorInstrumentHooks> constructors = new HashMap<>();
-  }
-
   static {
     String klass;
     ClassInstrumentHooks hooks;
 
-    MethodInstrumentHooks fs_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_fileStream_mexit);
-    MethodInstrumentHooks fs_open = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_fileStream_mexit);
+    EntryExitHooks<CtMethod> fs_default = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_fileStream_mexit);
+    EntryExitHooks<CtMethod> fs_open = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_fileStream_mexit);
 
     klass = "java.io.FileInputStream";
     hooks = new ClassInstrumentHooks();
@@ -57,10 +32,10 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     //creates recursion with print statements in bci code. uncomment when moving to jni and add hooks for open, write, close
 //    klass = "java.io.FileOutputStream";
 
-    MethodInstrumentHooks sock_input_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockStream_input_mexit);
-    MethodInstrumentHooks sock_output_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockStream_output_mexit);
-    MethodInstrumentHooks sock_connect = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sock_connect_mexit);
-    MethodInstrumentHooks sock_accept = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sock_accept_mexit);
+    EntryExitHooks<CtMethod> sock_input_default = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockStream_input_mexit);
+    EntryExitHooks<CtMethod> sock_output_default = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockStream_output_mexit);
+    EntryExitHooks<CtMethod> sock_connect = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sock_connect_mexit);
+    EntryExitHooks<CtMethod> sock_accept = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sock_accept_mexit);
 
     klass = "java.net.SocketInputStream";
     hooks = new ClassInstrumentHooks();
@@ -84,8 +59,8 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     INSTRUMENTED_CLASSES.put(klass, hooks);
     hooks.methods.put("accept()Ljava/net/Socket;", sock_accept);
 
-    MethodInstrumentHooks sock_ch_connect = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockCh_connect_mexit);
-    ConstructorInstrumentHooks sock_ch_ctr = new ConstructorInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_centry, ProfileMethodTransformer::instrument_sock_ch_cexit);
+    EntryExitHooks<CtMethod> sock_ch_connect = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockCh_connect_mexit);
+    EntryExitHooks<CtConstructor> sock_ch_ctr = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_centry, ProfileMethodTransformer::instrument_sock_ch_cexit);
 
     klass = "sun.nio.ch.SocketChannelImpl";
     hooks = new ClassInstrumentHooks();
@@ -93,8 +68,8 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     hooks.methods.put("connect(Ljava/net/SocketAddress;)Z", sock_ch_connect);
     hooks.constructors.put("SocketChannelImpl(Ljava/nio/channels/spi/SelectorProvider;Ljava/io/FileDescriptor;Ljava/net/InetSocketAddress;)V", sock_ch_ctr);
 
-    MethodInstrumentHooks ioutil_read = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_ioutil_read_mexit);
-    MethodInstrumentHooks ioutil_write = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_ioutil_write_mexit);
+    EntryExitHooks<CtMethod> ioutil_read = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_ioutil_read_mexit);
+    EntryExitHooks<CtMethod> ioutil_write = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_ioutil_write_mexit);
 
     klass = "sun.nio.ch.IOUtil";
     hooks = new ClassInstrumentHooks();
@@ -136,7 +111,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
           if (instrumentHooks.methods.size() > 0) {
             for (CtMethod currentMethod : cclass.getDeclaredMethods()) {
               System.out.println("Declared method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
-              MethodInstrumentHooks hooks;
+              EntryExitHooks<CtMethod> hooks;
               if (((hooks = instrumentHooks.methods.get(currentMethod.getName() + currentMethod.getSignature())) != null) && !Modifier.isNative(currentMethod.getModifiers()) && !currentMethod.isEmpty()) {
                 System.out.println("Transformed method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
                 if (hooks.entry != null) {
@@ -154,7 +129,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
           if (instrumentHooks.constructors.size() > 0) {
             for (CtConstructor constructor : cclass.getDeclaredConstructors()) {
               System.out.println("Declared constructor=" + constructor.getLongName() + " identifier=" + constructor.getName() + constructor.getSignature());
-              ConstructorInstrumentHooks hooks;
+              EntryExitHooks<CtConstructor> hooks;
               if ((hooks = instrumentHooks.constructors.get(constructor.getName() + constructor.getSignature())) != null) {
                 System.out.println("Transformed constructor=" + constructor.getLongName() + " identifier=" + constructor.getName() + constructor.getSignature());
                 if (hooks.entry != null) {
