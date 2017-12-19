@@ -8,8 +8,7 @@ import java.security.ProtectionDomain;
 import java.util.*;
 
 public class ProfileMethodTransformer implements ClassFileTransformer {
-  private static final String elapsedLocalVar = "$$$_elpsed";
-  private static final String fdLocalVar = "$$$_fd";
+
 
   private static final Map<String, ClassInstrumentHooks> INSTRUMENTED_CLASSES = new HashMap<>();
   private ClassPool pool;
@@ -18,24 +17,24 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     String klass;
     ClassInstrumentHooks hooks;
 
-    EntryExitHooks<CtMethod> fs_default = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_fileStream_mexit);
-    EntryExitHooks<CtMethod> fs_open = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_fileStream_mexit);
+    EntryExitHooks<CtMethod> fs_read = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::fileStream_read_mexit);
+    EntryExitHooks<CtMethod> fs_open = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::fileStream_open_mexit);
 
     klass = "java.io.FileInputStream";
     hooks = new ClassInstrumentHooks();
     INSTRUMENTED_CLASSES.put(klass, hooks);
     hooks.methods.put("open(Ljava/lang/String;)V", fs_open);
-    hooks.methods.put("read()I", fs_default);
-    hooks.methods.put("read([B)I", fs_default);
-    hooks.methods.put("read([BII)I", fs_default);
+    hooks.methods.put("read()I", fs_read);
+    hooks.methods.put("read([B)I", fs_read);
+    hooks.methods.put("read([BII)I", fs_read);
 
     //creates recursion with print statements in bci code. uncomment when moving to jni and add hooks for open, write, close
 //    klass = "java.io.FileOutputStream";
 
-    EntryExitHooks<CtMethod> sock_input_default = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockStream_input_mexit);
-    EntryExitHooks<CtMethod> sock_output_default = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockStream_output_mexit);
-    EntryExitHooks<CtMethod> sock_connect = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sock_connect_mexit);
-    EntryExitHooks<CtMethod> sock_accept = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sock_accept_mexit);
+    EntryExitHooks<CtMethod> sock_input_default = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::sockStream_input_mexit);
+    EntryExitHooks<CtMethod> sock_output_default = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::sockStream_output_mexit);
+    EntryExitHooks<CtMethod> sock_connect = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::sock_connect_mexit);
+    EntryExitHooks<CtMethod> sock_accept = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::sock_accept_mexit);
 
     klass = "java.net.SocketInputStream";
     hooks = new ClassInstrumentHooks();
@@ -59,8 +58,8 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     INSTRUMENTED_CLASSES.put(klass, hooks);
     hooks.methods.put("accept()Ljava/net/Socket;", sock_accept);
 
-    EntryExitHooks<CtMethod> sock_ch_connect = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_sockCh_connect_mexit);
-    EntryExitHooks<CtConstructor> sock_ch_ctr = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_centry, ProfileMethodTransformer::instrument_sock_ch_cexit);
+    EntryExitHooks<CtMethod> sock_ch_connect = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::sockCh_connect_mexit);
+    EntryExitHooks<CtConstructor> sock_ch_ctr = new EntryExitHooks<>(Instrumenter.ConstructorEntry::elapsed_centry, Instrumenter.ConstructorExit::sock_ch_cexit);
 
     klass = "sun.nio.ch.SocketChannelImpl";
     hooks = new ClassInstrumentHooks();
@@ -68,8 +67,8 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     hooks.methods.put("connect(Ljava/net/SocketAddress;)Z", sock_ch_connect);
     hooks.constructors.put("SocketChannelImpl(Ljava/nio/channels/spi/SelectorProvider;Ljava/io/FileDescriptor;Ljava/net/InetSocketAddress;)V", sock_ch_ctr);
 
-    EntryExitHooks<CtMethod> ioutil_read = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_ioutil_read_mexit);
-    EntryExitHooks<CtMethod> ioutil_write = new EntryExitHooks<>(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_ioutil_write_mexit);
+    EntryExitHooks<CtMethod> ioutil_read = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::ioutil_read_mexit);
+    EntryExitHooks<CtMethod> ioutil_write = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::ioutil_write_mexit);
 
     klass = "sun.nio.ch.IOUtil";
     hooks = new ClassInstrumentHooks();
@@ -93,6 +92,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
       if(className == null) {
         return null;
       }
+
       String normalizedClassName = className.replaceAll("/", ".");
       if(INSTRUMENTED_CLASSES.get(normalizedClassName) == null) {
         return null;
@@ -101,50 +101,10 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
       pool.insertClassPath(new ByteArrayClassPath(className, classfileBuffer));
       CtClass cclass = pool.get(normalizedClassName);
       boolean modified = false;
-
       if (!cclass.isFrozen()) {
 //        System.out.println("EDITABLE CLASS=" + cclass.getName());
         ClassInstrumentHooks instrumentHooks = INSTRUMENTED_CLASSES.get(cclass.getName());
-
-        if (instrumentHooks != null) {
-
-          if (instrumentHooks.methods.size() > 0) {
-            for (CtMethod currentMethod : cclass.getDeclaredMethods()) {
-              System.out.println("Declared method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
-              EntryExitHooks<CtMethod> hooks;
-              if (((hooks = instrumentHooks.methods.get(currentMethod.getName() + currentMethod.getSignature())) != null) && !Modifier.isNative(currentMethod.getModifiers()) && !currentMethod.isEmpty()) {
-                System.out.println("Transformed method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
-                if (hooks.entry != null) {
-                  hooks.entry.apply(currentMethod);
-                  modified = true;
-                }
-                if (hooks.exit != null) {
-                  hooks.exit.apply(currentMethod);
-                  modified = true;
-                }
-              }
-            }
-          }
-
-          if (instrumentHooks.constructors.size() > 0) {
-            for (CtConstructor constructor : cclass.getDeclaredConstructors()) {
-              System.out.println("Declared constructor=" + constructor.getLongName() + " identifier=" + constructor.getName() + constructor.getSignature());
-              EntryExitHooks<CtConstructor> hooks;
-              if ((hooks = instrumentHooks.constructors.get(constructor.getName() + constructor.getSignature())) != null) {
-                System.out.println("Transformed constructor=" + constructor.getLongName() + " identifier=" + constructor.getName() + constructor.getSignature());
-                if (hooks.entry != null) {
-                  hooks.entry.apply(constructor);
-                  modified = true;
-                }
-                if (hooks.exit != null) {
-                  hooks.exit.apply(constructor);
-                  modified = true;
-                }
-              }
-            }
-          }
-
-        }
+        modified = instrumentHooks != null && instrumentHooks.apply(cclass);
       }
 
       if(modified) {
@@ -156,134 +116,6 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     return null;
   }
 
-  private static void instrument_elapsed_mentry(CtMethod m) throws Exception {
-    String jStr = "";
-    m.addLocalVariable(elapsedLocalVar, CtClass.longType);
-    jStr += elapsedLocalVar + " = System.currentTimeMillis();";
-    m.insertBefore(jStr);
-  }
-
-  private static void instrument_fileStream_mexit(CtMethod m) throws Exception {
-    String jStr = "";
-    jStr += codebuild_calculateElapsedMillis();
-    jStr += codebuild_fileStream_saveFDToLocalVar();
-    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": name=\" + this.path + \" FD=\" + $$$_fd + \" elapsed=\" + " + elapsedLocalVar + ");";
-    //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
-    m.insertAfter(jStr, true);
-  }
-
-  private static void instrument_sockStream_input_mexit(CtMethod m) throws Exception {
-    String jStr = "";
-    jStr += codebuild_calculateElapsedMillis();
-    jStr += codebuild_sockStream_saveFDToLocalVar();
-    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" return=\" + $_ + \" elapsed=\" + " + elapsedLocalVar + ");";
-    m.insertAfter(jStr, true);
-  }
-
-  private static void instrument_sockStream_output_mexit(CtMethod m) throws Exception {
-    String jStr = "";
-    jStr += codebuild_calculateElapsedMillis();
-    jStr += codebuild_sockStream_saveFDToLocalVar();
-    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" written=\" + $3 + \" elapsed=\" + " + elapsedLocalVar + ");";
-    m.insertAfter(jStr, true);
-  }
-
-  private static void instrument_sock_connect_mexit(CtMethod m) throws Exception {
-    String jStr = "";
-    jStr += codebuild_calculateElapsedMillis();
-    jStr += codebuild_sockStream_saveFDToLocalVar();
-    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" connected=\" + connected + \" addr=\" + $1 + \" elapsed=\" + " + elapsedLocalVar + ");";
-    m.insertAfter(jStr, true);
-  }
-
-  private static void instrument_sock_accept_mexit(CtMethod m) throws Exception {
-    String jStr = "";
-    jStr += codebuild_calculateElapsedMillis();
-    jStr += codebuild_sock_accept_saveFDToLocalVar();
-    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" connected=\" + ($_ == null ? null : $_.isConnected()) + \" addr=\" + ($_ == null ? null : $_.getInetAddress()) + \" elapsed=\" + " + elapsedLocalVar + ");";
-    m.insertAfter(jStr, true);
-  }
-
-  private static void instrument_sockCh_connect_mexit(CtMethod m) throws Exception {
-    String jStr = "";
-    jStr += codebuild_calculateElapsedMillis();
-    jStr += codebuild_sockCh_saveFDToLocalVar();
-    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" remote_addr=\" + $1 + \" elapsed=\" + " + elapsedLocalVar + ");";
-    m.insertAfter(jStr, true);
-  }
-
-  private static void instrument_ioutil_read_mexit(CtMethod m) throws Exception {
-    String jStr = "";
-    jStr += codebuild_calculateElapsedMillis();
-    jStr += codebuild_ioUtil_saveFDToLocalVar();
-    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" read=\" + $_ + \" elapsed=\" + " + elapsedLocalVar + ");";
-    m.insertAfter(jStr, true);
-  }
-
-  private static void instrument_ioutil_write_mexit(CtMethod m) throws Exception {
-    String jStr = "";
-    jStr += codebuild_calculateElapsedMillis();
-    jStr += codebuild_ioUtil_saveFDToLocalVar();
-    jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" written=\" + $_ + \" elapsed=\" + " + elapsedLocalVar + ");";
-    m.insertAfter(jStr, true);
-  }
-
-
-  private static void instrument_elapsed_centry(CtConstructor c) throws Exception {
-    String jStr = "";
-    c.addLocalVariable(elapsedLocalVar, CtClass.longType);
-    jStr += elapsedLocalVar + " = System.currentTimeMillis();";
-    c.insertBefore(jStr);
-  }
-
-  private static void instrument_sock_ch_cexit(CtConstructor c) throws Exception {
-    String jStr = "";
-    jStr += codebuild_calculateElapsedMillis();
-    jStr += codebuild_sockCh_saveFDToLocalVar();
-    jStr += "System.out.println(\"CONSTRUCTOR=" + c.getLongName() + ": FD=\" + $$$_fd + \" remote_addr=\" + $3 + \" elapsed=\" + " + elapsedLocalVar + ");";
-    c.insertAfter(jStr, true);
-  }
-
-
-  private static String codebuild_calculateElapsedMillis() {
-    return elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
-  }
-
-  private static String codebuild_fileStream_saveFDToLocalVar() {
-    String jStr = "";
-    jStr += "java.lang.reflect.Field fdField = this.fd == null ? null : this.fd.getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt(this.fd) : -1;";
-    return jStr;
-  }
-
-  private static String codebuild_sock_accept_saveFDToLocalVar() {
-    String jStr = "";
-    jStr += "java.lang.reflect.Field fdField = ($_ == null || $_.getImpl() == null || $_.getImpl().getFileDescriptor() == null) ? null : $_.getImpl().getFileDescriptor().getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt($_.getImpl().getFileDescriptor()) : -1;";
-    return jStr;
-  }
-
-  private static String codebuild_sockStream_saveFDToLocalVar() {
-    String jStr = "";
-    jStr += "java.lang.reflect.Field fdField = (this.impl == null || this.impl.getFileDescriptor() == null) ? null : this.impl.getFileDescriptor().getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt(this.impl.getFileDescriptor()) : -1;";
-    return jStr;
-  }
-
-  private static String codebuild_ioUtil_saveFDToLocalVar() {
-    String jStr = "";
-    jStr += "java.lang.reflect.Field fdField = $1 == null ? null : $1.getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt($1) : -1;";
-    return jStr;
-  }
-
-  private static String codebuild_sockCh_saveFDToLocalVar() {
-    return "int " + fdLocalVar + " = fdVal;";
-  }
 
 }
 
@@ -352,7 +184,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
 
 
 //Not necessary if channel impl classes are instrumented correctly
-//    MethodInstrumentHooks net_connect = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_elapsed_mentry, ProfileMethodTransformer::instrument_net_connect_mexit);
+//    MethodInstrumentHooks net_connect = new MethodInstrumentHooks(Instrumenter::elapsed_mentry, Instrumenter::instrument_net_connect_mexit);
 //    klass = "sun.nio.ch.Net";
 //    hooks = new ClassInstrumentHooks();
 //    INSTRUMENTED_CLASSES.put(klass, hooks);
