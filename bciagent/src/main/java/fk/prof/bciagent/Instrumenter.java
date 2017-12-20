@@ -10,7 +10,7 @@ public class Instrumenter {
 
   static class MethodEntry {
 
-    static void elapsed_mentry(CtMethod m) throws Exception {
+    static void elapsed(CtMethod m) throws Exception {
       String jStr = "";
       m.addLocalVariable(elapsedLocalVar, CtClass.longType);
       jStr += elapsedLocalVar + " = System.currentTimeMillis();";
@@ -21,7 +21,7 @@ public class Instrumenter {
 
   static class MethodExit {
 
-    static void fileStream_open_mexit(CtMethod m) throws Exception {
+    static void fs_open(CtMethod m) throws Exception {
       String jStr = "";
       jStr += codebuild_calculateElapsedMillis();
       jStr += codebuild_fileStream_saveFDToLocalVar();
@@ -30,7 +30,7 @@ public class Instrumenter {
       m.insertAfter(jStr, true);
     }
 
-    static void fileStream_read_mexit(CtMethod m) throws Exception {
+    static void fs_read(CtMethod m) throws Exception {
       String jStr = "";
       jStr += codebuild_calculateElapsedMillis();
       jStr += codebuild_fileStream_saveFDToLocalVar();
@@ -39,7 +39,7 @@ public class Instrumenter {
       m.insertAfter(jStr, true);
     }
 
-    static void sockStream_input_mexit(CtMethod m) throws Exception {
+    static void ss_read(CtMethod m) throws Exception {
       String jStr = "";
       jStr += codebuild_calculateElapsedMillis();
       jStr += codebuild_sockStream_saveFDToLocalVar();
@@ -47,7 +47,7 @@ public class Instrumenter {
       m.insertAfter(jStr, true);
     }
 
-    static void sockStream_output_mexit(CtMethod m) throws Exception {
+    static void ss_write(CtMethod m) throws Exception {
       String jStr = "";
       jStr += codebuild_calculateElapsedMillis();
       jStr += codebuild_sockStream_saveFDToLocalVar();
@@ -55,7 +55,7 @@ public class Instrumenter {
       m.insertAfter(jStr, true);
     }
 
-    static void sock_connect_mexit(CtMethod m) throws Exception {
+    static void sock_connect(CtMethod m) throws Exception {
       String jStr = "";
       jStr += codebuild_calculateElapsedMillis();
       jStr += codebuild_sockStream_saveFDToLocalVar();
@@ -63,7 +63,7 @@ public class Instrumenter {
       m.insertAfter(jStr, true);
     }
 
-    static void sock_accept_mexit(CtMethod m) throws Exception {
+    static void sock_accept(CtMethod m) throws Exception {
       String jStr = "";
       jStr += codebuild_calculateElapsedMillis();
       jStr += codebuild_sock_accept_saveFDToLocalVar();
@@ -71,7 +71,7 @@ public class Instrumenter {
       m.insertAfter(jStr, true);
     }
 
-    static void sockCh_connect_mexit(CtMethod m) throws Exception {
+    static void sockCh_connect(CtMethod m) throws Exception {
       String jStr = "";
       jStr += codebuild_calculateElapsedMillis();
       jStr += codebuild_sockCh_saveFDToLocalVar();
@@ -79,7 +79,7 @@ public class Instrumenter {
       m.insertAfter(jStr, true);
     }
 
-    static void ioutil_read_mexit(CtMethod m) throws Exception {
+    static void ioutil_read(CtMethod m) throws Exception {
       String jStr = "";
       jStr += codebuild_calculateElapsedMillis();
       jStr += codebuild_ioUtil_saveFDToLocalVar();
@@ -87,7 +87,7 @@ public class Instrumenter {
       m.insertAfter(jStr, true);
     }
 
-    static void ioutil_write_mexit(CtMethod m) throws Exception {
+    static void ioutil_write(CtMethod m) throws Exception {
       String jStr = "";
       jStr += codebuild_calculateElapsedMillis();
       jStr += codebuild_ioUtil_saveFDToLocalVar();
@@ -99,7 +99,7 @@ public class Instrumenter {
 
   static class ConstructorEntry {
 
-    static void elapsed_centry(CtConstructor c) throws Exception {
+    static void elapsed(CtConstructor c) throws Exception {
       String jStr = "";
       c.addLocalVariable(elapsedLocalVar, CtClass.longType);
       jStr += elapsedLocalVar + " = System.currentTimeMillis();";
@@ -110,7 +110,7 @@ public class Instrumenter {
 
   static class ConstructorExit {
 
-    static void sock_ch_cexit(CtConstructor c) throws Exception {
+    static void sockCh(CtConstructor c) throws Exception {
       String jStr = "";
       jStr += codebuild_calculateElapsedMillis();
       jStr += codebuild_sockCh_saveFDToLocalVar();

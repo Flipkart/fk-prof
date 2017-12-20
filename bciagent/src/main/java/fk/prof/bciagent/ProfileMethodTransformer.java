@@ -17,8 +17,8 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     String klass;
     ClassInstrumentHooks hooks;
 
-    EntryExitHooks<CtMethod> fs_read = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::fileStream_read_mexit);
-    EntryExitHooks<CtMethod> fs_open = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::fileStream_open_mexit);
+    EntryExitHooks<CtMethod> fs_read = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::fs_read);
+    EntryExitHooks<CtMethod> fs_open = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::fs_open);
 
     klass = "java.io.FileInputStream";
     hooks = new ClassInstrumentHooks();
@@ -31,10 +31,10 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     //creates recursion with print statements in bci code. uncomment when moving to jni and add hooks for open, write, close
 //    klass = "java.io.FileOutputStream";
 
-    EntryExitHooks<CtMethod> sock_input_default = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::sockStream_input_mexit);
-    EntryExitHooks<CtMethod> sock_output_default = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::sockStream_output_mexit);
-    EntryExitHooks<CtMethod> sock_connect = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::sock_connect_mexit);
-    EntryExitHooks<CtMethod> sock_accept = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::sock_accept_mexit);
+    EntryExitHooks<CtMethod> sock_input_default = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::ss_read);
+    EntryExitHooks<CtMethod> sock_output_default = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::ss_write);
+    EntryExitHooks<CtMethod> sock_connect = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::sock_connect);
+    EntryExitHooks<CtMethod> sock_accept = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::sock_accept);
 
     klass = "java.net.SocketInputStream";
     hooks = new ClassInstrumentHooks();
@@ -58,8 +58,8 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     INSTRUMENTED_CLASSES.put(klass, hooks);
     hooks.methods.put("accept()Ljava/net/Socket;", sock_accept);
 
-    EntryExitHooks<CtMethod> sock_ch_connect = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::sockCh_connect_mexit);
-    EntryExitHooks<CtConstructor> sock_ch_ctr = new EntryExitHooks<>(Instrumenter.ConstructorEntry::elapsed_centry, Instrumenter.ConstructorExit::sock_ch_cexit);
+    EntryExitHooks<CtMethod> sock_ch_connect = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::sockCh_connect);
+    EntryExitHooks<CtConstructor> sock_ch_ctr = new EntryExitHooks<>(Instrumenter.ConstructorEntry::elapsed, Instrumenter.ConstructorExit::sockCh);
 
     klass = "sun.nio.ch.SocketChannelImpl";
     hooks = new ClassInstrumentHooks();
@@ -67,8 +67,8 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     hooks.methods.put("connect(Ljava/net/SocketAddress;)Z", sock_ch_connect);
     hooks.constructors.put("SocketChannelImpl(Ljava/nio/channels/spi/SelectorProvider;Ljava/io/FileDescriptor;Ljava/net/InetSocketAddress;)V", sock_ch_ctr);
 
-    EntryExitHooks<CtMethod> ioutil_read = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::ioutil_read_mexit);
-    EntryExitHooks<CtMethod> ioutil_write = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed_mentry, Instrumenter.MethodExit::ioutil_write_mexit);
+    EntryExitHooks<CtMethod> ioutil_read = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::ioutil_read);
+    EntryExitHooks<CtMethod> ioutil_write = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::ioutil_write);
 
     klass = "sun.nio.ch.IOUtil";
     hooks = new ClassInstrumentHooks();
@@ -184,7 +184,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
 
 
 //Not necessary if channel impl classes are instrumented correctly
-//    MethodInstrumentHooks net_connect = new MethodInstrumentHooks(Instrumenter::elapsed_mentry, Instrumenter::instrument_net_connect_mexit);
+//    MethodInstrumentHooks net_connect = new MethodInstrumentHooks(Instrumenter::elapsed, Instrumenter::instrument_net_connect_mexit);
 //    klass = "sun.nio.ch.Net";
 //    hooks = new ClassInstrumentHooks();
 //    INSTRUMENTED_CLASSES.put(klass, hooks);
