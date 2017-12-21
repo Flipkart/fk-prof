@@ -89,7 +89,7 @@ void JNICALL OnVMInit(jvmtiEnv *jvmti, JNIEnv *jniEnv, jthread thread) {
     metrics_thd = start_new_thd(jniEnv, jvmti, "Fk-Prof Metrics Reporter", metrics_poller, nullptr);
     
     // load IOTRace class and initialize the local iotrace object.
-    get_io_tracer_config().onVMinit(jvmti, jniEnv);
+    getIOTracerConfig().onVMInit(jvmti, jniEnv);
     
     controller->start();
 }
@@ -109,7 +109,7 @@ void JNICALL OnVMDeath(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
     IMPLICITLY_USE(jvmti_env);
     IMPLICITLY_USE(jni_env);
     
-    get_io_tracer_config().onVMDeath(jvmti_env, jni_env);
+    getIOTracerConfig().onVMDeath(jvmti_env, jni_env);
 }
 
 static bool PrepareJvmti(jvmtiEnv *jvmti) {

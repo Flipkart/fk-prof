@@ -13,11 +13,11 @@ public:
         return initialised;
     }
 
-    void onVMinit(jvmtiEnv *jvmti, JNIEnv *jniEnv);
+    void onVMInit(jvmtiEnv *jvmti, JNIEnv *jniEnv);
 
     void onVMDeath(jvmtiEnv *jvmti, JNIEnv *jniEnv);
 
-    void set_latency_threshold(JNIEnv* jniEnv, std::int64_t threshold);
+    void setLatencyThreshold(JNIEnv* jniEnv, std::int64_t threshold);
 
 private:
 
@@ -31,7 +31,7 @@ private:
 class IOTracer : public Process {
 public:
 
-    IOTracer(JavaVM* _jvm, jvmtiEnv* _jvmtiEnv, ThreadMap& _thread_map, FdMap& _fd_map, iotrace::Queue::Listener& _serializer, std::int64_t _latency_threshold, std::uint32_t _max_stack_depth);
+    IOTracer(JavaVM* _jvm, jvmtiEnv* _jvmti_env, ThreadMap& _thread_map, FdMap& _fd_map, iotrace::Queue::Listener& _serializer, std::int64_t _latency_threshold, std::uint32_t _max_stack_depth);
 
     bool start();
 
@@ -39,23 +39,23 @@ public:
 
     void stop() override;
     
-    void record_socket_read(JNIEnv* jniEnv, fd_type_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count, bool timeout);
+    void recordSocketRead(JNIEnv* jni_env, fd_type_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count, bool timeout);
     
-    void record_socket_write(JNIEnv* jniEnv, fd_type_t fd,std::uint64_t ts, std::uint64_t latency_ns, int count);
+    void recordSocketWrite(JNIEnv* jni_env, fd_type_t fd,std::uint64_t ts, std::uint64_t latency_ns, int count);
     
-    void record_file_read(JNIEnv* jniEnv, fd_type_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count);
+    void recordFileRead(JNIEnv* jni_env, fd_type_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count);
     
-    void record_file_write(JNIEnv* jniEnv, fd_type_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count);
+    void recordFileWrite(JNIEnv* jni_env, fd_type_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count);
     
     ~IOTracer();
 
 private:
     
-    void record(JNIEnv* jniEnv, blocking::BlockingEvt& evt);
+    void record(JNIEnv* jni_env, blocking::BlockingEvt& evt);
     
     JavaVM* jvm;
     
-    jvmtiEnv* jvmtiEnv;
+    jvmtiEnv* jvmti_env;
 
     ThreadMap& thread_map;
 
@@ -72,6 +72,6 @@ private:
     DISALLOW_COPY_AND_ASSIGN(IOTracer);
 };
 
-IOTracerConfig& get_io_tracer_config();
+IOTracerConfig& getIOTracerConfig();
 
 #endif /* IO_TRACER_HH */

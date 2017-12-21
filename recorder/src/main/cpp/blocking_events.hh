@@ -18,14 +18,14 @@ namespace blocking {
     
     // Events related to read/write events on file descriptors.
     struct FdReadEvt {
-        FdInfo* fd;
+        FdBucket* fd;
         // bytes read/write 
         int count;
         bool timeout;
     };
     
     struct FdWriteEvt {
-        FdInfo* fd;
+        FdBucket* fd;
         int count;
     };
     

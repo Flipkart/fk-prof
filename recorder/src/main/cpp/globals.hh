@@ -115,10 +115,10 @@ const int MAX_FRAMES_TO_CAPTURE = 2048;
     }                                                                          \
   }
 
-#define JNI_EXCEPTION_CHECK(errmsg)                                            \
+#define JNI_EXCEPTION_CHECK(jni_env, errmsg)                                            \
   {                                                                            \
-    if(jniEnv->ExceptionCheck()) {                                             \
-        jniEnv->ExceptionClear();                                              \
+    if(jni_env->ExceptionCheck()) {                                             \
+        jni_env->ExceptionClear();                                              \
         logger->error(errmsg);                                                 \
         return;                                                                \
     }                                                                          \

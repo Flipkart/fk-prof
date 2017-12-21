@@ -12,15 +12,15 @@ enum FdType {
 
 struct FdInfo {
     FdType type;
-    std::string targetPath;
+    std::string targe_path;
     bool connect;       // to distinguish between connected/accepted socket connection
     
     static FdInfo file(const char* path) {
         return FdInfo {File, std::string(path), false};
     }
     
-    static FdInfo socket(const char* remotePath, bool connect) {
-        return FdInfo {Socket, std::string(remotePath), connect};
+    static FdInfo socket(const char* remote_path, bool connect) {
+        return FdInfo {Socket, std::string(remote_path), connect};
     }
 };
 
@@ -44,7 +44,7 @@ public:
     
     void putFileInfo(fd_type_t fd, const char* path);
     
-    void putSocketInfo(fd_type_t fd, const char* remotePath, bool connect);
+    void putSocketInfo(fd_type_t fd, const char* remote_path, bool connect);
 
     Value* get(fd_type_t fd);
 
@@ -53,6 +53,6 @@ public:
 
 typedef FdMapBase FdMap;
 typedef FdMap::Value FdBucket;
-FdMap& get_fd_map();
+FdMap& getFdMap();
 
 #endif /* FD_MAP_HH */

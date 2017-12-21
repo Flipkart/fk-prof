@@ -1,6 +1,6 @@
 #include "fd_map.hh"
 
-static const int kInitialMapSize = 1024;
+static const int INITIAL_MAP_SIZE = 1024;
 
 void FdMapBase::put(map::KeyType key, Value* info) {
     add_to_values(info);
@@ -16,9 +16,9 @@ void FdMapBase::putFileInfo(fd_type_t fd, const char* path) {
     put(toKey(fd), info);
 }
 
-void FdMapBase::putSocketInfo(fd_type_t fd, const char* remotePath, bool connect) {
-    logger->info("Socket {} : '{}'", connect ? "connected" : "accepted", remotePath);
-    Value *info = new Value(FdInfo::socket(remotePath, connect));
+void FdMapBase::putSocketInfo(fd_type_t fd, const char* remote_path, bool connect) {
+    logger->info("Socket {} : '{}'", connect ? "connected" : "accepted", remote_path);
+    Value *info = new Value(FdInfo::socket(remote_path, connect));
     put(toKey(fd), info);
 }
 
@@ -35,7 +35,7 @@ FdMapBase::Value* FdMapBase::get(fd_type_t fd) {
 void FdMapBase::remove(fd_type_t fd) {
     Value* info = (Value*) map.remove(toKey(fd));
     if (info != nullptr) {
-        logger->info("{} closed : '{}'", info->data.type == File ? "File" : "Socket", info->data.targetPath);
+        logger->info("{} closed : '{}'", info->data.type == File ? "File" : "Socket", info->data.targe_path);
         remove_and_release(info);
     }
 }
@@ -43,8 +43,8 @@ void FdMapBase::remove(fd_type_t fd) {
 /*
  * global fd_map
  */
-FdMap fd_map(kInitialMapSize);
+FdMap fd_map(INITIAL_MAP_SIZE);
 
-FdMap& get_fd_map() {
+FdMap& getFdMap() {
     return fd_map;
 }
