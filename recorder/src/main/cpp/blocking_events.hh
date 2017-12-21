@@ -2,6 +2,7 @@
 #define BLOCKING_EVENTS_HH
 
 #include <stdint.h>
+#include "fd_map.hh"
 
 namespace blocking {
     
@@ -17,14 +18,14 @@ namespace blocking {
     
     // Events related to read/write events on file descriptors.
     struct FdReadEvt {
-        int fd;
+        FdInfo* fd;
         // bytes read/write 
         int count;
         bool timeout;
     };
     
     struct FdWriteEvt {
-        int fd;
+        FdInfo* fd;
         int count;
     };
     

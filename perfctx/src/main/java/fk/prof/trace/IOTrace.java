@@ -6,7 +6,7 @@ public class IOTrace {
      * Threshold in nanoseconds.
      * Blocking IO calls that takes more time than this threshold shall be recorded.
      */
-    private static long latencyThreshold = Long.MAX_VALUE;
+    private static volatile long latencyThreshold = Long.MAX_VALUE;
 
     public static long getLatencyThresholdNanos() {
         return latencyThreshold;

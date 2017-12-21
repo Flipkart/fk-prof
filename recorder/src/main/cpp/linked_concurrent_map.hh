@@ -25,11 +25,11 @@ public:
         template <typename... Args>
         Value(Args&&... args) : data(std::forward<Args>(args)...), refs(1) {}
         
-        Value(Data _data) : data(_data), refs(1) {}
+        Value(const Data& _data) : data(_data), refs(1) {}
         
         void release() {
             int prev = refs.fetch_sub(1, std::memory_order_acquire);
-            if (prev == 1 && links.next == nullptr && links.prev == nullptr) {
+            if (prev == 1) {
                 delete this;
             }
         }

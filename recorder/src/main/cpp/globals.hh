@@ -115,12 +115,21 @@ const int MAX_FRAMES_TO_CAPTURE = 2048;
     }                                                                          \
   }
 
+#define JNI_EXCEPTION_CHECK(errmsg)                                            \
+  {                                                                            \
+    if(jniEnv->ExceptionCheck()) {                                             \
+        jniEnv->ExceptionClear();                                              \
+        logger->error(errmsg);                                                 \
+        return;                                                                \
+    }                                                                          \
+  }
+
 #define DISALLOW_COPY_AND_ASSIGN(TypeName)                                     \
-  TypeName(const TypeName &);                                                  \
-  void operator=(const TypeName &)
+  TypeName(const TypeName &) = delete;                                                  \
+  void operator=(const TypeName &) = delete;
 
 #define DISALLOW_IMPLICIT_CONSTRUCTORS(TypeName)                               \
-  TypeName();                                                                  \
+  TypeName() = delete;                                                                  \
   DISALLOW_COPY_AND_ASSIGN(TypeName)
 
 // Short version: reinterpret_cast produces undefined behavior in many
@@ -128,9 +137,7 @@ const int MAX_FRAMES_TO_CAPTURE = 2048;
 template<class Dest, class Source>
 inline Dest bit_cast(const Source &source) {
     // Compile time assertion: sizeof(Dest) == sizeof(Source)
-    // A compile error here means your Dest and Source have different sizes.
-    typedef char VerifySizesAreEqual[sizeof(Dest) == sizeof(Source) ? 1 : -1]
-            __attribute__((unused));
+    static_assert(sizeof(Dest) == sizeof(Source), "Dest and Source have different sizes");
 
     Dest dest;
     memcpy(&dest, &source, sizeof(dest));

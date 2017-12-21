@@ -99,6 +99,7 @@ void Profiler::stop() {
     }
 
     handler->stopSigprof();
+    running = false;
 }
 
 void Profiler::set_sampling_freq(std::uint32_t sampling_freq) {
