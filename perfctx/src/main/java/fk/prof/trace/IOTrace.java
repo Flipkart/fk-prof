@@ -22,7 +22,7 @@ public class IOTrace {
 
         public static native void connect(int fd, String address, long ts, long elapsed);
 
-        public static native void read(int fd, int count, long ts, long elapsed);
+        public static native void read(int fd, int count, long ts, long elapsed, boolean timeout);
 
         public static native void write(int fd, int count, long ts, long elapsed);
 

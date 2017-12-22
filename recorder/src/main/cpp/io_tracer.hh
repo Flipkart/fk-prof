@@ -13,11 +13,11 @@ public:
         return initialised;
     }
 
-    void onVMInit(jvmtiEnv *jvmti, JNIEnv *jniEnv);
+    void onVMInit(jvmtiEnv *jvmti, JNIEnv *jni_env);
 
-    void onVMDeath(jvmtiEnv *jvmti, JNIEnv *jniEnv);
+    void onVMDeath(jvmtiEnv *jvmti, JNIEnv *jni_env);
 
-    void setLatencyThreshold(JNIEnv* jniEnv, std::int64_t threshold);
+    void setLatencyThreshold(JNIEnv* jni_env, std::int64_t threshold);
 
 private:
 

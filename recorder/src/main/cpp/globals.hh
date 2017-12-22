@@ -115,21 +115,21 @@ const int MAX_FRAMES_TO_CAPTURE = 2048;
     }                                                                          \
   }
 
-#define JNI_EXCEPTION_CHECK(jni_env, errmsg)                                            \
+#define JNI_EXCEPTION_CHECK(jni_env, errmsg)                                   \
   {                                                                            \
-    if(jni_env->ExceptionCheck()) {                                             \
-        jni_env->ExceptionClear();                                              \
+    if(jni_env->ExceptionCheck()) {                                            \
+        jni_env->ExceptionClear();                                             \
         logger->error(errmsg);                                                 \
         return;                                                                \
     }                                                                          \
   }
 
 #define DISALLOW_COPY_AND_ASSIGN(TypeName)                                     \
-  TypeName(const TypeName &) = delete;                                                  \
+  TypeName(const TypeName &) = delete;                                         \
   void operator=(const TypeName &) = delete;
 
 #define DISALLOW_IMPLICIT_CONSTRUCTORS(TypeName)                               \
-  TypeName() = delete;                                                                  \
+  TypeName() = delete;                                                         \
   DISALLOW_COPY_AND_ASSIGN(TypeName)
 
 // Short version: reinterpret_cast produces undefined behavior in many

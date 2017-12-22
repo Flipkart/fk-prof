@@ -72,10 +72,10 @@ JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_connect
 /*
  * Class:     fk_prof_trace_IOTrace_Socket
  * Method:    read
- * Signature: (IIJJ)V
+ * Signature: (IIJJZ)V
  */
 JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_read
-  (JNIEnv *, jclass, jint, jint, jlong, jlong);
+  (JNIEnv *, jclass, jint, jint, jlong, jlong, jboolean);
 
 /*
  * Class:     fk_prof_trace_IOTrace_Socket
