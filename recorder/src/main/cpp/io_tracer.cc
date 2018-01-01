@@ -1,7 +1,8 @@
 #include "io_tracer.hh"
 #include "io_trace_jni.hh"
+#include "bci_jni.hh"
 
-void IOTracerConfig::onVMInit(jvmtiEnv* jvmti, JNIEnv* jni_env) {
+void IOTracerJavaState::onVMInit(jvmtiEnv* jvmti, JNIEnv* jni_env) {
     if (initialised) return;
 
     jclass local_ref = jni_env->FindClass("fk/prof/trace/IOTrace");
@@ -16,49 +17,53 @@ void IOTracerConfig::onVMInit(jvmtiEnv* jvmti, JNIEnv* jni_env) {
     initialised = true;
 }
 
-void IOTracerConfig::onVMDeath(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
+void IOTracerJavaState::onVMDeath(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
     if (!initialised) return;
 
     jni_env->DeleteGlobalRef(io_trace_class);
 }
 
-void IOTracerConfig::setLatencyThreshold(JNIEnv* jni_env, std::int64_t threshold) {
+void IOTracerJavaState::setLatencyThreshold(JNIEnv* jni_env, std::int64_t threshold) {
     if (!initialised) return;
 
     jni_env->CallStaticVoidMethod(io_trace_class, latency_threshold_setter, (jlong) threshold);
 }
 
-const std::int64_t IOTracerConfig::default_latency_threshold = std::numeric_limits<std::int64_t>::max();
-
-// global IOtraceJni
-IOTracerConfig io_tracer_config;
-
-IOTracerConfig& getIOTracerConfig() {
-    return io_tracer_config;
+void IOTracerJavaState::failBciFor(const char* class_name) {
+    std::lock_guard<std::mutex> lock(mutex);
+    bci_failed.emplace_back(std::string(class_name));
 }
 
-IOTracer::IOTracer(JavaVM* _jvm, jvmtiEnv* _jvmti_env, ThreadMap& _thread_map, FdMap& _fd_map, iotrace::Queue::Listener& _serializer, std::int64_t _latency_threshold, std::uint32_t _max_stack_depth)
-: jvm(_jvm), jvmti_env(_jvmti_env), thread_map(_thread_map), fd_map(_fd_map), latency_threshold(_latency_threshold), max_stack_depth(_max_stack_depth), evt_queue(_serializer, _max_stack_depth) {
+const std::int64_t IOTracerJavaState::default_latency_threshold = std::numeric_limits<std::int64_t>::max();
+
+// global IOtrace java state
+IOTracerJavaState io_tracer_js;
+
+IOTracerJavaState& getIOTracerJavaState() {
+    return io_tracer_js;
+}
+
+IOTracer::IOTracer(JavaVM* _jvm, jvmtiEnv* _jvmti_env, ThreadMap& _thread_map, FdMap& _fd_map, iotrace::Queue::Listener& _serializer, std::int64_t _latency_threshold_ns, std::uint32_t _max_stack_depth)
+: jvm(_jvm), jvmti_env(_jvmti_env), thread_map(_thread_map), fd_map(_fd_map), latency_threshold_ns(_latency_threshold_ns), max_stack_depth(_max_stack_depth), evt_queue(_serializer, _max_stack_depth) {
 }
 
 IOTracer::~IOTracer() {
 }
 
-bool IOTracer::start() {
+bool IOTracer::start(JNIEnv* jni_env) {
     if (running) {
         logger->warn("IOTracer.start when it is already running");
         return true;
     }
-
-    JNIEnv* jni_env = getJNIEnv(jvm);
-    getIOTracerConfig().setLatencyThreshold(jni_env, latency_threshold);
+    
+    getIOTracerJavaState().setLatencyThreshold(jni_env, latency_threshold_ns);
     running = true;
     return true;
 }
 
 void IOTracer::stop() {
     JNIEnv* jni_env = getJNIEnv(jvm);
-    getIOTracerConfig().setLatencyThreshold(jni_env, IOTracerConfig::default_latency_threshold);
+    getIOTracerJavaState().setLatencyThreshold(jni_env, IOTracerJavaState::default_latency_threshold);
     running = false;
 }
 
@@ -140,6 +145,8 @@ void IOTracer::record(JNIEnv* jni_env, blocking::BlockingEvt& evt) {
     evt_queue.push(iotrace::InMsg(evt, thd_info, frames, frame_count, default_context));
 }
 
+/* JNI implementation */
+
 JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File_open(JNIEnv* jni_env, jclass , jint fd, jstring path, jlong ts, jlong latency) {
     const char* path_str = jni_env->GetStringUTFChars(path, nullptr);
     getFdMap().putFileInfo(fd, path_str);
@@ -184,4 +191,14 @@ JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_write(JNIEnv* jni_
     IOTracer* tracer = nullptr;
     if(tracer != nullptr)
         tracer->recordSocketWrite(jni_env, fd, ts, latency, count);
+}
+
+JNIEXPORT void JNICALL Java_fk_prof_bciagent_ProfileMethodTransformer_bciStarted(JNIEnv* jni_env, jclass ) {
+    getIOTracerJavaState().setBciStarted();
+}
+
+JNIEXPORT void JNICALL Java_fk_prof_bciagent_ProfileMethodTransformer_bciFailed(JNIEnv* jni_env, jclass , jstring class_name) {
+    const char* class_name_str = jni_env->GetStringUTFChars(class_name, nullptr);
+    getIOTracerJavaState().failBciFor(class_name_str);
+    jni_env->ReleaseStringUTFChars(class_name, class_name_str);
 }

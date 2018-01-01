@@ -25,8 +25,6 @@ public class IOTrace {
         public static native void read(int fd, int count, long ts, long elapsed, boolean timeout);
 
         public static native void write(int fd, int count, long ts, long elapsed);
-
-        // TODO finalize signature for select
     }
 
     public static class File {

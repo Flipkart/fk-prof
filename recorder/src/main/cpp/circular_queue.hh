@@ -119,7 +119,7 @@ namespace iotrace {
 
     struct Sample {
         std::atomic<int> is_committed;
-        ThreadBucket* info;
+        ThreadBucket* thd_info;
         blocking::BlockingEvt evt;
         Backtrace trace;
         PerfCtx::ThreadTracker::EffectiveCtx ctx;

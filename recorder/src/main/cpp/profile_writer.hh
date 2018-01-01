@@ -47,12 +47,11 @@ public:
     ~ProfileWriter();
 
     void write_header(const recording::RecordingHeader& rh);
-
-    void append_wse(const recording::Wse& e);
+    
+    void write_recording(const recording::Recording& recording);
 
     void flush();
 };
-
 
 struct SerializationFlushThresholds {
     
@@ -81,14 +80,15 @@ struct TruncationThresholds {
     ~TruncationThresholds() {}
 };
 
-// Serializes profiling data by listening to cpu_sample events.
-class ProfileSerializingWriter : public cpu::Queue::Listener, public SiteResolver::MethodListener {
+// Serializes profiling data by listening to events.
+class ProfileSerializingWriter : public cpu::Queue::Listener, public iotrace::Queue::Listener, public SiteResolver::MethodListener {
 private:
     jvmtiEnv* jvmti;
     
     typedef std::int64_t MthId;
     typedef std::int64_t ThdId;
     typedef std::uint32_t CtxId;
+    typedef std::uint32_t FdId;
     typedef SiteResolver::Addr Pc;
     typedef std::int32_t PcOffset;
     
@@ -97,18 +97,23 @@ private:
     SiteResolver::LineNoResolver lnr;
     PerfCtx::Registry& reg;
 
-    recording::Wse cpu_sample_accumulator;
+    recording::Recording recording;
+    recording::Wse* cpu_samples_accumulator;
+    recording::Wse* io_trace_accumulator;
     
     std::unordered_map<MthId, MthId> known_methods;
     std::unordered_map<Pc, std::pair<MthId, PcOffset>> known_symbols;
     MthId next_mthd_id;
-    std::unordered_map<ThdId, ThdId> known_threads;
+    std::unordered_map<uintptr_t, ThdId> known_threads;
     ThdId next_thd_id;
     std::unordered_map<PerfCtx::TracePt, CtxId> known_ctxs;
     CtxId next_ctx_id;
+    std::unordered_map<uintptr_t, FdId> known_fds;
+    FdId next_fd_id;
 
     const SerializationFlushThresholds& sft;
     SerializationFlushThresholds::FlushCtr cpu_samples_flush_ctr;
+    SerializationFlushThresholds::FlushCtr io_evts_flush_ctr;
 
     const TruncationThresholds& trunc_thresholds;
 
@@ -128,6 +133,10 @@ private:
     SiteResolver::SymInfo syms;
 
     CtxId report_ctx(PerfCtx::TracePt trace_pt);
+    
+    ThdId report_thd_info(const ThreadBucket* const thd_bucket);
+    
+    FdId report_fd_info(const FdBucket* const fd_bucket);
 
     void fill_frame(const JVMPI_CallFrame& jvmpi_cf, recording::Frame* f);
 
@@ -138,7 +147,18 @@ private:
     CtxId report_new_ctx(const std::string& name, const bool is_generated, const std::uint8_t coverage_pct, const PerfCtx::MergeSemantic m_sem);
 
     void report_new_ctx(const CtxId ctx_id, const std::string& name, const bool is_generated, const std::uint8_t coverage_pct, const PerfCtx::MergeSemantic m_sem);
-
+    
+    /* helper methods to populate proto structures */
+    void populate_ctx_in_ss(recording::StackSample* const ss, const PerfCtx::ThreadTracker::EffectiveCtx& ctx, std::uint8_t ctx_len, bool default_ctx);
+    
+    void populate_bt_in_ss(recording::StackSample* const ss, const Backtrace& bt, std::uint32_t frames_to_write, bool snipped);
+    
+    void populate_fdread(recording::IOTrace* const evt, const blocking::FdReadEvt& read_evt, blocking::EvtType type);
+    
+    void populate_fdwrite(recording::IOTrace* const evt, const blocking::FdWriteEvt& write_evt, blocking::EvtType type);
+    
+    void clear_proto();
+    
 public:
     ProfileSerializingWriter(jvmtiEnv* _jvmti, ProfileWriter& _w, SiteResolver::MethodInfoResolver _fir, SiteResolver::LineNoResolver _lnr,
                              PerfCtx::Registry& _reg, const SerializationFlushThresholds& _sft, const TruncationThresholds& _trunc_thresholds,
@@ -146,9 +166,11 @@ public:
 
     ~ProfileSerializingWriter();
 
-    virtual void record(const cpu::Sample& entry);
+    virtual void record(const cpu::Sample& entry) override;
+    
+    virtual void record(const iotrace::Sample& entry) override;
 
-    virtual MthId recordNewMethod(const jmethodID method_id, const char *file_name, const char *class_name, const char *method_name, const char *method_signature);
+    virtual MthId recordNewMethod(const jmethodID method_id, const char *file_name, const char *class_name, const char *method_name, const char *method_signature) override;
 
     void flush();
 };

@@ -135,7 +135,6 @@ cpu::InMsg::InMsg(BacktraceType _type, ThreadBucket* _info, const BacktraceError
 template class CircularQueue<cpu::Sample, cpu::InMsg>;
 
 // io tracing
-
 iotrace::Queue::Queue(QueueListener<iotrace::Sample> &listener, std::uint32_t maxFrameSize) : CircularQueue<iotrace::Sample, iotrace::InMsg>(listener, maxFrameSize) {
 }
 
@@ -150,8 +149,8 @@ iotrace::InMsg::InMsg(const blocking::BlockingEvt& _evt, ThreadBucket* _info, jv
 
 void iotrace::Queue::write(iotrace::Sample& entry, StackFrame* fb, const iotrace::InMsg& in_msg) {
     entry.evt = in_msg.evt;
-    entry.info = in_msg.info;
-    entry.ctx_len = (entry.info == nullptr) ? 0 : entry.info->data.ctx_tracker.current(entry.ctx);
+    entry.thd_info = in_msg.info;
+    entry.ctx_len = (entry.thd_info == nullptr) ? 0 : entry.thd_info->data.ctx_tracker.current(entry.ctx);
     entry.default_ctx = in_msg.default_ctx;
     
     jvmtiFrameInfo* frames = in_msg.frames;

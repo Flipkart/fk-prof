@@ -96,9 +96,13 @@ message RecordingHeader {
   required WorkAssignment work_assignment = 4;
 }
 
+message Recording {
+  optional IndexedData indexed_data = 1;
+  repeated Wse wse = 2;
+}
+
 /* entry */
 message Wse {
-  optional IndexedData indexed_data = 1;
   required WorkType w_type = 2;
   optional StackSampleWse cpu_sample_entry = 3;
   optional StackSampleWse thread_sample_entry = 4;
@@ -195,6 +199,7 @@ message StackSample {
     ticks_safepoint             = 10;
     fkp_no_error                = 100;
     fkp_no_jni_env              = 101;
+    fkp_getstacktrace_error     = 102;
   } // TODO: write me a test (to bijectively match BacktraceError)
   optional Error error = 6;
 }
@@ -254,11 +259,11 @@ message IOTrace {
 }
 
 enum IOTraceType {
-  file_read = 1;
-  file_write = 2;
-  socket_read = 3;
-  socket_write = 4;
-  select = 5;
+  socket_read = 0;
+  socket_write = 1;  
+  file_read = 2;
+  file_write = 3;
+  select = 4;
 }
 
 message FdRead {

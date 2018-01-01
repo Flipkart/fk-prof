@@ -9,8 +9,6 @@ namespace blocking {
     enum class EvtType {
         socket_read = 0,
         socket_write,
-        wait,
-        lock,
         file_read,
         file_write,
         select
@@ -41,4 +39,4 @@ namespace blocking {
     };
 }
 
-#endif /* IO_EVENTS_HH */
+#endif /* BLOCKING_EVENTS_HH */

@@ -4,21 +4,31 @@
 #include "processor.hh"
 #include "profile_writer.hh"
 
-class IOTracerConfig {
+class IOTracerJavaState {
 public:
 
     static const std::int64_t default_latency_threshold;
-    
-    bool isInitialised() {
-        return initialised;
-    }
 
     void onVMInit(jvmtiEnv *jvmti, JNIEnv *jni_env);
 
     void onVMDeath(jvmtiEnv *jvmti, JNIEnv *jni_env);
 
     void setLatencyThreshold(JNIEnv* jni_env, std::int64_t threshold);
+    
+    void setBciStarted() {
+        bci_started = true;
+    }
+    
+    void failBciFor(const char* class_name);
 
+    bool getBciFailedCount() {
+        return bci_failed.size();
+    }
+    
+    bool isBciStarted() {
+        return bci_started;
+    }
+    
 private:
 
     bool initialised = false;
@@ -26,6 +36,13 @@ private:
     jclass io_trace_class;
 
     jmethodID latency_threshold_setter;
+    
+    bool bci_started;
+    
+    std::vector<std::string> bci_failed;
+    
+    // for modifications to bci_failed vector
+    std::mutex mutex;
 };
 
 class IOTracer : public Process {
@@ -33,7 +50,7 @@ public:
 
     IOTracer(JavaVM* _jvm, jvmtiEnv* _jvmti_env, ThreadMap& _thread_map, FdMap& _fd_map, iotrace::Queue::Listener& _serializer, std::int64_t _latency_threshold, std::uint32_t _max_stack_depth);
 
-    bool start();
+    bool start(JNIEnv* env);
 
     void run() override;
 
@@ -61,7 +78,7 @@ private:
 
     FdMap& fd_map;
     
-    std::int64_t latency_threshold;
+    std::int64_t latency_threshold_ns;
     
     std::uint32_t max_stack_depth;
     
@@ -72,6 +89,6 @@ private:
     DISALLOW_COPY_AND_ASSIGN(IOTracer);
 };
 
-IOTracerConfig& getIOTracerConfig();
+IOTracerJavaState& getIOTracerJavaState();
 
 #endif /* IO_TRACER_HH */
