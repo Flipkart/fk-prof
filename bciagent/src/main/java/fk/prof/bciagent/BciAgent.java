@@ -1,6 +1,7 @@
 package fk.prof.bciagent;
 
 import java.lang.instrument.Instrumentation;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -9,14 +10,13 @@ public class BciAgent {
         // TODO maybe redirect these printf via jni logger call
         System.out.println("Starting the agent");
 
-        if(!FdAccessor.isInitialised()) {
-            System.err.println("Unable to get the fd field from FileDescriptor class. Disabling instrumentation.");
+        if (!verifyPrerequisites()) {
             return;
         }
 
         ProfileMethodTransformer transformer = new ProfileMethodTransformer();
 
-        if(!transformer.isInitialised()) {
+        if (!transformer.isInitialised()) {
             System.err.println("Unable to initialize class transformer. Disabling instrumentation.");
             return;
         }
@@ -42,6 +42,33 @@ public class BciAgent {
         } catch (Exception ex) {
             System.err.println("Error in retransforming: " + ex.getMessage());
             ex.printStackTrace();
+        }
+    }
+
+    private static boolean verifyPrerequisites() {
+
+        Class fdaccessor;
+        try {
+            Class tracer = Class.forName("fk.prof.trace.IOTrace", true, ClassLoader.getSystemClassLoader());
+            fdaccessor = Class.forName("fk.prof.FdAccessor", true, ClassLoader.getSystemClassLoader());
+        } catch (ClassNotFoundException e) {
+            System.err.println(e.getMessage());
+            return false;
+        } catch (LinkageError le) {
+            System.err.println(le.getMessage());
+            return false;
+        }
+
+        try {
+            Method m = fdaccessor.getDeclaredMethod("isInitialised");
+            Boolean initialised = (Boolean) m.invoke(null);
+            if (!initialised) {
+                System.err.println("Unable to get the fd field from FileDescriptor class. Disabling instrumentation.");
+            }
+            return initialised;
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
+            return false;
         }
     }
 }

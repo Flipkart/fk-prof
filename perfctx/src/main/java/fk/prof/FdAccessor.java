@@ -1,4 +1,4 @@
-package fk.prof.bciagent;
+package fk.prof;
 
 import java.io.FileDescriptor;
 import java.lang.reflect.Field;
@@ -19,7 +19,7 @@ public class FdAccessor {
         }
     }
 
-    static int getFd(FileDescriptor fdObj) {
+    public static int getFd(FileDescriptor fdObj) {
         try {
             return fdField.getInt(fdObj);
         }
@@ -28,7 +28,7 @@ public class FdAccessor {
         }
     }
 
-    static boolean isInitialised() {
+    public static boolean isInitialised() {
         return initialised;
     }
 }

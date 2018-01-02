@@ -147,46 +147,46 @@ void IOTracer::record(JNIEnv* jni_env, blocking::BlockingEvt& evt) {
 
 /* JNI implementation */
 
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File_open(JNIEnv* jni_env, jclass , jint fd, jstring path, jlong ts, jlong latency) {
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File__1open(JNIEnv* jni_env, jclass , jint fd, jstring path, jlong ts, jlong latency) {
     const char* path_str = jni_env->GetStringUTFChars(path, nullptr);
     getFdMap().putFileInfo(fd, path_str);
     jni_env->ReleaseStringUTFChars(path, path_str);
 }
 
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_accept(JNIEnv* jni_env, jclass, jint fd, jstring remote_path, jlong ts, jlong latency) {
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket__1accept(JNIEnv* jni_env, jclass, jint fd, jstring remote_path, jlong ts, jlong latency) {
     const char* path_str = jni_env->GetStringUTFChars(remote_path, nullptr);
     getFdMap().putSocketInfo(fd, path_str, false);
     jni_env->ReleaseStringUTFChars(remote_path, path_str);
 }
 
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_connect(JNIEnv* jni_env, jclass, jint fd, jstring remote_path, jlong ts, jlong latency) {
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket__1connect(JNIEnv* jni_env, jclass, jint fd, jstring remote_path, jlong ts, jlong latency) {
     const char* path_str = jni_env->GetStringUTFChars(remote_path, nullptr);
     getFdMap().putSocketInfo(fd, path_str, true);
     jni_env->ReleaseStringUTFChars(remote_path, path_str);
 }
 
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File_read(JNIEnv* jni_env, jclass, jint fd, jint count, jlong ts, jlong latency) {
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File__1read(JNIEnv* jni_env, jclass, jint fd, jint count, jlong ts, jlong latency) {
     // get the process object
     IOTracer* tracer = nullptr;
     if(tracer != nullptr)
         tracer->recordFileRead(jni_env, fd, ts, latency, count);
 }
 
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File_write(JNIEnv* jni_env, jclass, jint fd, jint count, jlong ts, jlong latency) {
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File__1write(JNIEnv* jni_env, jclass, jint fd, jint count, jlong ts, jlong latency) {
     // get the process object
     IOTracer* tracer = nullptr;
     if(tracer != nullptr)
         tracer->recordFileWrite(jni_env, fd, ts, latency, count);
 }
 
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_read(JNIEnv* jni_env, jclass, jint fd, jint count, jlong ts, jlong latency, jboolean timeout) {
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket__1read(JNIEnv* jni_env, jclass, jint fd, jint count, jlong ts, jlong latency, jboolean timeout) {
     // get the process object
     IOTracer* tracer = nullptr;
     if(tracer != nullptr)
         tracer->recordSocketRead(jni_env, fd, ts, latency, count, timeout);
 }
 
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_write(JNIEnv* jni_env, jclass, jint fd, jint count, jlong ts, jlong latency) {
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket__1write(JNIEnv* jni_env, jclass, jint fd, jint count, jlong ts, jlong latency) {
     // get the process object
     IOTracer* tracer = nullptr;
     if(tracer != nullptr)
