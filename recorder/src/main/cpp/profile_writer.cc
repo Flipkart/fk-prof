@@ -47,7 +47,7 @@ void ProfileWriter::write_header(const recording::RecordingHeader& rh) {
     write_unchecked(csum);
 }
 
-void ProfileWriter::write_recording(const recording::Recording& recording) {
+void ProfileWriter::write_recording(const recording::RecordingChunk& recording) {
     ensure_freebuff(recording);
     auto old_offset = data.write_end;
     write_unchecked_obj(recording);

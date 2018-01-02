@@ -355,7 +355,7 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
 
     auto lim = cis.PushLimit(len);
 
-    recording::Recording recording;
+    recording::RecordingChunk recording;
     CHECK(recording.ParseFromCodedStream(&cis));
 
     cis.PopLimit(lim);
@@ -514,7 +514,7 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
 
     auto lim = cis.PushLimit(len);
 
-    recording::Recording recording;
+    recording::RecordingChunk recording;
     CHECK(recording.ParseFromCodedStream(&cis));
 
     cis.PopLimit(lim);
@@ -631,7 +631,7 @@ TEST(ProfileSerializer__should_auto_flush__at_buffering_threshold) {
 
     auto lim = cis.PushLimit(len);
 
-    recording::Recording recording;
+    recording::RecordingChunk recording;
     CHECK(recording.ParseFromCodedStream(&cis));
     cis.PopLimit(lim);
 
@@ -756,7 +756,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     std::uint32_t len;
     std::uint32_t csum;
     Checksum c_calc;
-    recording::Recording recording0, recording1, recording2;
+    recording::RecordingChunk recording0, recording1, recording2;
     
     CHECK(cis.ReadVarint32(&len));
     auto lim = cis.PushLimit(len);
@@ -912,7 +912,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     std::uint32_t len;
     std::uint32_t csum;
     Checksum c_calc;
-    recording::Recording recording0, recording1, recording2;
+    recording::RecordingChunk recording0, recording1, recording2;
 
     CHECK(cis.ReadVarint32(&len));
     auto lim = cis.PushLimit(len);
@@ -1068,7 +1068,7 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_forte_error) {
 
     auto lim = cis.PushLimit(len);
 
-    recording::Recording recording;
+    recording::RecordingChunk recording;
     CHECK(recording.ParseFromCodedStream(&cis));
 
     cis.PopLimit(lim);
@@ -1180,7 +1180,7 @@ TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
 
     auto lim = cis.PushLimit(len);
 
-    recording::Recording recording;
+    recording::RecordingChunk recording;
     CHECK(recording.ParseFromCodedStream(&cis));
 
     cis.PopLimit(lim);
@@ -1229,7 +1229,7 @@ TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
     ASSERT_NATIVE_STACK_SAMPLE_IS(cse.stack_sample(1), 0, 3, s1n, s1_ctxs, true);
 }
 
-void play_last_flush_scenario(recording::Recording& recording1, int additional_traces) {
+void play_last_flush_scenario(recording::RecordingChunk& recording1, int additional_traces) {
     BlockingRingBuffer buff(1024 * 1024);
     std::shared_ptr<RawWriter> raw_w_ptr(new AccumulatingRawWriter(buff));
     Buff pw_buff;
@@ -1311,7 +1311,7 @@ void play_last_flush_scenario(recording::Recording& recording1, int additional_t
     std::uint32_t len;
     std::uint32_t csum;
     Checksum c_calc;
-    recording::Recording recording0;
+    recording::RecordingChunk recording0;
 
     CHECK(cis.ReadVarint32(&len));
     auto lim = cis.PushLimit(len);
@@ -1370,7 +1370,7 @@ void play_last_flush_scenario(recording::Recording& recording1, int additional_t
 
 TEST(ProfileSerializer__should_report_unflushed_trace__and_EOF_after_last_flush) {
     TestEnv _;
-    recording::Recording last;
+    recording::RecordingChunk last;
     play_last_flush_scenario(last, 1);
 
     //There is a little bit of duplication here, but its for readability reasons
@@ -1408,7 +1408,7 @@ TEST(ProfileSerializer__should_report_unflushed_trace__and_EOF_after_last_flush)
 
 TEST(ProfileSerializer__should_report_all_user_tracepoints_that_were_never_reported_before__and_EOF_after_last_flush) {
     TestEnv _;
-    recording::Recording last;
+    recording::RecordingChunk last;
     play_last_flush_scenario(last, 0);
 
     //There is a little bit of duplication here, but its for readability reasons

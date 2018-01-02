@@ -102,15 +102,18 @@ public class MockProfileObjects {
     return samples;
   }
 
-  public static Recorder.Wse getMockCpuWseWithStackSample(Recorder.StackSampleWse currentStackSampleWse, Recorder.StackSampleWse prevStackSampleWse) {
-    return Recorder.Wse.newBuilder()
-        .setWType(Recorder.WorkType.cpu_sample_work)
-        .setIndexedData(Recorder.IndexedData.newBuilder()
+  public static Recorder.RecordingChunk getMockCpuWseWithStackSample(Recorder.StackSampleWse currentStackSampleWse, Recorder.StackSampleWse prevStackSampleWse) {
+    Recorder.RecordingChunk.Builder chunkBuilder = Recorder.RecordingChunk.newBuilder();
+    chunkBuilder.setIndexedData(
+        Recorder.IndexedData.newBuilder()
             .addAllMethodInfo(generateMethodIndex(currentStackSampleWse, prevStackSampleWse))
             .addAllTraceCtx(generateTraceIndex(currentStackSampleWse, prevStackSampleWse))
             .build())
-        .setCpuSampleEntry(currentStackSampleWse)
-        .build();
+        .addWse(Recorder.Wse.newBuilder()
+            .setWType(Recorder.WorkType.cpu_sample_work)
+            .setCpuSampleEntry(currentStackSampleWse)
+            .build());
+    return chunkBuilder.build();
   }
 
   private static List<Recorder.MethodInfo> generateMethodIndex(Recorder.StackSampleWse currentStackSampleWse, Recorder.StackSampleWse prevStackSampleWse) {

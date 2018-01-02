@@ -153,14 +153,15 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
     }
   }
 
-  public void updateWorkInfoWithWSE(long workId, Recorder.Wse wse) {
+  public void updateWorkInfo(long workId, Recorder.RecordingChunk recording) {
     ensureEntityIsWriteable();
 
     ProfileWorkInfo workInfo = workInfoLookup.get(workId);
     if (workInfo == null) {
       throw new AggregationFailure(String.format("Cannot find work id=%d association in the aggregation window", workId), true);
     }
-    workInfo.updateWSESpecificDetails(wse);
+
+    workInfo.updateWSEDetails(recording);
   }
 
   public void updateRecorderInfo(long workId, Recorder.RecorderInfo recorderInfo) {

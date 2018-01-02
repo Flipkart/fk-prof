@@ -48,7 +48,7 @@ public:
 
     void write_header(const recording::RecordingHeader& rh);
     
-    void write_recording(const recording::Recording& recording);
+    void write_recording(const recording::RecordingChunk& recording);
 
     void flush();
 };
@@ -97,7 +97,7 @@ private:
     SiteResolver::LineNoResolver lnr;
     PerfCtx::Registry& reg;
 
-    recording::Recording recording;
+    recording::RecordingChunk recording;
     recording::Wse* cpu_samples_accumulator;
     recording::Wse* io_trace_accumulator;
     

@@ -40,11 +40,14 @@ public class ProfileWorkInfo extends FinalizableBuilder<FinalizedProfileWorkInfo
     this.recorderInfo = recorderInfo;
   }
 
-  public void updateWSESpecificDetails(Recorder.Wse wse) {
-    for (Recorder.TraceContext trace : wse.getIndexedData().getTraceCtxList()) {
+  public void updateWSEDetails(Recorder.RecordingChunk recording) {
+    for (Recorder.TraceContext trace : recording.getIndexedData().getTraceCtxList()) {
       traceCoverages.put(trace.getTraceName(), trace.getCoveragePct());
     }
-    workTypeSamples.put(wse.getWType(), workTypeSamples.getOrDefault(wse.getWType(), 0) + getSampleCount(wse));
+    for(int i = 0; i < recording.getWseCount(); i++) {
+      Recorder.Wse wse = recording.getWse(i);
+      workTypeSamples.put(wse.getWType(), workTypeSamples.getOrDefault(wse.getWType(), 0) + getSampleCount(wse));
+    }
   }
 
   public AggregationState startProfile(int recorderVersion, LocalDateTime startedAt) {

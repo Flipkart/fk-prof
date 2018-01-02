@@ -96,7 +96,8 @@ message RecordingHeader {
   required WorkAssignment work_assignment = 4;
 }
 
-message Recording {
+/* partial recording containing new events */
+message RecordingChunk {
   optional IndexedData indexed_data = 1;
   repeated Wse wse = 2;
 }
