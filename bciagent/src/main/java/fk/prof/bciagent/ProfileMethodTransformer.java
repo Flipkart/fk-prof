@@ -217,7 +217,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
             bciFailed = true;
             System.err.println(e.getMessage());
         }
-        return null;
+        return classfileBuffer;
     }
 
     private static void instrument_mentry(CtMethod m) throws Exception {
@@ -267,7 +267,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     }
 
     private static void instrument_sockStream_input_mexit(CtMethod m, CtClass socketTimeoutExceptionClass) throws Exception {
-        m.addCatch(timedoutLocalVar + " = true;", socketTimeoutExceptionClass);
+        m.addCatch("{ " + timedoutLocalVar + " = true; throw $e; }", socketTimeoutExceptionClass);
         String jStr = "";
         jStr += code_sockStream_saveFDToLocalVar();
         jStr += "fk.prof.trace.IOTrace.Socket.read(" + fdLocalVar + ", $_, " + expr_elapsedNanos() + ", " + timedoutLocalVar + ")";
