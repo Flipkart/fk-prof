@@ -193,8 +193,8 @@ JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket__1write(JNIEnv* jn
         tracer->recordSocketWrite(jni_env, fd, ts, latency, count);
 }
 
-JNIEXPORT void JNICALL Java_fk_prof_bciagent_ProfileMethodTransformer_bciStarted(JNIEnv* jni_env, jclass ) {
-    getIOTracerJavaState().setBciStarted();
+JNIEXPORT void JNICALL Java_fk_prof_bciagent_BciAgent_bciAgentLoaded(JNIEnv* jni_env, jclass ) {
+    getIOTracerJavaState().setBciAgentLoaded();
 }
 
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_ProfileMethodTransformer_bciFailed(JNIEnv* jni_env, jclass , jstring class_name) {

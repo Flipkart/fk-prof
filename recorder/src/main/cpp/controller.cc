@@ -716,7 +716,7 @@ void Controller::retire(const recording::CpuSampleWork& csw) {
 
 bool Controller::capable(const recording::IOTraceWork& csw) {
     IOTracerJavaState& state = getIOTracerJavaState();
-    return state.isBciStarted() && (state.getBciFailedCount() == 0);
+    return state.isBciAgentLoaded() && (state.getBciFailedCount() == 0);
 }
 
 void Controller::prep(const recording::IOTraceWork& csw) {

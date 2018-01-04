@@ -14,24 +14,14 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     private static final String timedoutLocalVar = "$$$_timedout";
 
     /**
-     * native method to signal that we are able to instrument the java code. It enables the io tracing from recorder side.
-     */
-    private static native void bciStarted();
-
-    /**
      * notifies the recorder that the bci failed for the provided class. Disables the io tracing if called at least once.
      *
      * @param className
      */
     private static native void bciFailed(String className);
 
-    private volatile boolean bciFailed = false;
-    private volatile boolean bciStarted = false;
-
     private final Map<String, ClassInstrumentHooks> INSTRUMENTED_CLASSES = new HashMap<>();
     private final ClassPool pool;
-
-    private boolean initialised = false;
 
     private static class MethodInstrumentHooks {
         public final MethodBciHook entry;
@@ -60,14 +50,9 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
 
     public ProfileMethodTransformer() {
         pool = ClassPool.getDefault();
-        init();
     }
 
-    public boolean isInitialised() {
-        return initialised;
-    }
-
-    private void init() {
+    public boolean init() {
         String klass;
         ClassInstrumentHooks hooks;
 
@@ -97,7 +82,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
             socketTimeoutExClass = pool.get("java.net.SocketTimeoutException");
         } catch (NotFoundException e) {
             System.err.println(e.getMessage());
-            return;
+            return false;
         }
 
         MethodInstrumentHooks sock_input_default = new MethodInstrumentHooks(ProfileMethodTransformer::instrument_socketStream_input_mentry,
@@ -148,7 +133,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
         hooks.methods.put("read(Ljava/io/FileDescriptor;Ljava/nio/ByteBuffer;JLsun/nio/ch/NativeDispatcher;)I", ioutil_read);
         hooks.methods.put("read(Ljava/io/FileDescriptor;[Ljava/nio/ByteBuffer;IILsun/nio/ch/NativeDispatcher;)J", ioutil_read);
 
-        initialised = true;
+        return true;
     }
 
     @Override
@@ -206,15 +191,10 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
             }
 
             if (modified) {
-                if (!bciFailed && !bciStarted) {
-                    bciStarted();
-                    bciStarted = true;
-                }
                 return cclass.toBytecode();
             }
         } catch (Exception e) {
             bciFailed(className);
-            bciFailed = true;
             System.err.println(e.getMessage());
         }
         return classfileBuffer;
@@ -247,11 +227,14 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
         jStr += code_fileStream_saveFDToLocalVar();
         String count;
         if (variant == 1) {
+            // write(byte)
             count = "1";
         } else if (variant == 2) {
+            // write(byte[])
             count = "$1 == null ? 0 : $1.length";
         } else {
-            count = "$3 - $2";
+            // write(byte[], offset, length)
+            count = "$1 == null ? 0 : $3";
         }
         jStr += "fk.prof.trace.IOTrace.File.write(" + fdLocalVar + ", " + count + ", " + expr_elapsedNanos() + ")";
         m.insertAfter(jStr, true);

@@ -15,8 +15,8 @@ public:
 
     void setLatencyThreshold(JNIEnv* jni_env, std::int64_t threshold);
     
-    void setBciStarted() {
-        bci_started = true;
+    void setBciAgentLoaded() {
+        bci_agent_loaded = true;
     }
     
     void failBciFor(const char* class_name);
@@ -25,8 +25,8 @@ public:
         return bci_failed.size();
     }
     
-    bool isBciStarted() {
-        return bci_started;
+    bool isBciAgentLoaded() {
+        return bci_agent_loaded;
     }
     
 private:
@@ -37,7 +37,7 @@ private:
 
     jmethodID latency_threshold_setter;
     
-    bool bci_started;
+    bool bci_agent_loaded;
     
     std::vector<std::string> bci_failed;
     

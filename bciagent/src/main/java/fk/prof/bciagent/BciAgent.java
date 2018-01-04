@@ -2,13 +2,20 @@ package fk.prof.bciagent;
 
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
 
 public class BciAgent {
+
+    /**
+     * native method to signal that we are now initialized and ready to instrument. It enables the io tracing from recorder side.
+     */
+    private static native void bciAgentLoaded();
+
     public static void premain(String agentArgs, Instrumentation inst) {
-        // TODO maybe redirect these printf via jni logger call
         System.out.println("Starting the agent");
+
+        // getting all loaded classes after creating lambdas creates issues. Retransformation does not play nice with lambdas.
+        Class[] classes = inst.getAllLoadedClasses();
 
         if (!verifyPrerequisites()) {
             return;
@@ -16,27 +23,24 @@ public class BciAgent {
 
         ProfileMethodTransformer transformer = new ProfileMethodTransformer();
 
-        if (!transformer.isInitialised()) {
+        if (!transformer.init()) {
             System.err.println("Unable to initialize class transformer. Disabling instrumentation.");
             return;
         }
 
-        Class[] classes = inst.getAllLoadedClasses();
-        List<Class> modifiableClasses = new ArrayList<>();
-        for (int i = 0; i < classes.length; i++) {
-            boolean isModifiable = inst.isModifiableClass(classes[i]);
-            if (isModifiable) {
-                modifiableClasses.add(classes[i]);
-            }
-        }
-
-
         inst.addTransformer(transformer, true);
 
-        Class[] retransformClasses = new Class[modifiableClasses.size()];
-        for (int j = 0; j < modifiableClasses.size(); j++) {
-            retransformClasses[j] = modifiableClasses.get(j);
+        Class[] retransformClasses = Arrays.stream(classes)
+                .filter(inst::isModifiableClass)
+                .toArray(Class[]::new);
+
+        try {
+            bciAgentLoaded();
+        } catch (LinkageError e) {
+            System.err.println("native methods not linked. libfkpagent.so might not be loaded. Disabling instrumentation.");
+            return;
         }
+
         try {
             inst.retransformClasses(retransformClasses);
         } catch (Exception ex) {
@@ -47,20 +51,17 @@ public class BciAgent {
 
     private static boolean verifyPrerequisites() {
 
-        Class fdaccessor;
+        Class<?> fdaccessor;
         try {
             Class tracer = Class.forName("fk.prof.trace.IOTrace", true, ClassLoader.getSystemClassLoader());
             fdaccessor = Class.forName("fk.prof.FdAccessor", true, ClassLoader.getSystemClassLoader());
-        } catch (ClassNotFoundException e) {
+        } catch (ClassNotFoundException | LinkageError e) {
             System.err.println(e.getMessage());
-            return false;
-        } catch (LinkageError le) {
-            System.err.println(le.getMessage());
             return false;
         }
 
         try {
-            Method m = fdaccessor.getDeclaredMethod("isInitialised");
+            Method m = fdaccessor.getDeclaredMethod("isInitialized");
             Boolean initialised = (Boolean) m.invoke(null);
             if (!initialised) {
                 System.err.println("Unable to get the fd field from FileDescriptor class. Disabling instrumentation.");

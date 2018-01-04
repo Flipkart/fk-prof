@@ -9,19 +9,31 @@ extern "C" {
 #endif
 /*
  * Class:     fk_prof_bciagent_ProfileMethodTransformer
- * Method:    bciStarted
- * Signature: ()V
- */
-JNIEXPORT void JNICALL Java_fk_prof_bciagent_ProfileMethodTransformer_bciStarted
-  (JNIEnv *, jclass);
-
-/*
- * Class:     fk_prof_bciagent_ProfileMethodTransformer
  * Method:    bciFailed
  * Signature: (Ljava/lang/String;)V
  */
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_ProfileMethodTransformer_bciFailed
   (JNIEnv *, jclass, jstring);
+
+#ifdef __cplusplus
+}
+#endif
+#endif
+
+/* Header for class fk_prof_bciagent_BciAgent */
+
+#ifndef _Included_fk_prof_bciagent_BciAgent
+#define _Included_fk_prof_bciagent_BciAgent
+#ifdef __cplusplus
+extern "C" {
+#endif
+/*
+ * Class:     fk_prof_bciagent_BciAgent
+ * Method:    bciAgentLoaded
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_fk_prof_bciagent_BciAgent_bciAgentLoaded
+  (JNIEnv *, jclass);
 
 #ifdef __cplusplus
 }

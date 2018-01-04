@@ -5,7 +5,7 @@ import java.lang.reflect.Field;
 
 public class FdAccessor {
     private static Field fdField;
-    private static boolean initialised = false;
+    private static boolean initialized = false;
 
     static {
         try {
@@ -13,7 +13,7 @@ public class FdAccessor {
             if(fdField != null) {
                 fdField.setAccessible(true);
             }
-            initialised = true;
+            initialized = true;
         }
         catch (NoSuchFieldException e) {
         }
@@ -28,7 +28,7 @@ public class FdAccessor {
         }
     }
 
-    public static boolean isInitialised() {
-        return initialised;
+    public static boolean isInitialized() {
+        return initialized;
     }
 }
