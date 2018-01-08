@@ -1,3 +1,6 @@
+#ifndef GLOBALS_H
+#define GLOBALS_H
+
 #include <assert.h>
 #include <dlfcn.h>
 #include <jvmti.h>
@@ -12,9 +15,6 @@
 #include <spdlog/spdlog.h>
 
 #include "perf_ctx.hh"
-
-#ifndef GLOBALS_H
-#define GLOBALS_H
 
 #define RECORDER_VERION 1
 #define DATA_ENCODING_VERSION 1
@@ -42,10 +42,12 @@ namespace Time {
 extern LoggerP logger;//TODO: stick me in GlobalCtx???
 
 class Profiler;
+class IOTracer;
 
 namespace GlobalCtx {
     typedef struct {
         UniqueReadsafePtr<Profiler> cpu_profiler;
+        UniqueReadsafePtr<IOTracer> io_tracer;
     } Rec;
 
     extern GlobalCtx::Rec recording;
@@ -58,6 +60,8 @@ const int DEFAULT_FLUSH_BATCH_SIZE = 100;
 const int DEFAULT_SAMPLING_INTERVAL = 1;
 const int DEFAULT_MAX_FRAMES_TO_CAPTURE = 128;
 const int MAX_FRAMES_TO_CAPTURE = 2048;
+
+const std::int64_t NANOS_IN_MILLIS = 1000000;
 
 #if defined(STATIC_ALLOCATION_ALLOCA)
   #define STATIC_ARRAY(NAME, TYPE, SIZE, MAXSZ) TYPE *NAME = (TYPE*)alloca((SIZE) * sizeof(TYPE))
@@ -115,12 +119,21 @@ const int MAX_FRAMES_TO_CAPTURE = 2048;
     }                                                                          \
   }
 
+#define JNI_EXCEPTION_CHECK(jni_env, errmsg)                                   \
+  {                                                                            \
+    if(jni_env->ExceptionCheck()) {                                            \
+        jni_env->ExceptionClear();                                             \
+        logger->error(errmsg);                                                 \
+        return;                                                                \
+    }                                                                          \
+  }
+
 #define DISALLOW_COPY_AND_ASSIGN(TypeName)                                     \
-  TypeName(const TypeName &);                                                  \
-  void operator=(const TypeName &)
+  TypeName(const TypeName &) = delete;                                         \
+  void operator=(const TypeName &) = delete
 
 #define DISALLOW_IMPLICIT_CONSTRUCTORS(TypeName)                               \
-  TypeName();                                                                  \
+  TypeName() = delete;                                                         \
   DISALLOW_COPY_AND_ASSIGN(TypeName)
 
 // Short version: reinterpret_cast produces undefined behavior in many
@@ -128,9 +141,7 @@ const int MAX_FRAMES_TO_CAPTURE = 2048;
 template<class Dest, class Source>
 inline Dest bit_cast(const Source &source) {
     // Compile time assertion: sizeof(Dest) == sizeof(Source)
-    // A compile error here means your Dest and Source have different sizes.
-    typedef char VerifySizesAreEqual[sizeof(Dest) == sizeof(Source) ? 1 : -1]
-            __attribute__((unused));
+    static_assert(sizeof(Dest) == sizeof(Source), "Dest and Source have different sizes");
 
     Dest dest;
     memcpy(&dest, &source, sizeof(dest));

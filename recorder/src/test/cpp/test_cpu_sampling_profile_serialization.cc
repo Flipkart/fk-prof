@@ -273,16 +273,16 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
 
     ThreadBucket t25(25, "Thread No. 25", 5, true);
 
-    t25.ctx_tracker.enter(ctx_foo);
-    t25.ctx_tracker.enter(ctx_bar);
+    t25.data.ctx_tracker.enter(ctx_foo);
+    t25.data.ctx_tracker.enter(ctx_bar);
     {
-        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+        cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
         q.push(m);
     }
     
-    t25.ctx_tracker.exit(ctx_bar);
-    push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q);
-    t25.ctx_tracker.exit(ctx_foo);
+    t25.data.ctx_tracker.exit(ctx_bar);
+    push_native_backtrace(t25.acquire(), BacktraceError::Fkp_no_error, q);
+    t25.data.ctx_tracker.exit(ctx_foo);
 
     frames[0].method_id = mid(d);
     frames[0].lineno = 10;
@@ -299,13 +299,13 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
     ct.num_frames = 6;
 
     ThreadBucket tmain(42, "main thread", 10, false);
-    tmain.ctx_tracker.enter(ctx_bar);
-    tmain.ctx_tracker.enter(ctx_baz);
+    tmain.data.ctx_tracker.enter(ctx_bar);
+    tmain.data.ctx_tracker.enter(ctx_baz);
     {
-        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&tmain), BacktraceError::Fkp_no_error, false);
+        cpu::InMsg m(ct, tmain.acquire(), BacktraceError::Fkp_no_error, false);
         q.push(m);
     }    
-    tmain.ctx_tracker.exit(ctx_baz);
+    tmain.data.ctx_tracker.exit(ctx_baz);
 
     frames[0].method_id = mid(c);
     frames[0].lineno = 10;
@@ -321,10 +321,10 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
     frames[5].lineno = 30;
     ct.num_frames = 6;
     {
-        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&tmain), BacktraceError::Fkp_no_error, false);
+        cpu::InMsg m(ct, tmain.acquire(), BacktraceError::Fkp_no_error, false);
         q.push(m);
     }
-    tmain.ctx_tracker.exit(ctx_bar);
+    tmain.data.ctx_tracker.exit(ctx_bar);
 
     frames[0].method_id = mid(c);
     frames[0].lineno = 40;
@@ -355,8 +355,8 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
 
     auto lim = cis.PushLimit(len);
 
-    recording::Wse wse;
-    CHECK(wse.ParseFromCodedStream(&cis));
+    recording::RecordingChunk recording;
+    CHECK(recording.ParseFromCodedStream(&cis));
 
     cis.PopLimit(lim);
 
@@ -369,9 +369,10 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
     auto computed_csum = c_calc.chksum(tmp_buff.get(), pos);
 
     CHECK_EQUAL(computed_csum, csum);
+    auto& wse = recording.wse(0);
 
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse.w_type());
-    auto idx_data = wse.indexed_data();
+    auto idx_data = recording.indexed_data();
     CHECK_EQUAL(0, idx_data.monitor_info_size());
     
     CHECK_EQUAL(2, idx_data.thread_info_size());
@@ -470,15 +471,15 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
     ct.num_frames = 2;
 
     ThreadBucket t25(25, "some thread", 8, false);
-    t25.ctx_tracker.enter(ctx_foo);
-    t25.ctx_tracker.enter(ctx_bar);
-    push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q, false, 0);
+    t25.data.ctx_tracker.enter(ctx_foo);
+    t25.data.ctx_tracker.enter(ctx_bar);
+    push_native_backtrace(t25.acquire(), BacktraceError::Fkp_no_error, q, false, 0);
     {
-        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+        cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
         q.push(m);
     }
-    t25.ctx_tracker.exit(ctx_bar);
-    t25.ctx_tracker.exit(ctx_foo);
+    t25.data.ctx_tracker.exit(ctx_bar);
+    t25.data.ctx_tracker.exit(ctx_foo);
 
     frames[0].method_id = mid(y);
     frames[0].lineno = 10;
@@ -486,14 +487,14 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
     frames[1].lineno = 20;
     ct.num_frames = 2;
 
-    t25.ctx_tracker.enter(ctx_bar);
-    t25.ctx_tracker.enter(ctx_foo);
+    t25.data.ctx_tracker.enter(ctx_bar);
+    t25.data.ctx_tracker.enter(ctx_foo);
     {
-        cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+        cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
         q.push(m);
     }
-    t25.ctx_tracker.exit(ctx_foo);
-    t25.ctx_tracker.exit(ctx_bar);
+    t25.data.ctx_tracker.exit(ctx_foo);
+    t25.data.ctx_tracker.exit(ctx_bar);
 
     CHECK(q.pop());
     CHECK(q.pop());
@@ -513,13 +514,14 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
 
     auto lim = cis.PushLimit(len);
 
-    recording::Wse wse;
-    CHECK(wse.ParseFromCodedStream(&cis));
+    recording::RecordingChunk recording;
+    CHECK(recording.ParseFromCodedStream(&cis));
 
     cis.PopLimit(lim);
 
+    auto& wse = recording.wse(0);
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse.w_type());
-    auto idx_data = wse.indexed_data();
+    auto idx_data = recording.indexed_data();
     CHECK_EQUAL(0, idx_data.monitor_info_size());
     
     CHECK_EQUAL(1, idx_data.thread_info_size());
@@ -598,22 +600,22 @@ TEST(ProfileSerializer__should_auto_flush__at_buffering_threshold) {
     ct.num_frames = 2;
 
     ThreadBucket t25(25, "some thread", 8, false);
-    t25.ctx_tracker.enter(ctx_foo);
+    t25.data.ctx_tracker.enter(ctx_foo);
     for (auto i = 0; i < 10; i++) {
         if (i < 5) {
-            cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+            cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
             q.push(m);
         } else {
-            push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q, false, 0);
+            push_native_backtrace(t25.acquire(), BacktraceError::Fkp_no_error, q, false, 0);
         }
         CHECK(q.pop());
 
         std::uint8_t tmp;
         CHECK_EQUAL(0, buff.read(&tmp, 0, 1, false));
     }
-    cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+    cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
     q.push(m);
-    t25.ctx_tracker.exit(ctx_foo);
+    t25.data.ctx_tracker.exit(ctx_foo);
     CHECK(q.pop());
 
     const std::size_t one_meg = 1024 * 1024;
@@ -629,13 +631,13 @@ TEST(ProfileSerializer__should_auto_flush__at_buffering_threshold) {
 
     auto lim = cis.PushLimit(len);
 
-    recording::Wse wse;
-    CHECK(wse.ParseFromCodedStream(&cis));
-
+    recording::RecordingChunk recording;
+    CHECK(recording.ParseFromCodedStream(&cis));
     cis.PopLimit(lim);
 
+    auto& wse = recording.wse(0);
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse.w_type());
-    auto idx_data = wse.indexed_data();
+    auto idx_data = recording.indexed_data();
     CHECK_EQUAL(0, idx_data.monitor_info_size());
     
     CHECK_EQUAL(1, idx_data.thread_info_size());
@@ -725,23 +727,23 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
 
     ThreadBucket t25(25, "some thread", 8, false);
     ThreadBucket t10(10, "some other thread", 6, true);
-    t25.ctx_tracker.enter(ctx_foo);
-    t10.ctx_tracker.enter(ctx_bar);
+    t25.data.ctx_tracker.enter(ctx_foo);
+    t10.data.ctx_tracker.enter(ctx_bar);
     for (auto i = 0; i < 26; i++) {
         if (i == 15) {
             ps.flush();//check manual flush interleving
         }
         if (i < 15) {
-            cpu::InMsg m(ct0, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+            cpu::InMsg m(ct0, t25.acquire(), BacktraceError::Fkp_no_error, false);
             q.push(m);
         } else {
-            cpu::InMsg m(ct1, ThreadBucket::acq_bucket(&t10), BacktraceError::Fkp_no_error, false);
+            cpu::InMsg m(ct1, t10.acquire(), BacktraceError::Fkp_no_error, false);
             q.push(m);
         }
         CHECK(q.pop());
     }
-    t25.ctx_tracker.exit(ctx_foo);
-    t10.ctx_tracker.exit(ctx_bar);
+    t25.data.ctx_tracker.exit(ctx_foo);
+    t10.data.ctx_tracker.exit(ctx_bar);
 
     const std::size_t one_meg = 1024 * 1024;
     std::shared_ptr<std::uint8_t> tmp_buff(new std::uint8_t[one_meg], std::default_delete<std::uint8_t[]>());
@@ -754,11 +756,11 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     std::uint32_t len;
     std::uint32_t csum;
     Checksum c_calc;
-    recording::Wse wse0, wse1, wse2;
-
+    recording::RecordingChunk recording0, recording1, recording2;
+    
     CHECK(cis.ReadVarint32(&len));
     auto lim = cis.PushLimit(len);
-    CHECK(wse0.ParseFromCodedStream(&cis));
+    CHECK(recording0.ParseFromCodedStream(&cis));
     cis.PopLimit(lim);
     auto pos = cis.CurrentPosition();
     CHECK(cis.ReadVarint32(&csum));
@@ -768,7 +770,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
 
     CHECK(cis.ReadVarint32(&len));
     lim = cis.PushLimit(len);
-    CHECK(wse1.ParseFromCodedStream(&cis));
+    CHECK(recording1.ParseFromCodedStream(&cis));
     cis.PopLimit(lim);
     pos = cis.CurrentPosition();
     CHECK(cis.ReadVarint32(&csum));
@@ -779,7 +781,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
 
     CHECK(cis.ReadVarint32(&len));
     lim = cis.PushLimit(len);
-    CHECK(wse2.ParseFromCodedStream(&cis));
+    CHECK(recording2.ParseFromCodedStream(&cis));
     cis.PopLimit(lim);
     pos = cis.CurrentPosition();
     CHECK(cis.ReadVarint32(&csum));
@@ -787,11 +789,12 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     computed_csum = c_calc.chksum(tmp_buff.get() + next_record_start, pos - next_record_start);
     CHECK_EQUAL(computed_csum, csum);
 
+    auto& wse0 = recording0.wse(0), & wse1 = recording1.wse(0), & wse2 = recording2.wse(0);
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse0.w_type());
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse1.w_type());
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse2.w_type());
 
-    auto idx_data0 = wse0.indexed_data();
+    auto idx_data0 = recording0.indexed_data();
     CHECK_EQUAL(0, idx_data0.monitor_info_size());
     
     CHECK_EQUAL(1, idx_data0.thread_info_size());
@@ -816,7 +819,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
         ASSERT_STACK_SAMPLE_IS(cse0.stack_sample(i), 0, 3, s0, s0_ctxs, false);
     }
 
-    auto idx_data1 = wse1.indexed_data();
+    auto idx_data1 = recording1.indexed_data();
     CHECK_EQUAL(0, idx_data1.monitor_info_size());
     CHECK_EQUAL(0, idx_data1.thread_info_size());
     CHECK_EQUAL(0, idx_data1.method_info_size());
@@ -828,7 +831,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
         ASSERT_STACK_SAMPLE_IS(cse1.stack_sample(i), 0, 3, s0, s0_ctxs, false);
     }
 
-    auto idx_data2 = wse2.indexed_data();
+    auto idx_data2 = recording2.indexed_data();
     CHECK_EQUAL(0, idx_data2.monitor_info_size());
     
     CHECK_EQUAL(1, idx_data2.thread_info_size());
@@ -882,21 +885,21 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
 
     ThreadBucket t25(25, "some thread", 8, false);
     ThreadBucket t10(10, "some other thread", 6, true);
-    t25.ctx_tracker.enter(ctx_foo);
-    t10.ctx_tracker.enter(ctx_bar);
+    t25.data.ctx_tracker.enter(ctx_foo);
+    t10.data.ctx_tracker.enter(ctx_bar);
     for (auto i = 0; i < 26; i++) {
         if (i == 15) {
             ps.flush();//check manual flush interleving
         }
         if (i < 15) {
-            push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q, false, 0);
+            push_native_backtrace(t25.acquire(), BacktraceError::Fkp_no_error, q, false, 0);
         } else {
-            push_native_backtrace(ThreadBucket::acq_bucket(&t10), BacktraceError::Fkp_no_error, q, false, 1);
+            push_native_backtrace(t10.acquire(), BacktraceError::Fkp_no_error, q, false, 1);
         }
         CHECK(q.pop());
     }
-    t25.ctx_tracker.exit(ctx_foo);
-    t10.ctx_tracker.exit(ctx_bar);
+    t25.data.ctx_tracker.exit(ctx_foo);
+    t10.data.ctx_tracker.exit(ctx_bar);
 
     const std::size_t one_meg = 1024 * 1024;
     std::shared_ptr<std::uint8_t> tmp_buff(new std::uint8_t[one_meg], std::default_delete<std::uint8_t[]>());
@@ -909,11 +912,11 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     std::uint32_t len;
     std::uint32_t csum;
     Checksum c_calc;
-    recording::Wse wse0, wse1, wse2;
+    recording::RecordingChunk recording0, recording1, recording2;
 
     CHECK(cis.ReadVarint32(&len));
     auto lim = cis.PushLimit(len);
-    CHECK(wse0.ParseFromCodedStream(&cis));
+    CHECK(recording0.ParseFromCodedStream(&cis));
     cis.PopLimit(lim);
     auto pos = cis.CurrentPosition();
     CHECK(cis.ReadVarint32(&csum));
@@ -923,7 +926,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
 
     CHECK(cis.ReadVarint32(&len));
     lim = cis.PushLimit(len);
-    CHECK(wse1.ParseFromCodedStream(&cis));
+    CHECK(recording1.ParseFromCodedStream(&cis));
     cis.PopLimit(lim);
     pos = cis.CurrentPosition();
     CHECK(cis.ReadVarint32(&csum));
@@ -934,7 +937,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
 
     CHECK(cis.ReadVarint32(&len));
     lim = cis.PushLimit(len);
-    CHECK(wse2.ParseFromCodedStream(&cis));
+    CHECK(recording2.ParseFromCodedStream(&cis));
     cis.PopLimit(lim);
     pos = cis.CurrentPosition();
     CHECK(cis.ReadVarint32(&csum));
@@ -942,11 +945,12 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     computed_csum = c_calc.chksum(tmp_buff.get() + next_record_start, pos - next_record_start);
     CHECK_EQUAL(computed_csum, csum);
 
+    auto& wse0 = recording0.wse(0), & wse1 = recording1.wse(0), & wse2 = recording2.wse(0);
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse0.w_type());
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse1.w_type());
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse2.w_type());
 
-    auto idx_data0 = wse0.indexed_data();
+    auto idx_data0 = recording0.indexed_data();
     CHECK_EQUAL(0, idx_data0.monitor_info_size());
 
     CHECK_EQUAL(1, idx_data0.thread_info_size());
@@ -973,7 +977,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
         ASSERT_NATIVE_STACK_SAMPLE_IS(cse0.stack_sample(j), 0, 3, s0, s0_ctxs, false);
     }
 
-    auto idx_data1 = wse1.indexed_data();
+    auto idx_data1 = recording1.indexed_data();
     CHECK_EQUAL(0, idx_data1.monitor_info_size());
     CHECK_EQUAL(0, idx_data1.thread_info_size());
     CHECK_EQUAL(0, idx_data1.method_info_size());
@@ -985,7 +989,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
         ASSERT_NATIVE_STACK_SAMPLE_IS(cse0.stack_sample(j), 0, 3, s0, s0_ctxs, false);
     }
 
-    auto idx_data2 = wse2.indexed_data();
+    auto idx_data2 = recording2.indexed_data();
     CHECK_EQUAL(0, idx_data2.monitor_info_size());
 
     CHECK_EQUAL(1, idx_data2.thread_info_size());
@@ -1064,13 +1068,14 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_forte_error) {
 
     auto lim = cis.PushLimit(len);
 
-    recording::Wse wse;
-    CHECK(wse.ParseFromCodedStream(&cis));
+    recording::RecordingChunk recording;
+    CHECK(recording.ParseFromCodedStream(&cis));
 
     cis.PopLimit(lim);
 
+    auto& wse = recording.wse(0);
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse.w_type());
-    auto idx_data = wse.indexed_data();
+    auto idx_data = recording.indexed_data();
     CHECK_EQUAL(0, idx_data.monitor_info_size());
     CHECK_EQUAL(0, idx_data.thread_info_size());
     CHECK_EQUAL(3, idx_data.method_info_size());
@@ -1152,11 +1157,11 @@ TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
     ct.num_frames = 5;
 
     ThreadBucket t25(25, "Thread No. 25", 5, true);
-    t25.ctx_tracker.enter(ctx_foo);
-    cpu::InMsg m(ct, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+    t25.data.ctx_tracker.enter(ctx_foo);
+    cpu::InMsg m(ct, t25.acquire(), BacktraceError::Fkp_no_error, false);
     q.push(m);
-    push_native_backtrace(ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, q);//default is 6 frames
-    t25.ctx_tracker.exit(ctx_foo);
+    push_native_backtrace(t25.acquire(), BacktraceError::Fkp_no_error, q);//default is 6 frames
+    t25.data.ctx_tracker.exit(ctx_foo);
 
     CHECK(q.pop());
     CHECK(q.pop());
@@ -1175,8 +1180,8 @@ TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
 
     auto lim = cis.PushLimit(len);
 
-    recording::Wse wse;
-    CHECK(wse.ParseFromCodedStream(&cis));
+    recording::RecordingChunk recording;
+    CHECK(recording.ParseFromCodedStream(&cis));
 
     cis.PopLimit(lim);
 
@@ -1190,8 +1195,9 @@ TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
 
     CHECK_EQUAL(computed_csum, csum);
 
+    auto& wse = recording.wse(0);
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse.w_type());
-    auto idx_data = wse.indexed_data();
+    auto idx_data = recording.indexed_data();
     CHECK_EQUAL(0, idx_data.monitor_info_size());
     
     CHECK_EQUAL(1, idx_data.thread_info_size());
@@ -1223,7 +1229,7 @@ TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
     ASSERT_NATIVE_STACK_SAMPLE_IS(cse.stack_sample(1), 0, 3, s1n, s1_ctxs, true);
 }
 
-void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
+void play_last_flush_scenario(recording::RecordingChunk& recording1, int additional_traces) {
     BlockingRingBuffer buff(1024 * 1024);
     std::shared_ptr<RawWriter> raw_w_ptr(new AccumulatingRawWriter(buff));
     Buff pw_buff;
@@ -1272,7 +1278,7 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
     ct0.num_frames = 2;
 
     ThreadBucket t25(25, "some thread", 8, false);
-    t25.ctx_tracker.enter(ctx_foo);
+    t25.data.ctx_tracker.enter(ctx_foo);
     {
         //destructor is the cue for EoF
         ProfileWriter pw(raw_w_ptr, pw_buff);
@@ -1282,7 +1288,7 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
         cpu::Queue q(ps, 10);
 
         for (auto i = 0; i < 10 + additional_traces; i++) {
-            cpu::InMsg m(ct0, ThreadBucket::acq_bucket(&t25), BacktraceError::Fkp_no_error, false);
+            cpu::InMsg m(ct0, t25.acquire(), BacktraceError::Fkp_no_error, false);
             q.push(m);
             CHECK(q.pop());
         }
@@ -1290,7 +1296,7 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
             ps.flush();
         }
     }
-    t25.ctx_tracker.exit(ctx_foo);
+    t25.data.ctx_tracker.exit(ctx_foo);
 
     buff.readonly();
 
@@ -1305,11 +1311,11 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
     std::uint32_t len;
     std::uint32_t csum;
     Checksum c_calc;
-    recording::Wse wse0;
+    recording::RecordingChunk recording0;
 
     CHECK(cis.ReadVarint32(&len));
     auto lim = cis.PushLimit(len);
-    CHECK(wse0.ParseFromCodedStream(&cis));
+    CHECK(recording0.ParseFromCodedStream(&cis));
     cis.PopLimit(lim);
     auto pos = cis.CurrentPosition();
     CHECK(cis.ReadVarint32(&csum));
@@ -1319,7 +1325,7 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
 
     CHECK(cis.ReadVarint32(&len));
     lim = cis.PushLimit(len);
-    CHECK(wse1.ParseFromCodedStream(&cis));
+    CHECK(recording1.ParseFromCodedStream(&cis));
     cis.PopLimit(lim);
     pos = cis.CurrentPosition();
     CHECK(cis.ReadVarint32(&csum));
@@ -1332,10 +1338,11 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
     CHECK_EQUAL(cis.CurrentPosition(), bytes_sz);
     CHECK_EQUAL(0, len);//EOF marker
 
+    auto& wse0 = recording0.wse(0), & wse1 = recording1.wse(0);
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse0.w_type());
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse1.w_type());
 
-    auto idx_data0 = wse0.indexed_data();
+    auto idx_data0 = recording0.indexed_data();
     CHECK_EQUAL(0, idx_data0.monitor_info_size());
 
     CHECK_EQUAL(1, idx_data0.thread_info_size());
@@ -1363,7 +1370,7 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
 
 TEST(ProfileSerializer__should_report_unflushed_trace__and_EOF_after_last_flush) {
     TestEnv _;
-    recording::Wse last;
+    recording::RecordingChunk last;
     play_last_flush_scenario(last, 1);
 
     //There is a little bit of duplication here, but its for readability reasons
@@ -1393,7 +1400,7 @@ TEST(ProfileSerializer__should_report_unflushed_trace__and_EOF_after_last_flush)
     ASSERT_TRACE_CTX_INFO_WITHOUT_CTXID_IS(last_data.trace_ctx(tce[3].second), "grault", 80, 2, false);
     ASSERT_TRACE_CTX_INFO_WITHOUT_CTXID_IS(last_data.trace_ctx(tce[4].second), "quux", 60, 3, false);
 
-    auto cse1 = last.cpu_sample_entry();
+    auto cse1 = last.wse(0).cpu_sample_entry();
     CHECK_EQUAL(1, cse1.stack_sample_size());
     ASSERT_STACK_SAMPLE_IS(cse1.stack_sample(0), 0, 3, s0, s0_ctxs, false);
 }
@@ -1401,7 +1408,7 @@ TEST(ProfileSerializer__should_report_unflushed_trace__and_EOF_after_last_flush)
 
 TEST(ProfileSerializer__should_report_all_user_tracepoints_that_were_never_reported_before__and_EOF_after_last_flush) {
     TestEnv _;
-    recording::Wse last;
+    recording::RecordingChunk last;
     play_last_flush_scenario(last, 0);
 
     //There is a little bit of duplication here, but its for readability reasons
@@ -1428,7 +1435,7 @@ TEST(ProfileSerializer__should_report_all_user_tracepoints_that_were_never_repor
     ASSERT_TRACE_CTX_INFO_WITHOUT_CTXID_IS(last_data.trace_ctx(tce[3].second), "grault", 80, 2, false);
     ASSERT_TRACE_CTX_INFO_WITHOUT_CTXID_IS(last_data.trace_ctx(tce[4].second), "quux", 60, 3, false);
 
-    auto cse1 = last.cpu_sample_entry();
+    auto cse1 = last.wse(0).cpu_sample_entry();
     CHECK_EQUAL(0, cse1.stack_sample_size());
 }
 

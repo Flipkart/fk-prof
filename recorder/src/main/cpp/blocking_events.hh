@@ -2,14 +2,13 @@
 #define BLOCKING_EVENTS_HH
 
 #include <stdint.h>
+#include "fd_map.hh"
 
 namespace blocking {
     
     enum class EvtType {
         socket_read = 0,
         socket_write,
-        wait,
-        lock,
         file_read,
         file_write,
         select
@@ -17,14 +16,14 @@ namespace blocking {
     
     // Events related to read/write events on file descriptors.
     struct FdReadEvt {
-        int fd;
+        FdBucket* fd;
         // bytes read/write 
         int count;
         bool timeout;
     };
     
     struct FdWriteEvt {
-        int fd;
+        FdBucket* fd;
         int count;
     };
     
@@ -40,4 +39,4 @@ namespace blocking {
     };
 }
 
-#endif /* IO_EVENTS_HH */
+#endif /* BLOCKING_EVENTS_HH */

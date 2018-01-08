@@ -20,26 +20,26 @@ extern "C" {
 #endif
 /*
  * Class:     fk_prof_trace_IOTrace_File
- * Method:    open
- * Signature: (ILjava/lang/String;IJJ)V
+ * Method:    _open
+ * Signature: (ILjava/lang/String;JJ)V
  */
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File_open
-  (JNIEnv *, jclass, jint, jstring, jint, jlong, jlong);
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File__1open
+  (JNIEnv *, jclass, jint, jstring, jlong, jlong);
 
 /*
  * Class:     fk_prof_trace_IOTrace_File
- * Method:    read
+ * Method:    _read
  * Signature: (IIJJ)V
  */
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File_read
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File__1read
   (JNIEnv *, jclass, jint, jint, jlong, jlong);
 
 /*
  * Class:     fk_prof_trace_IOTrace_File
- * Method:    write
+ * Method:    _write
  * Signature: (IIJJ)V
  */
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File_write
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024File__1write
   (JNIEnv *, jclass, jint, jint, jlong, jlong);
 
 #ifdef __cplusplus
@@ -55,34 +55,34 @@ extern "C" {
 #endif
 /*
  * Class:     fk_prof_trace_IOTrace_Socket
- * Method:    accept
- * Signature: (ILjava/lang/String;IJJ)V
+ * Method:    _accept
+ * Signature: (ILjava/lang/String;JJ)V
  */
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_accept
-  (JNIEnv *, jclass, jint, jstring, jint, jlong, jlong);
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket__1accept
+  (JNIEnv *, jclass, jint, jstring, jlong, jlong);
 
 /*
  * Class:     fk_prof_trace_IOTrace_Socket
- * Method:    connect
- * Signature: (ILjava/lang/String;IJJ)V
+ * Method:    _connect
+ * Signature: (ILjava/lang/String;JJ)V
  */
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_connect
-  (JNIEnv *, jclass, jint, jstring, jint, jlong, jlong);
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket__1connect
+  (JNIEnv *, jclass, jint, jstring, jlong, jlong);
 
 /*
  * Class:     fk_prof_trace_IOTrace_Socket
- * Method:    read
+ * Method:    _read
+ * Signature: (IIJJZ)V
+ */
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket__1read
+  (JNIEnv *, jclass, jint, jint, jlong, jlong, jboolean);
+
+/*
+ * Class:     fk_prof_trace_IOTrace_Socket
+ * Method:    _write
  * Signature: (IIJJ)V
  */
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_read
-  (JNIEnv *, jclass, jint, jint, jlong, jlong);
-
-/*
- * Class:     fk_prof_trace_IOTrace_Socket
- * Method:    write
- * Signature: (IIJJ)V
- */
-JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket_write
+JNIEXPORT void JNICALL Java_fk_prof_trace_IOTrace_00024Socket__1write
   (JNIEnv *, jclass, jint, jint, jlong, jlong);
 
 #ifdef __cplusplus

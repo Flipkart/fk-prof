@@ -7,7 +7,7 @@
 // AsyncGetCallTrace in the Java virtual machine, which is used by Sun
 // Studio Analyzer, and designed to get stack traces asynchronously.
 // It uses the old JVMPI interface, so we must reconstruct the
-// neccesary bits of that here.
+// necessary bits of that here.
 
 // For a Java frame, the lineno is the bci of the method, and the
 // method_id is the jmethodID.  For a JNI method, the lineno is -3,
@@ -62,7 +62,8 @@ enum class BacktraceError {
     Forte_deopt                 = 9,
     Forte_safepoint             = 10,  //range [0, 100) is reserved for Forte
     Fkp_no_error                = 100,
-    Fkp_no_jni_env              = 101
+    Fkp_no_jni_env              = 101,
+    Fkp_getstacktrace_error     = 102
 };
 
 enum class BacktraceType {

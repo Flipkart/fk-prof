@@ -8,28 +8,28 @@ import recording.Recorder;
 import java.io.IOException;
 import java.util.zip.Adler32;
 
-public class WseParser {
-  private Recorder.Wse wse = null;
+public class RecordingChunkParser {
+  private Recorder.RecordingChunk recording = null;
 
-  private Adler32 wseChecksum = new Adler32();
-  private boolean wseParsed = false;
+  private Adler32 checksum = new Adler32();
+  private boolean parsed = false;
   private int maxMessageSizeInBytes;
   private boolean endMarkerReceived = false;
 
   private MessageParser msgParser;
 
-  public WseParser(int maxMessageSizeInBytes, Histogram histWseSize) {
+  public RecordingChunkParser(int maxMessageSizeInBytes, Histogram histWseSize) {
     this.maxMessageSizeInBytes = maxMessageSizeInBytes;
     this.msgParser = new MessageParser(histWseSize);
   }
 
   /**
-   * Returns true if wse has been read and checksum validated, false otherwise
+   * Returns true if recording has been read and checksum validated, false otherwise
    *
-   * @return returns if wse has been parsed or not
+   * @return returns if recording has been parsed or not
    */
   public boolean isParsed() {
-    return this.wseParsed;
+    return this.parsed;
   }
 
   public boolean isEndMarkerReceived() {
@@ -41,8 +41,8 @@ public class WseParser {
    *
    * @return
    */
-  public Recorder.Wse get() {
-    return this.wse;
+  public Recorder.RecordingChunk get() {
+    return this.recording;
   }
 
   /**
@@ -50,9 +50,9 @@ public class WseParser {
    * Note: If {@link #get()} is not performed before reset, previous parsed entry will be lost
    */
   public void reset() {
-    this.wse = null;
-    this.wseParsed = false;
-    this.wseChecksum.reset();
+    this.recording = null;
+    this.parsed = false;
+    this.checksum.reset();
   }
 
   /**
@@ -61,21 +61,21 @@ public class WseParser {
    */
   public void parse(CompositeByteBufInputStream in) throws AggregationFailure {
     try {
-      if (wse == null) {
+      if (recording == null) {
         in.markAndDiscardRead();
-        wse = msgParser.readDelimited(Recorder.Wse.parser(), in, maxMessageSizeInBytes, "WSE");
-        if(wse == null) {
+        recording = msgParser.readDelimited(Recorder.RecordingChunk.parser(), in, maxMessageSizeInBytes, "RecordingChunk");
+        if(recording == null) {
           endMarkerReceived = true;
           return;
         }
-        in.updateChecksumSinceMarked(wseChecksum);
+        in.updateChecksumSinceMarked(checksum);
       }
       in.markAndDiscardRead();
       int checksumValue = msgParser.readRawVariantInt(in, "wseChecksumValue");
-      if (checksumValue != ((int) wseChecksum.getValue())) {
-        throw new AggregationFailure("Checksum of wse does not match");
+      if (checksumValue != ((int) checksum.getValue())) {
+        throw new AggregationFailure("Checksum of recording does not match");
       }
-      wseParsed = true;
+      parsed = true;
     }
     catch (UnexpectedEOFException e) {
       try {

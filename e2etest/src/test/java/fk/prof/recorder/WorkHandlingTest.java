@@ -205,7 +205,7 @@ public class WorkHandlingTest {
             poll[i] = tellRecorderWeHaveNoWork(pollReqs, i);
         }
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
+        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
 
         wireUpProfileAction(true);
 
@@ -437,7 +437,7 @@ public class WorkHandlingTest {
         }
     }
 
-    public static void recordProfile(byte[] req, MutableObject<Recorder.RecordingHeader> hdr, List<Recorder.Wse> entries) {
+    public static void recordProfile(byte[] req, MutableObject<Recorder.RecordingHeader> hdr, List<Recorder.RecordingChunk> entries) {
         try {
             recordProfile_(req, hdr, entries);
         } catch (IOException e) {
@@ -445,7 +445,7 @@ public class WorkHandlingTest {
         }
     }
 
-    public static void recordProfile_(byte[] req, MutableObject<Recorder.RecordingHeader> hdr, List<Recorder.Wse> entries) throws IOException {
+    public static void recordProfile_(byte[] req, MutableObject<Recorder.RecordingHeader> hdr, List<Recorder.RecordingChunk> entries) throws IOException {
         CodedInputStream is = CodedInputStream.newInstance(req);
         assertThat(is.readUInt32(), is(Versions.RECORDER_ENCODING_VERSION));
 
@@ -470,15 +470,15 @@ public class WorkHandlingTest {
         assertThat((int) csum.getValue(), is(chksum));
 
         while (true) {
-            int wseLen = is.readUInt32();
-            if (wseLen == 0) break; //EOF condition
+            int recLen = is.readUInt32();
+            if (recLen == 0) break; //EOF condition
             if (bytesAfterChksum >= req.length)
                 throw new IllegalStateException("Stream ended before recorder EoF-marker");
-            int wseLim = is.pushLimit(wseLen);
-            Recorder.Wse.Builder wseBuilder = Recorder.Wse.newBuilder();
-            wseBuilder.mergeFrom(is);
-            is.popLimit(wseLim);
-            entries.add(wseBuilder.build());
+            int recLim = is.pushLimit(recLen);
+            Recorder.RecordingChunk.Builder recBuilder = Recorder.RecordingChunk.newBuilder();
+            recBuilder.mergeFrom(is);
+            is.popLimit(recLim);
+            entries.add(recBuilder.build());
 
             //// len and chksum
             bytesBeforeChksum = is.getTotalBytesRead() - bytesAfterChksum;

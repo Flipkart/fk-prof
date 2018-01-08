@@ -131,11 +131,15 @@ set(SOURCE_FILES
     ${SRC}/site_resolver.hh
     ${SRC}/profiler.cc
     ${SRC}/profiler.hh
+    ${SRC}/io_tracer.cc
+    ${SRC}/io_tracer.hh
     ${SRC}/stacktraces.hh
     ${SRC}/stacktraces.cc
     ${SRC}/trace.hh
     ${SRC}/thread_map.hh
     ${SRC}/thread_map.cc
+    ${SRC}/fd_map.hh
+    ${SRC}/fd_map.cc
     ${SRC}/concurrent_map.hh
     ${SRC}/concurrent_map.cc
     ${SRC}/profile_writer.cc
@@ -146,7 +150,6 @@ set(SOURCE_FILES
     ${SRC}/config.cc
     ${SRC}/scheduler.hh
     ${SRC}/scheduler.cc
-    ${SRC}/instrumentation_stub.hh
     ${SRC}/util.hh
     ${SRC}/perf_ctx_jni.hh
     ${SRC}/perf_ctx.hh

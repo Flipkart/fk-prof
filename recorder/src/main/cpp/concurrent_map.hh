@@ -710,6 +710,26 @@ public:
 	}
 };
 
+class GCHelper {
+public:
+    static map::GC::EpochType attach() {
+        return map::DefaultGC.attachThread();
+    }
+
+    static void detach(map::GC::EpochType &localEpoch) {
+        if (localEpoch != map::GC::kEpochInitial)
+            map::DefaultGC.detachThread(localEpoch);
+    }
+
+    static void safepoint(map::GC::EpochType &localEpoch) {
+        map::DefaultGC.safepoint(localEpoch);
+    }
+
+    static void signalSafepoint(map::GC::EpochType &localEpoch) {
+        map::DefaultGC.ss_safepoint(localEpoch);
+    }
+};
+
 } // namespace map end
 
 #endif

@@ -7,13 +7,23 @@ import javassist.CtMethod;
 public class Instrumenter {
   private static final String elapsedLocalVar = "$$$_elpsed";
   private static final String fdLocalVar = "$$$_fd";
+  private static final String timedoutLocalVar = "$$$_timedout";
 
   static class MethodEntry {
 
     static void elapsed(CtMethod m) throws Exception {
       String jStr = "";
       m.addLocalVariable(elapsedLocalVar, CtClass.longType);
-      jStr += elapsedLocalVar + " = System.currentTimeMillis();";
+      jStr += elapsedLocalVar + " = System.nanoTime();";
+      m.insertBefore(jStr);
+    }
+
+    static void ss_read(CtMethod m) throws Exception {
+      String jStr = "";
+      m.addLocalVariable(elapsedLocalVar, CtClass.longType);
+      m.addLocalVariable(timedoutLocalVar, CtClass.booleanType);
+      jStr += elapsedLocalVar + " = System.nanoTime();";
+      jStr += timedoutLocalVar + " = false;";
       m.insertBefore(jStr);
     }
 
@@ -23,75 +33,85 @@ public class Instrumenter {
 
     static void fs_open(CtMethod m) throws Exception {
       String jStr = "";
-      jStr += codebuild_calculateElapsedMillis();
-      jStr += codebuild_fileStream_saveFDToLocalVar();
-      jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": name=\" + this.path + \" FD=\" + $$$_fd + \" elapsed=\" + " + elapsedLocalVar + ");";
-      //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
+      jStr += code_fileStream_saveFDToLocalVar();
+      jStr += "if(" + fdLocalVar + " != null) " +
+              "{ fk.prof.trace.IOTrace.File.open(" + fdLocalVar + ", this.path, " + expr_elapsedNanos() + "); }";
       m.insertAfter(jStr, true);
     }
 
     static void fs_read(CtMethod m) throws Exception {
       String jStr = "";
-      jStr += codebuild_calculateElapsedMillis();
-      jStr += codebuild_fileStream_saveFDToLocalVar();
-      jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" return=\" + $_ + \" elapsed=\" + " + elapsedLocalVar + ");";
-      //jStr += "fk.prof.InstrumentationStub.fsOpEndTracepoint(" + elapsedLocalVar + ", this.path, $$$_fd);";
+      jStr += code_fileStream_saveFDToLocalVar();
+      jStr += "fk.prof.trace.IOTrace.File.read(" + fdLocalVar + ", $_, " + expr_elapsedNanos() + ")";
       m.insertAfter(jStr, true);
     }
 
-    static void ss_read(CtMethod m) throws Exception {
+    static void fs_write(CtMethod m, int variant) throws Exception {
       String jStr = "";
-      jStr += codebuild_calculateElapsedMillis();
-      jStr += codebuild_sockStream_saveFDToLocalVar();
-      jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" read=\" + $_ + \" elapsed=\" + " + elapsedLocalVar + ");";
+      jStr += code_fileStream_saveFDToLocalVar();
+      String count;
+      if (variant == 1) {
+          count = "1";  // write(byte)
+      } else if (variant == 2) {
+          count = "$1 == null ? 0 : $1.length"; // write(byte[])
+      } else {
+          count = "$1 == null ? 0 : $3"; // write(byte[], offset, length)
+      }
+      jStr += "fk.prof.trace.IOTrace.File.write(" + fdLocalVar + ", " + count + ", " + expr_elapsedNanos() + ")";
+      m.insertAfter(jStr, true);
+    }
+
+    static void ss_read(CtMethod m, CtClass socketTimeoutExceptionClass) throws Exception {
+      m.addCatch("{ " + timedoutLocalVar + " = true; throw $e; }", socketTimeoutExceptionClass);
+      String jStr = "";
+      jStr += code_sockStream_saveFDToLocalVar();
+      jStr += "fk.prof.trace.IOTrace.Socket.read(" + fdLocalVar + ", $_, " + expr_elapsedNanos() + ", " + timedoutLocalVar + ")";
       m.insertAfter(jStr, true);
     }
 
     static void ss_write(CtMethod m) throws Exception {
       String jStr = "";
-      jStr += codebuild_calculateElapsedMillis();
-      jStr += codebuild_sockStream_saveFDToLocalVar();
-      jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" written=\" + $3 + \" elapsed=\" + " + elapsedLocalVar + ");";
+      jStr += code_sockStream_saveFDToLocalVar();
+      jStr += "fk.prof.trace.IOTrace.Socket.write(" + fdLocalVar + ", $3," + expr_elapsedNanos() + ");";
       m.insertAfter(jStr, true);
     }
 
     static void sock_connect(CtMethod m) throws Exception {
       String jStr = "";
-      jStr += codebuild_calculateElapsedMillis();
-      jStr += codebuild_sockStream_saveFDToLocalVar();
-      jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" connected=\" + connected + \" addr=\" + $1 + \" elapsed=\" + " + elapsedLocalVar + ");";
+      jStr += code_sockStream_saveFDToLocalVar();
+      jStr += "if(" + fdLocalVar + " != null) " +
+                "{ fk.prof.trace.IOTrace.Socket.connect(" + fdLocalVar + ", $1.toString(), " + expr_elapsedNanos() + "); }";
       m.insertAfter(jStr, true);
     }
 
     static void sock_accept(CtMethod m) throws Exception {
       String jStr = "";
-      jStr += codebuild_calculateElapsedMillis();
-      jStr += codebuild_sock_accept_saveFDToLocalVar();
-      jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" connected=\" + ($_ == null ? null : $_.isConnected()) + \" addr=\" + ($_ == null ? null : $_.getInetAddress()) + \" elapsed=\" + " + elapsedLocalVar + ");";
+      jStr += code_sock_accept_saveFDToLocalVar();
+      jStr += "if(" + fdLocalVar + " != null) " +
+                "{ fk.prof.trace.IOTrace.Socket.accept(" + fdLocalVar + ", $_.getInetAddress().toString(), " + expr_elapsedNanos() + "); }";
       m.insertAfter(jStr, true);
     }
 
     static void sockCh_connect(CtMethod m) throws Exception {
       String jStr = "";
-      jStr += codebuild_calculateElapsedMillis();
-      jStr += codebuild_sockCh_saveFDToLocalVar();
-      jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" remote_addr=\" + $1 + \" elapsed=\" + " + elapsedLocalVar + ");";
+      jStr += code_sockCh_saveFDToLocalVar();
+      // TODO: non blocking??
+      jStr += "if(" + fdLocalVar + " >= 0) " +
+                "{ fk.prof.trace.IOTrace.Socket.connect(" + fdLocalVar + ", $1.toString(), " + expr_elapsedNanos() + "); }";
       m.insertAfter(jStr, true);
     }
 
     static void ioutil_read(CtMethod m) throws Exception {
       String jStr = "";
-      jStr += codebuild_calculateElapsedMillis();
-      jStr += codebuild_ioUtil_saveFDToLocalVar();
-      jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" read=\" + $_ + \" elapsed=\" + " + elapsedLocalVar + ");";
+      jStr += code_ioUtil_saveFDToLocalVar();
+      jStr += "fk.prof.trace.IOTrace.Socket.read(" + fdLocalVar + ", $_, " + expr_elapsedNanos() + ", false)";
       m.insertAfter(jStr, true);
     }
 
     static void ioutil_write(CtMethod m) throws Exception {
       String jStr = "";
-      jStr += codebuild_calculateElapsedMillis();
-      jStr += codebuild_ioUtil_saveFDToLocalVar();
-      jStr += "System.out.println(\"METHOD=" + m.getLongName() + ": FD=\" + $$$_fd + \" written=\" + $_ + \" elapsed=\" + " + elapsedLocalVar + ");";
+      jStr += code_ioUtil_saveFDToLocalVar();
+      jStr += "fk.prof.trace.IOTrace.Socket.write(" + fdLocalVar + ", $_," + expr_elapsedNanos() + ");";        
       m.insertAfter(jStr, true);
     }
 
@@ -102,7 +122,7 @@ public class Instrumenter {
     static void elapsed(CtConstructor c) throws Exception {
       String jStr = "";
       c.addLocalVariable(elapsedLocalVar, CtClass.longType);
-      jStr += elapsedLocalVar + " = System.currentTimeMillis();";
+      jStr += elapsedLocalVar + " = System.nanoTime();";
       c.insertBefore(jStr);
     }
 
@@ -112,52 +132,49 @@ public class Instrumenter {
 
     static void sockCh(CtConstructor c) throws Exception {
       String jStr = "";
-      jStr += codebuild_calculateElapsedMillis();
-      jStr += codebuild_sockCh_saveFDToLocalVar();
-      jStr += "System.out.println(\"CONSTRUCTOR=" + c.getLongName() + ": FD=\" + $$$_fd + \" remote_addr=\" + $3 + \" elapsed=\" + " + elapsedLocalVar + ");";
+      jStr += code_sockCh_saveFDToLocalVar();
+      jStr += "if(" + fdLocalVar + " >= 0) " +
+                "{ fk.prof.trace.IOTrace.Socket.accept(" + fdLocalVar + ", $3.toString(), " + expr_elapsedNanos() + "); }";
       c.insertAfter(jStr, true);
     }
 
   }
 
 
-  private static String codebuild_calculateElapsedMillis() {
-    return elapsedLocalVar + " = System.currentTimeMillis() - " + elapsedLocalVar + ";";
-  }
+  private static String expr_elapsedNanos() {
+    return "System.nanoTime() - " + elapsedLocalVar;
+  } 
 
-  private static String codebuild_fileStream_saveFDToLocalVar() {
+  private static String code_fileStream_saveFDToLocalVar() {
     String jStr = "";
-    jStr += "java.lang.reflect.Field fdField = this.fd == null ? null : this.fd.getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt(this.fd) : -1;";
+    jStr += "java.io.FileDescriptor " + fdLocalVar + " = this.fd;";
     return jStr;
   }
 
-  private static String codebuild_sock_accept_saveFDToLocalVar() {
+  private static String code_sock_accept_saveFDToLocalVar() {
     String jStr = "";
-    jStr += "java.lang.reflect.Field fdField = ($_ == null || $_.getImpl() == null || $_.getImpl().getFileDescriptor() == null) ? null : $_.getImpl().getFileDescriptor().getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt($_.getImpl().getFileDescriptor()) : -1;";
+    jStr += "java.io.FileDescriptor " +
+            fdLocalVar +
+            " = ($_ == null || $_.getImpl() == null || $_.getImpl().getFileDescriptor() == null)" +
+            " ? null : $_.getImpl().getFileDescriptor();";
     return jStr;
   }
 
-  private static String codebuild_sockStream_saveFDToLocalVar() {
+  private static String code_sockStream_saveFDToLocalVar() {
     String jStr = "";
-    jStr += "java.lang.reflect.Field fdField = (this.impl == null || this.impl.getFileDescriptor() == null) ? null : this.impl.getFileDescriptor().getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt(this.impl.getFileDescriptor()) : -1;";
+    jStr += "java.io.FileDescriptor " +
+            fdLocalVar +
+            " = (this.impl == null || this.impl.getFileDescriptor() == null) ? null : this.impl.getFileDescriptor();";
     return jStr;
   }
 
-  private static String codebuild_ioUtil_saveFDToLocalVar() {
+  private static String code_ioUtil_saveFDToLocalVar() {
     String jStr = "";
-    jStr += "java.lang.reflect.Field fdField = $1 == null ? null : $1.getClass().getDeclaredField(\"fd\");";
-    jStr += "if (fdField != null) { fdField.setAccessible(true); }";
-    jStr += "int " + fdLocalVar + " = fdField != null ? fdField.getInt($1) : -1;";
+    jStr += "java.io.FileDescriptor " + fdLocalVar + " = $1;";
     return jStr;
   }
 
-  private static String codebuild_sockCh_saveFDToLocalVar() {
+  private static String code_sockCh_saveFDToLocalVar() {
     return "int " + fdLocalVar + " = fdVal;";
   }
 }

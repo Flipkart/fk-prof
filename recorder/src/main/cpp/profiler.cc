@@ -25,7 +25,7 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
     if (jniEnv != nullptr) {
         thread_info = thread_map.get(jniEnv);
         if (thread_info != nullptr) {//TODO: increment a counter here to monitor freq of this, it could be GC thd or compiler-broker etc
-            ctx_tracker = &(thread_info->ctx_tracker);
+            ctx_tracker = &(thread_info->data.ctx_tracker);
             if (ctx_tracker->in_ctx()) {
                 do_record = ctx_tracker->should_record();
             } else {
@@ -99,6 +99,7 @@ void Profiler::stop() {
     }
 
     handler->stopSigprof();
+    running = false;
 }
 
 void Profiler::set_sampling_freq(std::uint32_t sampling_freq) {

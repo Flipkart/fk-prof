@@ -7,6 +7,7 @@
 #include "globals.hh"
 #include "config.hh"
 #include "profiler.hh"
+#include "io_tracer.hh"
 #include "thread_map.hh"
 #include "controller.hh"
 #include "perf_ctx.hh"
@@ -86,6 +87,10 @@ void JNICALL OnVMInit(jvmtiEnv *jvmti, JNIEnv *jniEnv, jthread thread) {
     }
 
     metrics_thd = start_new_thd(jniEnv, jvmti, "Fk-Prof Metrics Reporter", metrics_poller, nullptr);
+    
+    // load IOTRace class and initialize the local iotrace object.
+    getIOTracerJavaState().onVMInit(jvmti, jniEnv);
+    
     controller->start();
 }
 
@@ -103,6 +108,8 @@ void JNICALL OnClassPrepare(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
 void JNICALL OnVMDeath(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
     IMPLICITLY_USE(jvmti_env);
     IMPLICITLY_USE(jni_env);
+    
+    getIOTracerJavaState().onVMDeath(jvmti_env, jni_env);
 }
 
 static bool PrepareJvmti(jvmtiEnv *jvmti) {
@@ -351,14 +358,14 @@ AGENTEXPORT void JNICALL Agent_OnUnload(JavaVM *vm) {
     delete CONFIGURATION;
 }
 
-extern "C" JNIEXPORT void JNICALL Java_fk_prof_InstrumentationStub_fsMethodExit(JNIEnv* env, jclass _, jlong elapsed, jint fd, jstring filename) {
-    std::int32_t n_fd = static_cast<std::int32_t>(fd);
-    std::int64_t  n_elapsed = static_cast<std::int64_t>(elapsed);
-    std::unique_ptr<const char, std::function<void(const char*)>>
-            n_filename(env->GetStringUTFChars(filename, nullptr),
-                     [&](const char* str) { if (str != nullptr) env->ReleaseStringUTFChars(filename, str); });
-    logger->info("Death to Republic: {}, {}, {}", n_fd, n_elapsed, n_filename.get());
-}
+//extern "C" JNIEXPORT void JNICALL Java_fk_prof_InstrumentationStub_fsMethodExit(JNIEnv* env, jclass _, jlong elapsed, jint fd, jstring filename) {
+//    std::int32_t n_fd = static_cast<std::int32_t>(fd);
+//    std::int64_t  n_elapsed = static_cast<std::int64_t>(elapsed);
+//    std::unique_ptr<const char, std::function<void(const char*)>>
+//            n_filename(env->GetStringUTFChars(filename, nullptr),
+//                     [&](const char* str) { if (str != nullptr) env->ReleaseStringUTFChars(filename, str); });
+//    logger->info("Death to Republic: {}, {}, {}", n_fd, n_elapsed, n_filename.get());
+//}
 
 
 ThreadMap& get_thread_map() {

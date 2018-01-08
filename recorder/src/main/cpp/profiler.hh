@@ -21,36 +21,6 @@ using std::ofstream;
 using std::ostringstream;
 using std::string;
 
-template <bool blocking = true>
-class SimpleSpinLockGuard {
-private:
-    std::atomic_bool& f;
-    bool rel;
-
-public:
-    SimpleSpinLockGuard(std::atomic_bool& field, bool relaxed = false) : f(field), rel(relaxed) {
-        bool expectedState = false;
-        while (!f.compare_exchange_weak(expectedState, true, std::memory_order_acquire)) {
-            expectedState = false;
-            sched_yield();
-        }
-    }
-
-    ~SimpleSpinLockGuard() {
-        f.store(false, rel ? std::memory_order_relaxed : std::memory_order_release);
-    }
-};
-
-template <>
-class SimpleSpinLockGuard<false> {
-public:
-    SimpleSpinLockGuard(std::atomic_bool& field) {
-        field.load(std::memory_order_acquire);
-    }
-
-    ~SimpleSpinLockGuard() {}
-};
-
 class Profiler : public Process {
 public:
     static std::uint32_t calculate_max_stack_depth(std::uint32_t hinted_max_stack_depth);
@@ -59,9 +29,9 @@ public:
 
     bool start(JNIEnv *jniEnv);
 
-    void stop();
+    void stop() override;
 
-    void run();
+    void run() override;
 
     void handle(int signum, siginfo_t *info, void *context);
 

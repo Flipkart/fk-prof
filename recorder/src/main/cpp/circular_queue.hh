@@ -40,18 +40,20 @@ public:
 
     virtual ~CircularQueue();
 
+    //TODO: see if instead of push/pop semantic, acquire/release slot sematic helps in avoiding stacktrace copy.
+    
     bool push(const InMsg& in_msg);
 
     bool pop();
 
 private:
-    QueueListener<TraceType> &listener_;
+    Listener& listener_;
 
     std::atomic<size_t> input;
     std::atomic<size_t> output;
 
     TraceType buffer[Capacity];
-    StackFrame *frame_buffer_[Capacity];
+    StackFrame* frame_buffer_[Capacity];
 
     size_t advance(size_t index) const;
 
@@ -64,10 +66,11 @@ protected:
 };
 
 namespace cpu {
+
     struct Sample {
         std::atomic<int> is_committed;
         Backtrace trace;
-        ThreadBucket *info;
+        ThreadBucket* info;
         PerfCtx::ThreadTracker::EffectiveCtx ctx;
         std::uint8_t ctx_len;
         bool default_ctx;
@@ -78,10 +81,13 @@ namespace cpu {
         ThreadBucket* info;
         BacktraceError error;
         bool default_ctx;
+
         union {
+
             struct {
                 const JVMPI_CallTrace* ct;
             } java;
+
             struct {
                 const NativeFrame* ct;
                 std::uint32_t num_frames;
@@ -89,16 +95,16 @@ namespace cpu {
         } ct;
 
         InMsg(const JVMPI_CallTrace& item, ThreadBucket* info, const BacktraceError error, const bool default_ctx);
-    
+
         InMsg(const NativeFrame* trace, const std::uint32_t num_frames, ThreadBucket* info, const BacktraceError error, bool default_ctx);
-    
+
     private:
         InMsg(BacktraceType type, ThreadBucket* info, const BacktraceError error, bool default_ctx);
     };
 
     class Queue : public CircularQueue<Sample, InMsg> {
     public:
-        explicit Queue(QueueListener<Sample>& listener, std::uint32_t maxFrameSize);
+        explicit Queue(Listener& listener, std::uint32_t maxFrameSize);
 
         ~Queue();
 
@@ -110,10 +116,12 @@ namespace cpu {
 extern template class ::CircularQueue<cpu::Sample, cpu::InMsg>;
 
 namespace iotrace {
+
     struct Sample {
         std::atomic<int> is_committed;
+        ThreadBucket* thd_info;
         blocking::BlockingEvt evt;
-        ThreadBucket *info;
+        Backtrace trace;
         PerfCtx::ThreadTracker::EffectiveCtx ctx;
         std::uint8_t ctx_len;
         bool default_ctx;
@@ -122,14 +130,19 @@ namespace iotrace {
     struct InMsg {
         blocking::BlockingEvt evt;
         ThreadBucket* info;
+        jvmtiFrameInfo* frames;
+        int frame_count;
         bool default_ctx;
+
+        InMsg(const blocking::BlockingEvt& evt, ThreadBucket* info, jvmtiFrameInfo* frames, const int frame_count, const bool default_ctx);
         
         InMsg(const blocking::BlockingEvt& evt, ThreadBucket* info, const bool default_ctx);
     };
 
     class Queue : public CircularQueue<Sample, InMsg> {
     public:
-        explicit Queue(QueueListener<Sample>& listener, std::uint32_t maxFrameSize);
+
+        explicit Queue(Listener& listener, std::uint32_t maxFrameSize);
 
         ~Queue();
 

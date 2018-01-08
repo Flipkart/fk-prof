@@ -116,12 +116,12 @@ public class ProfileApiTest {
     LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
     AggregationWindow aw = new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId1, workId2, workId3}, 60);
     activeAggregationWindows.associateAggregationWindow(new long[] {workId1, workId2, workId3}, aw);
-    List<Recorder.Wse> wseList = getMockWseEntriesForMultipleProfiles();
+    List<Recorder.RecordingChunk> recList = getMockWseEntriesForMultipleProfiles();
 
     final Async async = context.async();
-    Future<ResponsePayload> f1 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId1), Arrays.asList(wseList.get(0)));
-    Future<ResponsePayload> f2 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId2), Arrays.asList(wseList.get(1)));
-    Future<ResponsePayload> f3 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId3), Arrays.asList(wseList.get(2)));
+    Future<ResponsePayload> f1 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId1), Arrays.asList(recList.get(0)));
+    Future<ResponsePayload> f2 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId2), Arrays.asList(recList.get(1)));
+    Future<ResponsePayload> f3 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId3), Arrays.asList(recList.get(2)));
     CompositeFuture.all(Arrays.asList(f1, f2, f3)).setHandler(ar -> {
       if (ar.failed()) {
         context.fail(ar.cause());
@@ -256,11 +256,11 @@ public class ProfileApiTest {
     LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
     AggregationWindow aw = new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId1, workId2}, 60);
     activeAggregationWindows.associateAggregationWindow(new long[] {workId1}, aw);
-    List<Recorder.Wse> wseList = getMockWseEntriesForMultipleProfiles();
+    List<Recorder.RecordingChunk> recList = getMockWseEntriesForMultipleProfiles();
 
     final Async async = context.async();
-    Future<ResponsePayload> f1 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId1, 1), Arrays.asList(wseList.get(0)));
-    Future<ResponsePayload> f2 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId2, 2), Arrays.asList(wseList.get(1)));
+    Future<ResponsePayload> f1 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId1, 1), Arrays.asList(recList.get(0)));
+    Future<ResponsePayload> f2 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId2, 2), Arrays.asList(recList.get(1)));
     CompositeFuture.all(Arrays.asList(f1, f2)).setHandler(ar -> {
       if (ar.failed()) {
         context.fail(ar.cause());
@@ -364,12 +364,12 @@ public class ProfileApiTest {
     LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
     AggregationWindow aw = new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId1, workId2, workId3}, 60);
     activeAggregationWindows.associateAggregationWindow(new long[] {workId1, workId2, workId3}, aw);
-    List<Recorder.Wse> wseList = getMockWseEntriesForMultipleProfiles();
+    List<Recorder.RecordingChunk> recList = getMockWseEntriesForMultipleProfiles();
 
     final Async async = context.async();
-    Future<ResponsePayload> f1 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId1), Arrays.asList(wseList.get(0)));
+    Future<ResponsePayload> f1 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId1), Arrays.asList(recList.get(0)));
     //make a long running profile request
-    Future<ResponsePayload> f2 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId2), Arrays.asList(wseList.get(1)), 2000);
+    Future<ResponsePayload> f2 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId2), Arrays.asList(recList.get(1)), 2000);
     Thread.sleep(500);
     f1.setHandler(ar -> {
       if (ar.failed()) {
@@ -399,12 +399,12 @@ public class ProfileApiTest {
 
   }
 
-  private Future<ResponsePayload> makeValidProfileRequest(Recorder.RecordingHeader recordingHeader, List<Recorder.Wse> wseList) {
-    return makeValidProfileRequest(recordingHeader, wseList, 0);
+  private Future<ResponsePayload> makeValidProfileRequest(Recorder.RecordingHeader recordingHeader, List<Recorder.RecordingChunk> recList) {
+    return makeValidProfileRequest(recordingHeader, recList, 0);
   }
 
-  private Future<ResponsePayload> makeValidProfileRequest(Recorder.RecordingHeader recordingHeader, List<Recorder.Wse> wseList, int additionalDelayInMs) {
-    return makeProfileRequest(vertx, port, recordingHeader, wseList, HeaderPayloadStrategy.VALID, WsePayloadStrategy.VALID, false, additionalDelayInMs);
+  private Future<ResponsePayload> makeValidProfileRequest(Recorder.RecordingHeader recordingHeader, List<Recorder.RecordingChunk> recList, int additionalDelayInMs) {
+    return makeProfileRequest(vertx, port, recordingHeader, recList, HeaderPayloadStrategy.VALID, WsePayloadStrategy.VALID, false, additionalDelayInMs);
   }
 
   private void makeInvalidHeaderProfileRequest(TestContext context, HeaderPayloadStrategy payloadStrategy, String errorToGrep) {
@@ -525,7 +525,7 @@ public class ProfileApiTest {
     return expectedProfileWorkInfo;
   }
 
-  public static Future<ResponsePayload> makeProfileRequest(Vertx vertx, int port, Recorder.RecordingHeader recordingHeader, List<Recorder.Wse> wseList, HeaderPayloadStrategy headerPayloadStrategy, WsePayloadStrategy wsePayloadStrategy, boolean skipEndMarker, int additionalDelayInMs) {
+  public static Future<ResponsePayload> makeProfileRequest(Vertx vertx, int port, Recorder.RecordingHeader recordingHeader, List<Recorder.RecordingChunk> recList, HeaderPayloadStrategy headerPayloadStrategy, WsePayloadStrategy wsePayloadStrategy, boolean skipEndMarker, int additionalDelayInMs) {
     Future<ResponsePayload> future = Future.future();
     vertx.executeBlocking(blockingFuture -> {
       try {
@@ -549,8 +549,8 @@ public class ProfileApiTest {
         if(recordingHeader != null) {
           writeMockHeaderToRequest(recordingHeader, requestStream, headerPayloadStrategy);
         }
-        if(wseList != null) {
-          writeMockWseEntriesToRequest(wseList, requestStream, wsePayloadStrategy);
+        if(recList != null) {
+          writeMockWseEntriesToRequest(recList, requestStream, wsePayloadStrategy);
         }
         if(!skipEndMarker) {
           writeEndMarkerToRequest(requestStream);
@@ -635,22 +635,22 @@ public class ProfileApiTest {
     outputStream.writeTo(requestStream);
   }
 
-  public static void writeMockWseEntriesToRequest(List<Recorder.Wse> wseList, ByteArrayOutputStream requestStream) throws IOException {
-    writeMockWseEntriesToRequest(wseList, requestStream, WsePayloadStrategy.VALID);
+  public static void writeMockWseEntriesToRequest(List<Recorder.RecordingChunk> recList, ByteArrayOutputStream requestStream) throws IOException {
+    writeMockWseEntriesToRequest(recList, requestStream, WsePayloadStrategy.VALID);
   }
 
-  public static void writeMockWseEntriesToRequest(List<Recorder.Wse> wseList, ByteArrayOutputStream requestStream, WsePayloadStrategy payloadStrategy) throws IOException {
-    if (wseList != null) {
-      for (Recorder.Wse wse : wseList) {
-        writeWseToRequest(wse, requestStream, payloadStrategy);
+  public static void writeMockWseEntriesToRequest(List<Recorder.RecordingChunk> recList, ByteArrayOutputStream requestStream, WsePayloadStrategy payloadStrategy) throws IOException {
+    if (recList != null) {
+      for (Recorder.RecordingChunk rec : recList) {
+        writeWseToRequest(rec, requestStream, payloadStrategy);
       }
     }
   }
 
-  public static void writeWseToRequest(Recorder.Wse wse, ByteArrayOutputStream requestStream, WsePayloadStrategy payloadStrategy) throws IOException {
+  public static void writeWseToRequest(Recorder.RecordingChunk rec, ByteArrayOutputStream requestStream, WsePayloadStrategy payloadStrategy) throws IOException {
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     CodedOutputStream codedOutputStream = CodedOutputStream.newInstance(outputStream);
-    byte[] wseBytes = wse.toByteArray();
+    byte[] wseBytes = rec.toByteArray();
 
     if (payloadStrategy.equals(WsePayloadStrategy.INVALID_WSE_LENGTH)) {
       codedOutputStream.writeUInt32NoTag(Integer.MAX_VALUE);
@@ -664,7 +664,7 @@ public class ProfileApiTest {
       invalidArr[invalidArr.length - 1] = invalidArr[invalidArr.length - 2] = invalidArr[invalidArr.length - 3] = 0;
       codedOutputStream.writeByteArrayNoTag(invalidArr);
     } else {
-      wse.writeTo(codedOutputStream);
+      rec.writeTo(codedOutputStream);
     }
     codedOutputStream.flush();
     byte[] bytesWritten = outputStream.toByteArray();
@@ -686,7 +686,7 @@ public class ProfileApiTest {
     outputStream.writeTo(requestStream);
   }
 
-  public static List<Recorder.Wse> getMockWseEntriesForSingleProfile() {
+  public static List<Recorder.RecordingChunk> getMockWseEntriesForSingleProfile() {
     List<Recorder.StackSample> samples = MockProfileObjects.getPredefinedStackSamples(1);
     Recorder.StackSampleWse ssw1 = Recorder.StackSampleWse.newBuilder()
         .addStackSample(samples.get(0))
@@ -696,13 +696,13 @@ public class ProfileApiTest {
         .addStackSample(samples.get(2))
         .build();
 
-    Recorder.Wse wse1 = MockProfileObjects.getMockCpuWseWithStackSample(ssw1, null);
-    Recorder.Wse wse2 = MockProfileObjects.getMockCpuWseWithStackSample(ssw2, ssw1);
+    Recorder.RecordingChunk rec1 = MockProfileObjects.getMockCpuWseWithStackSample(ssw1, null);
+    Recorder.RecordingChunk rec2 = MockProfileObjects.getMockCpuWseWithStackSample(ssw2, ssw1);
 
-    return Arrays.asList(wse1, wse2);
+    return Arrays.asList(rec1, rec2);
   }
 
-  public static List<Recorder.Wse> getMockWseEntriesForMultipleProfiles() {
+  public static List<Recorder.RecordingChunk> getMockWseEntriesForMultipleProfiles() {
     List<Recorder.StackSample> samples = MockProfileObjects.getPredefinedStackSamples(1);
     Recorder.StackSampleWse ssw1 = Recorder.StackSampleWse.newBuilder()
         .addStackSample(samples.get(0))
@@ -714,11 +714,11 @@ public class ProfileApiTest {
         .addStackSample(samples.get(2))
         .build();
 
-    Recorder.Wse wse1 = MockProfileObjects.getMockCpuWseWithStackSample(ssw1, null);
-    Recorder.Wse wse2 = MockProfileObjects.getMockCpuWseWithStackSample(ssw2, null);
-    Recorder.Wse wse3 = MockProfileObjects.getMockCpuWseWithStackSample(ssw3, null);
+    Recorder.RecordingChunk rec1 = MockProfileObjects.getMockCpuWseWithStackSample(ssw1, null);
+    Recorder.RecordingChunk rec2 = MockProfileObjects.getMockCpuWseWithStackSample(ssw2, null);
+    Recorder.RecordingChunk rec3 = MockProfileObjects.getMockCpuWseWithStackSample(ssw3, null);
 
-    return Arrays.asList(wse1, wse2, wse3);
+    return Arrays.asList(rec1, rec2, rec3);
   }
 
   public enum HeaderPayloadStrategy {

@@ -127,7 +127,7 @@ public class CpuSamplingTest {
 
     @Test
     public void should_Track_And_Retire_CpuProfileWork() throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
+        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
@@ -165,7 +165,7 @@ public class CpuSamplingTest {
 
     @Test
     public void should_Report_Alloc_Burn() throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
+        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
@@ -194,7 +194,7 @@ public class CpuSamplingTest {
 
     @Test
     public void should_Report_Intrinsic_Burn() throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
+        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
@@ -221,13 +221,14 @@ public class CpuSamplingTest {
         assertOnStackPctIsAbove(Pattern.compile(".*(sin|cos).*"), 2.0, profileEntries);
     }
 
-    private void assertOnStackPctIsAbove(Pattern pattern, double minPct, List<Recorder.Wse> entries) {
+    private void assertOnStackPctIsAbove(Pattern pattern, double minPct, List<Recorder.RecordingChunk> entries) {
         Set<Long> methodIds = new TreeSet<>();
         long matchCount = 0;
         long totalCount = 0;
-        for (Recorder.Wse entry : entries) {
+        for (Recorder.RecordingChunk rec : entries) {
+            Recorder.Wse entry = rec.getWse(0);
             assertThat(entry.hasCpuSampleEntry(), is(true));
-            for (Recorder.MethodInfo methodInfo : entry.getIndexedData().getMethodInfoList()) {
+            for (Recorder.MethodInfo methodInfo : rec.getIndexedData().getMethodInfoList()) {
                 String methodName = methodInfo.getMethodName();
                 if (pattern.matcher(methodName).matches()) {
                     methodIds.add(methodInfo.getMethodId());
@@ -253,7 +254,7 @@ public class CpuSamplingTest {
 
     @Test
     public void should_ShutdownCleanly_On_SIGTERM_WhileProfiling() throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
+        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
@@ -293,7 +294,7 @@ public class CpuSamplingTest {
 
     @Test
     public void should_respect_Coverage_and_MergeSemantic() throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
+        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
@@ -384,7 +385,7 @@ public class CpuSamplingTest {
 
     @Test
     public void shouldReport_Threads() throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
+        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
@@ -421,7 +422,7 @@ public class CpuSamplingTest {
 
     @Test
     public void should_HandleCtxScoping() throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
+        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
@@ -464,7 +465,7 @@ public class CpuSamplingTest {
 
     @Test
     public void should_HandleCtxStacking() throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
+        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
@@ -509,7 +510,7 @@ public class CpuSamplingTest {
 
     @Test
     public void should_Report_NoCtxData() throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
+        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
@@ -545,7 +546,7 @@ public class CpuSamplingTest {
 
     @Test
     public void should_SnipBacktrace_ToChosenLength() throws ExecutionException, InterruptedException, IOException, TimeoutException {
-        List<Recorder.Wse> profileEntries = new ArrayList<>();
+        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
         MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
         MutableBoolean profileCalledSecondTime = new MutableBoolean(false);
         String cpuSamplingWorkIssueTime = ISODateTimeFormat.dateTime().print(DateTime.now());
@@ -602,11 +603,11 @@ public class CpuSamplingTest {
                                 nodeMatcher(Blackhole.class, "consumeCPU", "(J)V", expectedOncpuPct, 20, Collections.emptySet())))))));
     }
 
-    private PollReqWithTime[] stubRecorderInteraction(List<Recorder.Wse> profileEntries, MutableObject<Recorder.RecordingHeader> hdr, MutableBoolean profileCalledSecondTime, String cpuSamplingWorkIssueTime, final int maxFrames) {
+    private PollReqWithTime[] stubRecorderInteraction(List<Recorder.RecordingChunk> profileEntries, MutableObject<Recorder.RecordingHeader> hdr, MutableBoolean profileCalledSecondTime, String cpuSamplingWorkIssueTime, final int maxFrames) {
         return stubRecorderInteraction(profileEntries, hdr, profileCalledSecondTime, cpuSamplingWorkIssueTime, maxFrames, 10, 2, 1);
     }
 
-    private PollReqWithTime[] stubRecorderInteraction(List<Recorder.Wse> profileEntries, MutableObject<Recorder.RecordingHeader> hdr, MutableBoolean profileCalledSecondTime, String cpuSamplingWorkIssueTime, int maxFrames, int duration, int delay, final int workAllocatingPoll) {
+    private PollReqWithTime[] stubRecorderInteraction(List<Recorder.RecordingChunk> profileEntries, MutableObject<Recorder.RecordingHeader> hdr, MutableBoolean profileCalledSecondTime, String cpuSamplingWorkIssueTime, int maxFrames, int duration, int delay, final int workAllocatingPoll) {
         PollReqWithTime pollReqs[] = new PollReqWithTime[poll.length];
 
         MutableObject<Recorder.RecorderInfo> recInfo = new MutableObject<>();
@@ -671,7 +672,7 @@ public class CpuSamplingTest {
         WorkHandlingTest.assertRecordingHeaderIsGood(hdr.getValue(), CONTROLLER_ID, CPU_SAMPLING_WORK_ID, cpuSamplingWorkIssueTime, 10, 2, 1, new Recorder.Work[]{w});
     }
 
-    private void assertProfileCallAndContent(MutableBoolean profileCalledSecondTime, List<Recorder.Wse> profileEntries, Map<String, StackNodeMatcher> expectedContent, final PivotResolver pivotResolver, final HashMap<Integer, TraceInfo> traceInfoMap, final HashMap<Integer, ThreadInfo> thdInfoMap, final HashMap<Long, MthdInfo> mthdInfoMap, final HashMap<String, SampledStackNode> aggregations) {
+    private void assertProfileCallAndContent(MutableBoolean profileCalledSecondTime, List<Recorder.RecordingChunk> profileEntries, Map<String, StackNodeMatcher> expectedContent, final PivotResolver pivotResolver, final HashMap<Integer, TraceInfo> traceInfoMap, final HashMap<Integer, ThreadInfo> thdInfoMap, final HashMap<Long, MthdInfo> mthdInfoMap, final HashMap<String, SampledStackNode> aggregations) {
         assertCpuProfileEntriesAre(profileEntries, expectedContent, false, pivotResolver, traceInfoMap, thdInfoMap, mthdInfoMap, aggregations);
 
         assertThat(profileCalledSecondTime.getValue(), is(false));
@@ -817,7 +818,7 @@ public class CpuSamplingTest {
         }
     }
 
-    private void assertCpuProfileEntriesAre(List<Recorder.Wse> entries, Map<String, StackNodeMatcher> expected, final boolean ignoreOtherWseTypes, final PivotResolver pivotResolver, final Map<Integer, TraceInfo> traceInfoMap, final Map<Integer, ThreadInfo> thdInfoMap, final Map<Long, MthdInfo> mthdInfoMap, final Map<String, SampledStackNode> aggregations) {
+    private void assertCpuProfileEntriesAre(List<Recorder.RecordingChunk> entries, Map<String, StackNodeMatcher> expected, final boolean ignoreOtherWseTypes, final PivotResolver pivotResolver, final Map<Integer, TraceInfo> traceInfoMap, final Map<Integer, ThreadInfo> thdInfoMap, final Map<Long, MthdInfo> mthdInfoMap, final Map<String, SampledStackNode> aggregations) {
         //first let us build the tree
         int totalSamples = makeTree(entries, ignoreOtherWseTypes, pivotResolver, traceInfoMap, thdInfoMap, mthdInfoMap, aggregations);
 
@@ -830,16 +831,17 @@ public class CpuSamplingTest {
         assertThat(aggregations.size(), is(expected.size()));
     }
 
-    private int makeTree(List<Recorder.Wse> entries, boolean ignoreOtherWseTypes, PivotResolver pivotResolver, Map<Integer, TraceInfo> traceInfoMap, Map<Integer, ThreadInfo> thdInfoMap, Map<Long, MthdInfo> mthdInfoMap, Map<String, SampledStackNode> aggregations) {
+    private int makeTree(List<Recorder.RecordingChunk> entries, boolean ignoreOtherWseTypes, PivotResolver pivotResolver, Map<Integer, TraceInfo> traceInfoMap, Map<Integer, ThreadInfo> thdInfoMap, Map<Long, MthdInfo> mthdInfoMap, Map<String, SampledStackNode> aggregations) {
         int totalSamples = 0;
-        for (Recorder.Wse entry : entries) {
+        for (Recorder.RecordingChunk rec : entries) {
+            Recorder.Wse entry = rec.getWse(0);
             if (!ignoreOtherWseTypes) {
                 assertThat(entry.getWType(), is(Recorder.WorkType.cpu_sample_work));
             } else if (entry.getWType() != Recorder.WorkType.cpu_sample_work) {
                 continue;
             }
             assertThat(entry.hasCpuSampleEntry(), is(true));
-            Recorder.IndexedData idxData = entry.getIndexedData();
+            Recorder.IndexedData idxData = rec.getIndexedData();
             for (Recorder.ThreadInfo thdEntry : idxData.getThreadInfoList()) {
                 int id = (int) thdEntry.getThreadId();
                 assertThat(thdInfoMap.containsKey(id), is(false));

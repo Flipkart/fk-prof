@@ -3,6 +3,7 @@
 #include <curl/curl.h>
 #include "buff.hh"
 #include "blocking_ring_buffer.hh"
+#include "io_tracer.hh"
 
 void controllerRunnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg) {
     auto control = static_cast<Controller*>(arg);
@@ -677,16 +678,17 @@ void Controller::prep(const recording::CpuSampleWork& csw) {
     tts.cpu_samples_max_stack_sz = Profiler::calculate_max_stack_depth(csw.max_frames());
 }
 
-class CpuProfileProcess : public Process {
-    ReadsafePtr<Profiler> p;
+template <typename T>
+class ProcessWrapper : public Process {
+    ReadsafePtr<T> p;
     bool available;
 
 public:
-    CpuProfileProcess() : p(GlobalCtx::recording.cpu_profiler) {
+    ProcessWrapper(UniqueReadsafePtr<T>& ptr) : p(ptr) {
         available = p.available();
     }
 
-    virtual ~CpuProfileProcess() {}
+    virtual ~ProcessWrapper() {}
 
     void run() {
         if (available) p->run();
@@ -701,10 +703,10 @@ void Controller::issue(const recording::CpuSampleWork& csw, Processes& processes
     auto freq = csw.frequency();
     logger->info("Starting cpu-sampling at {} Hz and for upto {} frames", freq, tts.cpu_samples_max_stack_sz);
     
-    GlobalCtx::recording.cpu_profiler.reset(new Profiler(jvm, jvmti, thread_map, *serializer.get(), tts.cpu_samples_max_stack_sz, freq, get_prob_pct(), cfg.noctx_cov_pct, cfg.capture_native_bt, cfg.capture_unknown_thd_bt));
+    GlobalCtx::recording.cpu_profiler.reset(new Profiler(jvm, jvmti, thread_map, *serializer, tts.cpu_samples_max_stack_sz, freq, get_prob_pct(), cfg.noctx_cov_pct, cfg.capture_native_bt, cfg.capture_unknown_thd_bt));
     ReadsafePtr<Profiler> p(GlobalCtx::recording.cpu_profiler);
     p->start(env);
-    processes.push_back(new CpuProfileProcess());
+    processes.push_back(new ProcessWrapper<Profiler>(GlobalCtx::recording.cpu_profiler));
 }
 
 void Controller::retire(const recording::CpuSampleWork& csw) {
@@ -713,19 +715,35 @@ void Controller::retire(const recording::CpuSampleWork& csw) {
 }
 
 bool Controller::capable(const recording::IOTraceWork& csw) {
-    //TODO: check how java agent is loaded. Put a variable that enables/checks instrumentation.
-    return false;
+    IOTracerJavaState& state = getIOTracerJavaState();
+    return state.isBciAgentLoaded() && (state.getBciFailedCount() == 0);
 }
 
 void Controller::prep(const recording::IOTraceWork& csw) {
     sft.io_trace_evts = csw.serialization_flush_threshold();
     tts.io_trace_max_stack_sz = Profiler::calculate_max_stack_depth(csw.max_frames());
-    //TODO: 
 }
 
-void Controller::issue(const recording::IOTraceWork& csw, Processes& processes, JNIEnv* env) {}
+void Controller::issue(const recording::IOTraceWork& csw, Processes& processes, JNIEnv* env) {
+    std::uint64_t latency_threshold = csw.latency_threshold_ms() * NANOS_IN_MILLIS;
+    
+    logger->info("Starting io-tracing with threashold {} ms and for upto {} frames", csw.latency_threshold_ms(), tts.io_trace_max_stack_sz);
+    
+    // process instance
+    GlobalCtx::recording.io_tracer.reset(new IOTracer(jvm, jvmti, thread_map, getFdMap(), *serializer, latency_threshold, tts.io_trace_max_stack_sz));
 
-void Controller::retire(const recording::IOTraceWork& csw) {}
+    ReadsafePtr<IOTracer> p(GlobalCtx::recording.io_tracer);
+
+    // enable tracing
+    p->start(env);
+    
+    processes.push_back(new ProcessWrapper<IOTracer>(GlobalCtx::recording.io_tracer));
+}
+
+void Controller::retire(const recording::IOTraceWork& csw) {
+    logger->info("Stopping io-tracing");
+    GlobalCtx::recording.io_tracer.reset();
+}
 
 namespace GlobalCtx {
     GlobalCtx::Rec recording;
