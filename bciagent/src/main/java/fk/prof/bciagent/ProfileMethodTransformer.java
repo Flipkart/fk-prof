@@ -40,13 +40,13 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     hooks.methods.put("read([B)I", fs_read);
     hooks.methods.put("read([BII)I", fs_read);
 
-    klass = "java.io.FileOutputStream";
-    hooks = new ClassInstrumentHooks();
-    INSTRUMENTED_CLASSES.put(klass, hooks);
-    hooks.methods.put("open(Ljava/lang/String;Z)V", fs_open);
-    hooks.methods.put("write(I)V", fs_write.apply(1));
-    hooks.methods.put("write([B)V", fs_write.apply(2));
-    hooks.methods.put("write([BII)V", fs_write.apply(3));
+//    klass = "java.io.FileOutputStream";
+//    hooks = new ClassInstrumentHooks();
+//    INSTRUMENTED_CLASSES.put(klass, hooks);
+//    hooks.methods.put("open(Ljava/lang/String;Z)V", fs_open);
+//    hooks.methods.put("write(I)V", fs_write.apply(1));
+//    hooks.methods.put("write([B)V", fs_write.apply(2));
+//    hooks.methods.put("write([BII)V", fs_write.apply(3));
 
     CtClass socketTimeoutExClass;
     try {
@@ -129,8 +129,8 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
         return cclass.toBytecode();
       }
     } catch (Exception e) {
+      System.err.println(e);
       bciFailed(className);
-      System.err.println(e.getMessage());
     }
     return null;
   }

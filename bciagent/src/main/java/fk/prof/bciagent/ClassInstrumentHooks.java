@@ -28,7 +28,6 @@ class ClassInstrumentHooks {
     boolean modified = false;
     if (methods.size() > 0) {
       for (CtMethod currentMethod : cclass.getDeclaredMethods()) {
-        System.out.println("Declared method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
         EntryExitHooks<CtMethod> hooks;
         if (((hooks = methods.get(currentMethod.getName() + currentMethod.getSignature())) != null) && !Modifier.isNative(currentMethod.getModifiers()) && !currentMethod.isEmpty()) {
           System.out.println("Transformed method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());

@@ -42,7 +42,7 @@ public class Instrumenter {
     static void fs_read(CtMethod m) throws Exception {
       String jStr = "";
       jStr += code_fileStream_saveFDToLocalVar();
-      jStr += "fk.prof.trace.IOTrace.File.read(" + fdLocalVar + ", $_, " + expr_elapsedNanos() + ")";
+      jStr += "fk.prof.trace.IOTrace.File.read(" + fdLocalVar + ", $_, " + expr_elapsedNanos() + ");";
       m.insertAfter(jStr, true);
     }
 
@@ -57,15 +57,15 @@ public class Instrumenter {
       } else {
           count = "$1 == null ? 0 : $3"; // write(byte[], offset, length)
       }
-      jStr += "fk.prof.trace.IOTrace.File.write(" + fdLocalVar + ", " + count + ", " + expr_elapsedNanos() + ")";
+      jStr += "fk.prof.trace.IOTrace.File.write(" + fdLocalVar + ", " + count + ", " + expr_elapsedNanos() + ");";
       m.insertAfter(jStr, true);
     }
 
     static void ss_read(CtMethod m, CtClass socketTimeoutExceptionClass) throws Exception {
-      m.addCatch("{ " + timedoutLocalVar + " = true; throw $e; }", socketTimeoutExceptionClass);
+//      m.addCatch("{ " + timedoutLocalVar + " = true; throw $e; }", socketTimeoutExceptionClass);
       String jStr = "";
       jStr += code_sockStream_saveFDToLocalVar();
-      jStr += "fk.prof.trace.IOTrace.Socket.read(" + fdLocalVar + ", $_, " + expr_elapsedNanos() + ", " + timedoutLocalVar + ")";
+      jStr += "fk.prof.trace.IOTrace.Socket.read(" + fdLocalVar + ", $_, " + expr_elapsedNanos() + ", " + timedoutLocalVar + ");";
       m.insertAfter(jStr, true);
     }
 
@@ -96,15 +96,14 @@ public class Instrumenter {
       String jStr = "";
       jStr += code_sockCh_saveFDToLocalVar();
       // TODO: non blocking??
-      jStr += "if(" + fdLocalVar + " >= 0) " +
-                "{ fk.prof.trace.IOTrace.Socket.connect(" + fdLocalVar + ", $1.toString(), " + expr_elapsedNanos() + "); }";
+      jStr += "fk.prof.trace.IOTrace.Socket.connect(" + fdLocalVar + ", $1.toString(), " + expr_elapsedNanos() + ");";
       m.insertAfter(jStr, true);
     }
 
     static void ioutil_read(CtMethod m) throws Exception {
       String jStr = "";
       jStr += code_ioUtil_saveFDToLocalVar();
-      jStr += "fk.prof.trace.IOTrace.Socket.read(" + fdLocalVar + ", $_, " + expr_elapsedNanos() + ", false)";
+      jStr += "fk.prof.trace.IOTrace.Socket.read(" + fdLocalVar + ", $_, " + expr_elapsedNanos() + ", false);";
       m.insertAfter(jStr, true);
     }
 
@@ -133,8 +132,7 @@ public class Instrumenter {
     static void sockCh(CtConstructor c) throws Exception {
       String jStr = "";
       jStr += code_sockCh_saveFDToLocalVar();
-      jStr += "if(" + fdLocalVar + " >= 0) " +
-                "{ fk.prof.trace.IOTrace.Socket.accept(" + fdLocalVar + ", $3.toString(), " + expr_elapsedNanos() + "); }";
+      jStr += "fk.prof.trace.IOTrace.Socket.accept(" + fdLocalVar + ", $3.toString(), " + expr_elapsedNanos() + ");";
       c.insertAfter(jStr, true);
     }
 
