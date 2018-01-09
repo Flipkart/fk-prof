@@ -153,7 +153,7 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
     }
   }
 
-  public void updateWorkInfo(long workId, Recorder.RecordingChunk recording) {
+  public void updateWorkInfo(long workId, Recorder.RecordingChunk recordingChunk) {
     ensureEntityIsWriteable();
 
     ProfileWorkInfo workInfo = workInfoLookup.get(workId);
@@ -161,7 +161,7 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
       throw new AggregationFailure(String.format("Cannot find work id=%d association in the aggregation window", workId), true);
     }
 
-    workInfo.updateWSEDetails(recording);
+    workInfo.updateWSEDetails(recordingChunk);
   }
 
   public void updateRecorderInfo(long workId, Recorder.RecorderInfo recorderInfo) {

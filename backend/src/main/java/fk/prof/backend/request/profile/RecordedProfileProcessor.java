@@ -181,8 +181,8 @@ public class RecordedProfileProcessor implements Handler<Buffer> {
           if(recordingChunkParser.isEndMarkerReceived()) {
             return;
           } else if (recordingChunkParser.isParsed()) {
-            Recorder.RecordingChunk recording = recordingChunkParser.get();
-            processRecordingChunk(recording);
+            Recorder.RecordingChunk chunk = recordingChunkParser.get();
+            processRecordingChunk(chunk);
             recordingChunkParser.reset();
           } else {
             break;
