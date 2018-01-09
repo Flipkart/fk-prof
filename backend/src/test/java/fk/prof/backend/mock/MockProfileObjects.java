@@ -102,7 +102,7 @@ public class MockProfileObjects {
     return samples;
   }
 
-  public static Recorder.RecordingChunk getMockCpuWseWithStackSample(Recorder.StackSampleWse currentStackSampleWse, Recorder.StackSampleWse prevStackSampleWse) {
+  public static Recorder.RecordingChunk getMockChunkWithCpuWseAndStackSample(Recorder.StackSampleWse currentStackSampleWse, Recorder.StackSampleWse prevStackSampleWse) {
     Recorder.RecordingChunk.Builder chunkBuilder = Recorder.RecordingChunk.newBuilder();
     chunkBuilder.setIndexedData(
         Recorder.IndexedData.newBuilder()

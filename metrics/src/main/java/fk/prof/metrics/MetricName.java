@@ -42,7 +42,7 @@ public enum MetricName {
   Profile_Payload_Corrupt("profile.payload.corrupt"),
   Profile_Payload_Invalid("profile.payload.invalid"),
   Profile_Window_Miss("profile.window.miss"),
-  Profile_Wse_Size("profile.wse.size"),
+  Profile_RecChunk_Size("profile.recchunk.size"),
   Profile_Header_Size("profile.header.size"),
 
   Recorder_Poll_Complete("recorder.poll.complete"),
