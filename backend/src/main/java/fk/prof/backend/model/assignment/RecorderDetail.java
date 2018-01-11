@@ -5,9 +5,10 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import com.google.common.base.Preconditions;
 import fk.prof.backend.ConfigManager;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.WorkEntities;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.RecorderTag;
-import recording.Recorder;
 
 public class RecorderDetail {
   private static final double NANOSECONDS_IN_SECOND = Math.pow(10, 9);
@@ -17,7 +18,7 @@ public class RecorderDetail {
 
   private long lastReportedTick = 0;
   private Long lastReportedTime = null;
-  private Recorder.WorkResponse currentWorkResponse;
+  private WorkEntities.WorkResponse currentWorkResponse;
 
   private final MetricRegistry metricRegistry = SharedMetricRegistries.getOrCreate(ConfigManager.METRIC_REGISTRY);
   private final Meter mtrPollReset, mtrPollStale, mtrPollComplete;
@@ -60,7 +61,7 @@ public class RecorderDetail {
 
   public boolean canAcceptWork() {
     return !isDefunct() &&
-        (currentWorkResponse.getWorkId() == 0 || Recorder.WorkResponse.WorkState.complete.equals(currentWorkResponse.getWorkState()));
+        (currentWorkResponse.getWorkId() == 0 || WorkEntities.WorkResponse.WorkState.complete.equals(currentWorkResponse.getWorkState()));
   }
 
   @Override

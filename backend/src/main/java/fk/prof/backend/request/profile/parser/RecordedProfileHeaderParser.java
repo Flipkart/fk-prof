@@ -4,14 +4,14 @@ import com.codahale.metrics.Histogram;
 import fk.prof.backend.exception.AggregationFailure;
 import fk.prof.backend.model.profile.RecordedProfileHeader;
 import fk.prof.backend.request.CompositeByteBufInputStream;
-import recording.Recorder;
+import fk.prof.idl.Recording;
 
 import java.io.IOException;
 import java.util.zip.Adler32;
 
 public class RecordedProfileHeaderParser {
   private int encodingVersion;
-  private Recorder.RecordingHeader recordingHeader = null;
+  private Recording.RecordingHeader recordingHeader = null;
 
   private Adler32 checksum = new Adler32();
   private boolean parsed = false;
@@ -53,7 +53,7 @@ public class RecordedProfileHeaderParser {
       if(recordingHeader == null) {
         in.markAndDiscardRead();
         encodingVersion = msgParser.readRawVariantInt(in, "encodingVersion");
-        recordingHeader = msgParser.readDelimited(Recorder.RecordingHeader.parser(), in, maxMessageSizeInBytes, "recording header");
+        recordingHeader = msgParser.readDelimited(Recording.RecordingHeader.parser(), in, maxMessageSizeInBytes, "recording header");
         in.updateChecksumSinceMarked(checksum);
       }
       in.markAndDiscardRead();

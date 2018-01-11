@@ -1,19 +1,20 @@
 package fk.prof.backend.util.proto;
 
-import fk.prof.backend.proto.BackendDTO;
-import recording.Recorder;
+import fk.prof.idl.Entities;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.WorkEntities;
 
 public class RecorderProtoUtil {
 
-  public static Recorder.ProcessGroup mapRecorderInfoToProcessGroup(Recorder.RecorderInfo recorderInfo) {
-    return Recorder.ProcessGroup.newBuilder()
+  public static Entities.ProcessGroup mapRecorderInfoToProcessGroup(Recorder.RecorderInfo recorderInfo) {
+    return Entities.ProcessGroup.newBuilder()
         .setAppId(recorderInfo.getAppId())
         .setCluster(recorderInfo.getCluster())
         .setProcName(recorderInfo.getProcName())
         .build();
   }
 
-  public static String processGroupCompactRepr(Recorder.ProcessGroup processGroup) {
+  public static String processGroupCompactRepr(Entities.ProcessGroup processGroup) {
     return processGroup == null ? null : String.format("%s,%s,%s", processGroup.getAppId(), processGroup.getCluster(), processGroup.getProcName());
   }
 
@@ -32,7 +33,7 @@ public class RecorderProtoUtil {
         ", rec_version=" + recorderInfo.getRecorderVersion();
   }
 
-  public static String workResponseCompactRepr(Recorder.WorkResponse workResponse) {
+  public static String workResponseCompactRepr(WorkEntities.WorkResponse workResponse) {
     if(workResponse == null) {
       return null;
     }
@@ -64,57 +65,24 @@ public class RecorderProtoUtil {
         ", delay=" + pollRes.getAssignment().getDelay();
   }
 
-  public static Recorder.Work translateWorkFromBackendDTO(BackendDTO.Work backendDTOWork) {
-    return Recorder.Work.newBuilder()
+  public static WorkEntities.Work translateWorkFromBackendDTO(WorkEntities.Work backendDTOWork) {
+    return WorkEntities.Work.newBuilder()
         .setWType(translateWorkTypeFromBackendDTO(backendDTOWork.getWType()))
         .setCpuSample(translateCpuSampleWorkFromBackendDTO(backendDTOWork.getCpuSample()))
-        .setThdSample(translateThreadSampleWorkFromBackendDTO(backendDTOWork.getThdSample()))
-        .setMonitorBlock(translateMonitorContentionWorkFromBackendDTO(backendDTOWork.getMonitorBlock()))
-        .setMonitorWait(translateMonitorWaitWorkFromBackendDTO(backendDTOWork.getMonitorWait()))
         .build();
   }
 
-  private static Recorder.WorkType translateWorkTypeFromBackendDTO(BackendDTO.WorkType backendDTOWorkType) {
-    return Recorder.WorkType.forNumber(backendDTOWorkType.getNumber());
+  private static WorkEntities.WorkType translateWorkTypeFromBackendDTO(WorkEntities.WorkType backendDTOWorkType) {
+    return WorkEntities.WorkType.forNumber(backendDTOWorkType.getNumber());
   }
 
-  private static Recorder.CpuSampleWork translateCpuSampleWorkFromBackendDTO(BackendDTO.CpuSampleWork backendDTOCpuSampleWork) {
+  private static WorkEntities.CpuSampleWork translateCpuSampleWorkFromBackendDTO(WorkEntities.CpuSampleWork backendDTOCpuSampleWork) {
     if(backendDTOCpuSampleWork == null) {
       return null;
     }
-    return Recorder.CpuSampleWork.newBuilder()
+    return WorkEntities.CpuSampleWork.newBuilder()
         .setFrequency(backendDTOCpuSampleWork.getFrequency())
         .setMaxFrames(backendDTOCpuSampleWork.getMaxFrames())
-        .build();
-  }
-
-  private static Recorder.ThreadSampleWork translateThreadSampleWorkFromBackendDTO(BackendDTO.ThreadSampleWork backendDTOThreadSampleWork) {
-    if(backendDTOThreadSampleWork == null) {
-      return null;
-    }
-    return Recorder.ThreadSampleWork.newBuilder()
-        .setFrequency(backendDTOThreadSampleWork.getFrequency())
-        .setMaxFrames(backendDTOThreadSampleWork.getMaxFrames())
-        .build();
-  }
-
-  private static Recorder.MonitorContentionWork translateMonitorContentionWorkFromBackendDTO(BackendDTO.MonitorContentionWork backendDTOMonitorContentionWork) {
-    if(backendDTOMonitorContentionWork == null) {
-      return null;
-    }
-    return Recorder.MonitorContentionWork.newBuilder()
-        .setMaxMonitors(backendDTOMonitorContentionWork.getMaxMonitors())
-        .setMaxFrames(backendDTOMonitorContentionWork.getMaxFrames())
-        .build();
-  }
-
-  private static Recorder.MonitorWaitWork translateMonitorWaitWorkFromBackendDTO(BackendDTO.MonitorWaitWork backendDTOMonitorWaitWork) {
-    if(backendDTOMonitorWaitWork == null) {
-      return null;
-    }
-    return Recorder.MonitorWaitWork.newBuilder()
-        .setMaxMonitors(backendDTOMonitorWaitWork.getMaxMonitors())
-        .setMaxFrames(backendDTOMonitorWaitWork.getMaxFrames())
         .build();
   }
 }

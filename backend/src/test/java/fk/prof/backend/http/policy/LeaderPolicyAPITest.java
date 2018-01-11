@@ -11,6 +11,7 @@ import fk.prof.backend.model.association.BackendAssociationStore;
 import fk.prof.backend.model.policy.PolicyStore;
 import fk.prof.backend.util.ProtoUtil;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
+import fk.prof.idl.PolicyEntities;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
@@ -24,7 +25,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import proto.PolicyDTO;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
@@ -112,7 +112,7 @@ public class LeaderPolicyAPITest {
 
         when(policyStore.createVersionedPolicy(MockPolicyData.mockProcessGroups.get(0), MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0), 0)))
                 .thenAnswer(invocation -> {
-                    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = invocation.getArgument(1);
+                    PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = invocation.getArgument(1);
                     return Future.failedFuture(new PolicyException("Initial policy version must be -1, your version = " + versionedPolicyDetails.getVersion(), false));
                 });
 
@@ -161,7 +161,7 @@ public class LeaderPolicyAPITest {
 
         when(policyStore.updateVersionedPolicy(MockPolicyData.mockProcessGroups.get(0), MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0), -1)))
                 .thenAnswer(invocation -> {
-                    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = invocation.getArgument(1);
+                    PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = invocation.getArgument(1);
                     return Future.failedFuture(new PolicyException("Policy Version mismatch, currentVersion = 0, your version = " + versionedPolicyDetails.getVersion() + ", for ProcessGroup = " + RecorderProtoUtil.processGroupCompactRepr(MockPolicyData.mockProcessGroups.get(0)), false));
                 });
 

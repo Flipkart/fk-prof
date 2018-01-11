@@ -3,13 +3,13 @@ package fk.prof.backend.request.profile.parser;
 import com.codahale.metrics.Histogram;
 import fk.prof.backend.exception.AggregationFailure;
 import fk.prof.backend.request.CompositeByteBufInputStream;
-import recording.Recorder;
+import fk.prof.idl.Recording;
 
 import java.io.IOException;
 import java.util.zip.Adler32;
 
 public class RecordingChunkParser {
-  private Recorder.RecordingChunk chunk = null;
+  private Recording.RecordingChunk chunk = null;
 
   private Adler32 checksum = new Adler32();
   private boolean parsed = false;
@@ -37,11 +37,11 @@ public class RecordingChunkParser {
   }
 
   /**
-   * Returns {@link Recorder.RecordingChunk} if {@link #isParsed()} is true, null otherwise
+   * Returns {@link Recording.RecordingChunk} if {@link #isParsed()} is true, null otherwise
    *
    * @return
    */
-  public Recorder.RecordingChunk get() {
+  public Recording.RecordingChunk get() {
     return this.chunk;
   }
 
@@ -63,7 +63,7 @@ public class RecordingChunkParser {
     try {
       if (chunk == null) {
         in.markAndDiscardRead();
-        chunk = msgParser.readDelimited(Recorder.RecordingChunk.parser(), in, maxMessageSizeInBytes, "RecordingChunk");
+        chunk = msgParser.readDelimited(Recording.RecordingChunk.parser(), in, maxMessageSizeInBytes, "RecordingChunk");
         if(chunk == null) {
           endMarkerReceived = true;
           return;

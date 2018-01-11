@@ -1,13 +1,12 @@
 package fk.prof.backend.model.assignment.impl;
 
 import com.codahale.metrics.CachedGauge;
-import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import fk.prof.backend.ConfigManager;
 import fk.prof.backend.model.assignment.*;
+import fk.prof.idl.Entities;
 import fk.prof.metrics.MetricName;
-import recording.Recorder;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 public class AssociatedProcessGroupsImpl implements AssociatedProcessGroups, ProcessGroupDiscoveryContext {
-  private final Map<Recorder.ProcessGroup, ProcessGroupDetail> processGroupLookup = new ConcurrentHashMap<>();
+  private final Map<Entities.ProcessGroup, ProcessGroupDetail> processGroupLookup = new ConcurrentHashMap<>();
   private final int thresholdForDefunctRecorderInSecs;
 
   private final MetricRegistry metricRegistry = SharedMetricRegistries.getOrCreate(ConfigManager.METRIC_REGISTRY);
@@ -38,9 +37,9 @@ public class AssociatedProcessGroupsImpl implements AssociatedProcessGroups, Pro
 
   //Called by backend daemon thread when load is reported to leader and leader responds with associations
   @Override
-  public void updateProcessGroupAssociations(Recorder.ProcessGroups processGroups, BiConsumer<ProcessGroupContextForScheduling, ProcessGroupAssociationResult> postUpdateAction) {
+  public void updateProcessGroupAssociations(Entities.ProcessGroups processGroups, BiConsumer<ProcessGroupContextForScheduling, ProcessGroupAssociationResult> postUpdateAction) {
     //Remove process group associations which are not returned by leader
-    for(Recorder.ProcessGroup processGroup: this.processGroupLookup.keySet()) {
+    for(Entities.ProcessGroup processGroup: this.processGroupLookup.keySet()) {
       if(!processGroups.getProcessGroupList().contains(processGroup)) {
         ProcessGroupDetail processGroupDetail = this.processGroupLookup.remove(processGroup);
         postUpdateAction.accept(processGroupDetail, ProcessGroupAssociationResult.REMOVED);
@@ -48,7 +47,7 @@ public class AssociatedProcessGroupsImpl implements AssociatedProcessGroups, Pro
     }
 
     //Add process group associations which are returned by leader
-    for(Recorder.ProcessGroup processGroup: processGroups.getProcessGroupList()) {
+    for(Entities.ProcessGroup processGroup: processGroups.getProcessGroupList()) {
       ProcessGroupDetail existingValue = this.processGroupLookup.putIfAbsent(processGroup, new ProcessGroupDetail(processGroup, thresholdForDefunctRecorderInSecs));
       if(existingValue == null) {
         postUpdateAction.accept(this.processGroupLookup.get(processGroup), ProcessGroupAssociationResult.ADDED);
@@ -57,7 +56,7 @@ public class AssociatedProcessGroupsImpl implements AssociatedProcessGroups, Pro
   }
 
   @Override
-  public ProcessGroupContextForPolling getProcessGroupContextForPolling(Recorder.ProcessGroup processGroup) {
+  public ProcessGroupContextForPolling getProcessGroupContextForPolling(Entities.ProcessGroup processGroup) {
     return this.processGroupLookup.get(processGroup);
   }
 }

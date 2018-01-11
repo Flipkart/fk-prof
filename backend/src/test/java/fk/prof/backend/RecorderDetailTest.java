@@ -2,9 +2,10 @@ package fk.prof.backend;
 
 import fk.prof.backend.model.assignment.RecorderDetail;
 import fk.prof.backend.model.assignment.RecorderIdentifier;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.WorkEntities;
 import org.junit.Assert;
 import org.junit.Test;
-import recording.Recorder;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -20,11 +21,11 @@ public class RecorderDetailTest {
     Assert.assertEquals(true, recorderDetail.isDefunct());
     Assert.assertEquals(false, recorderDetail.canAcceptWork());
 
-    Recorder.WorkResponse workResponse = Recorder.WorkResponse.newBuilder()
+    WorkEntities.WorkResponse workResponse = WorkEntities.WorkResponse.newBuilder()
         .setElapsedTime(100)
         .setWorkId(0)
-        .setWorkResult(Recorder.WorkResponse.WorkResult.success)
-        .setWorkState(Recorder.WorkResponse.WorkState.complete)
+        .setWorkResult(WorkEntities.WorkResponse.WorkResult.success)
+        .setWorkState(WorkEntities.WorkResponse.WorkState.complete)
         .build();
 
     //send poll with default work response and tick 1
@@ -45,11 +46,11 @@ public class RecorderDetailTest {
     //send poll with running work
     updated = recorderDetail.receivePoll(Recorder.PollReq.newBuilder()
         .setRecorderInfo(recorderInfoBuilder.setRecorderTick(4).build())
-        .setWorkLastIssued(Recorder.WorkResponse.newBuilder()
+        .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(1)
-            .setWorkResult(Recorder.WorkResponse.WorkResult.unknown)
-            .setWorkState(Recorder.WorkResponse.WorkState.running).build())
+            .setWorkResult(WorkEntities.WorkResponse.WorkResult.unknown)
+            .setWorkState(WorkEntities.WorkResponse.WorkState.running).build())
         .build());
     Assert.assertTrue(updated);
     Assert.assertEquals(false, recorderDetail.isDefunct());
@@ -58,11 +59,11 @@ public class RecorderDetailTest {
     //send poll with lower tick than before
     updated = recorderDetail.receivePoll(Recorder.PollReq.newBuilder()
         .setRecorderInfo(recorderInfoBuilder.setRecorderTick(3).build())
-        .setWorkLastIssued(Recorder.WorkResponse.newBuilder()
+        .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(1)
-            .setWorkResult(Recorder.WorkResponse.WorkResult.unknown)
-            .setWorkState(Recorder.WorkResponse.WorkState.running).build())
+            .setWorkResult(WorkEntities.WorkResponse.WorkResult.unknown)
+            .setWorkState(WorkEntities.WorkResponse.WorkState.running).build())
         .build());
     Assert.assertFalse(updated);
 
@@ -70,11 +71,11 @@ public class RecorderDetailTest {
     //send poll with lower tick than before
     updated = recorderDetail.receivePoll(Recorder.PollReq.newBuilder()
         .setRecorderInfo(recorderInfoBuilder.setRecorderTick(5).build())
-        .setWorkLastIssued(Recorder.WorkResponse.newBuilder()
+        .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(1)
-            .setWorkResult(Recorder.WorkResponse.WorkResult.success)
-            .setWorkState(Recorder.WorkResponse.WorkState.complete).build())
+            .setWorkResult(WorkEntities.WorkResponse.WorkResult.success)
+            .setWorkState(WorkEntities.WorkResponse.WorkState.complete).build())
         .build());
     Assert.assertTrue(updated);
     Assert.assertEquals(false, recorderDetail.isDefunct());

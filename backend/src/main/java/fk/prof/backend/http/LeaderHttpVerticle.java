@@ -10,10 +10,13 @@ import fk.prof.backend.Configuration;
 import fk.prof.backend.exception.HttpFailure;
 import fk.prof.backend.model.association.BackendAssociationStore;
 import fk.prof.backend.model.policy.PolicyStore;
-import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.ProtoUtil;
-import fk.prof.backend.util.proto.PolicyDTOProtoUtil;
+import fk.prof.backend.util.proto.PolicyEntitiesProtoUtil;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
+import fk.prof.idl.Backend;
+import fk.prof.idl.Entities;
+import fk.prof.idl.PolicyEntities;
+import fk.prof.idl.Recorder;
 import fk.prof.metrics.BackendTag;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
@@ -28,8 +31,6 @@ import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.LoggerHandler;
-import proto.PolicyDTO;
-import recording.Recorder;
 
 import java.io.IOException;
 
@@ -133,7 +134,7 @@ public class LeaderHttpVerticle extends AbstractVerticle {
 
   private void handlePostLoad(RoutingContext context) {
     try {
-      BackendDTO.LoadReportRequest payload = ProtoUtil.buildProtoFromBuffer(BackendDTO.LoadReportRequest.parser(), context.getBody());
+      Backend.LoadReportRequest payload = ProtoUtil.buildProtoFromBuffer(Backend.LoadReportRequest.parser(), context.getBody());
       String backendStr = new BackendTag(payload.getIp(), payload.getPort()).toString();
       Meter mtrFailure = metricRegistry.meter(MetricRegistry.name(MetricName.Leader_LoadReport_Failure.get(), backendStr));
       Meter mtrSuccess = metricRegistry.meter(MetricRegistry.name(MetricName.Leader_LoadReport_Success.get(), backendStr));
@@ -163,7 +164,7 @@ public class LeaderHttpVerticle extends AbstractVerticle {
   private void handlePostAssociation(RoutingContext context) {
     try {
       Recorder.RecorderInfo recorderInfo = ProtoUtil.buildProtoFromBuffer(Recorder.RecorderInfo.parser(), context.getBody());
-      Recorder.ProcessGroup processGroup = RecorderProtoUtil.mapRecorderInfoToProcessGroup(recorderInfo);
+      Entities.ProcessGroup processGroup = RecorderProtoUtil.mapRecorderInfoToProcessGroup(recorderInfo);
 
       String processGroupStr = new ProcessGroupTag(processGroup.getAppId(), processGroup.getCluster(), processGroup.getProcName()).toString();
       Meter mtrFailure = metricRegistry.meter(MetricRegistry.name(MetricName.Leader_Assoc_Failure.get(), processGroupStr));
@@ -196,7 +197,7 @@ public class LeaderHttpVerticle extends AbstractVerticle {
       String appId = context.request().getParam("appId");
       String clusterId = context.request().getParam("clusterId");
       String procName = context.request().getParam("procName");
-      Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId(appId).setCluster(clusterId).setProcName(procName).build();
+      Entities.ProcessGroup processGroup = Entities.ProcessGroup.newBuilder().setAppId(appId).setCluster(clusterId).setProcName(procName).build();
 
       String processGroupStr = new ProcessGroupTag(appId, clusterId, procName).toString();
       Meter mtrAssocMiss = metricRegistry.meter(MetricRegistry.name(MetricName.Leader_Work_Assoc_Miss.get(), processGroupStr));
@@ -211,7 +212,7 @@ public class LeaderHttpVerticle extends AbstractVerticle {
         context.response().setStatusCode(400);
         context.response().end("Calling backend=" + RecorderProtoUtil.assignedBackendCompactRepr(callingBackend) + " not assigned to process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup));
       } else {
-        BackendDTO.RecordingPolicy recordingPolicy = PolicyDTOProtoUtil.translateToBackendRecordingPolicy(policyStore.getVersionedPolicy(processGroup));
+        Backend.RecordingPolicy recordingPolicy = PolicyEntitiesProtoUtil.translateToBackendRecordingPolicy(policyStore.getVersionedPolicy(processGroup));
         if (recordingPolicy == null) {
           mtrPolicyMiss.mark();
           context.response().setStatusCode(400);
@@ -228,8 +229,8 @@ public class LeaderHttpVerticle extends AbstractVerticle {
 
   private void handleGetPolicy(RoutingContext context) {
     try {
-      Recorder.ProcessGroup pg = parseProcessGroup(context);
-      PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = policyStore.getVersionedPolicy(pg);
+      Entities.ProcessGroup pg = parseProcessGroup(context);
+      PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = policyStore.getVersionedPolicy(pg);
       if (versionedPolicyDetails == null) {
         throw new HttpFailure("Policy not found for process group " + RecorderProtoUtil.processGroupCompactRepr(pg), 404);
       } else {
@@ -243,8 +244,8 @@ public class LeaderHttpVerticle extends AbstractVerticle {
 
   private void handleCreatePolicy(RoutingContext context) {
     try {
-      Recorder.ProcessGroup pg = parseProcessGroup(context);
-      PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = parseVersionedPolicyDetailsFromPayload(context);
+      Entities.ProcessGroup pg = parseProcessGroup(context);
+      PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = parseVersionedPolicyDetailsFromPayload(context);
       policyStore.createVersionedPolicy(pg, versionedPolicyDetails).setHandler(ar -> setResponse(ar, context, 201));
     } catch (Exception ex) {
       HttpFailure httpFailure = HttpFailure.failure(ex);
@@ -254,8 +255,8 @@ public class LeaderHttpVerticle extends AbstractVerticle {
 
   private void handleUpdatePolicy(RoutingContext context) {
     try {
-      Recorder.ProcessGroup pg = parseProcessGroup(context);
-      PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = parseVersionedPolicyDetailsFromPayload(context);
+      Entities.ProcessGroup pg = parseProcessGroup(context);
+      PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = parseVersionedPolicyDetailsFromPayload(context);
       policyStore.updateVersionedPolicy(pg, versionedPolicyDetails).setHandler(ar -> setResponse(ar, context, 200));
     } catch (Exception ex) {
       HttpFailure httpFailure = HttpFailure.failure(ex);
@@ -277,17 +278,17 @@ public class LeaderHttpVerticle extends AbstractVerticle {
     }
   }
 
-  private Recorder.ProcessGroup parseProcessGroup(RoutingContext context) {
+  private Entities.ProcessGroup parseProcessGroup(RoutingContext context) {
     final String appId = context.request().getParam("appId");
     final String clusterId = context.request().getParam("clusterId");
     final String procName = context.request().getParam("procName");
 
-    return Recorder.ProcessGroup.newBuilder().setAppId(appId).setCluster(clusterId).setProcName(procName).build();
+    return Entities.ProcessGroup.newBuilder().setAppId(appId).setCluster(clusterId).setProcName(procName).build();
   }
 
-  private PolicyDTO.VersionedPolicyDetails parseVersionedPolicyDetailsFromPayload(RoutingContext context) throws Exception {
-    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = ProtoUtil.buildProtoFromBuffer(PolicyDTO.VersionedPolicyDetails.parser(), context.getBody());
-    PolicyDTOProtoUtil.validatePolicyValues(versionedPolicyDetails);
+  private PolicyEntities.VersionedPolicyDetails parseVersionedPolicyDetailsFromPayload(RoutingContext context) throws Exception {
+    PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = ProtoUtil.buildProtoFromBuffer(PolicyEntities.VersionedPolicyDetails.parser(), context.getBody());
+    PolicyEntitiesProtoUtil.validatePolicyValues(versionedPolicyDetails);
     return versionedPolicyDetails;
   }
 
@@ -305,7 +306,7 @@ public class LeaderHttpVerticle extends AbstractVerticle {
       String appId = context.request().getParam("appId");
       String clusterId = context.request().getParam("clusterId");
       String procName = context.request().getParam("procName");
-      Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId(appId).setCluster(clusterId).setProcName(procName).build();
+      Entities.ProcessGroup processGroup = Entities.ProcessGroup.newBuilder().setAppId(appId).setCluster(clusterId).setProcName(procName).build();
 
       Recorder.AssignedBackend assignedBackend = backendAssociationStore.removeAssociation(processGroup);
       if(assignedBackend != null) {

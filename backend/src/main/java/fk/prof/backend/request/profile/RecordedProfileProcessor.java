@@ -12,6 +12,7 @@ import fk.prof.backend.request.CompositeByteBufInputStream;
 import fk.prof.backend.request.profile.parser.RecordedProfileHeaderParser;
 import fk.prof.backend.request.profile.parser.RecordingChunkParser;
 import fk.prof.backend.model.aggregation.AggregationWindowDiscoveryContext;
+import fk.prof.idl.Recording;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
 import io.vertx.core.Handler;
@@ -19,7 +20,6 @@ import io.vertx.core.buffer.Buffer;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
-import recording.Recorder;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -181,7 +181,7 @@ public class RecordedProfileProcessor implements Handler<Buffer> {
           if(recordingChunkParser.isEndMarkerReceived()) {
             return;
           } else if (recordingChunkParser.isParsed()) {
-            Recorder.RecordingChunk chunk = recordingChunkParser.get();
+            Recording.RecordingChunk chunk = recordingChunkParser.get();
             processRecordingChunk(chunk);
             recordingChunkParser.reset();
           } else {
@@ -198,7 +198,7 @@ public class RecordedProfileProcessor implements Handler<Buffer> {
     }
   }
 
-  private void processRecordingChunk(Recorder.RecordingChunk chunk) throws AggregationFailure {
+  private void processRecordingChunk(Recording.RecordingChunk chunk) throws AggregationFailure {
     indexes.update(chunk.getIndexedData());
     aggregationWindow.updateWorkInfo(workId, chunk);
     for(int i = 0; i < chunk.getWseCount(); ++i) {

@@ -1,13 +1,13 @@
 package fk.prof.backend.model.profile;
 
-import recording.Recorder;
+import fk.prof.idl.Recording;
 
 public class RecordedProfileHeader {
 
   private final int encodingVersion;
-  private final Recorder.RecordingHeader recordingHeader;
+  private final Recording.RecordingHeader recordingHeader;
 
-  public RecordedProfileHeader(int encodingVersion, Recorder.RecordingHeader recordingHeader) {
+  public RecordedProfileHeader(int encodingVersion, Recording.RecordingHeader recordingHeader) {
     this.encodingVersion = encodingVersion;
     this.recordingHeader = recordingHeader;
   }
@@ -16,7 +16,7 @@ public class RecordedProfileHeader {
     return encodingVersion;
   }
 
-  public Recorder.RecordingHeader getRecordingHeader() {
+  public Recording.RecordingHeader getRecordingHeader() {
     return recordingHeader;
   }
 

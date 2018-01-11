@@ -1,6 +1,6 @@
 package fk.prof.backend.model.election;
 
-import fk.prof.backend.proto.BackendDTO;
+import fk.prof.idl.Backend;
 
 public interface LeaderWriteContext {
   /**
@@ -8,5 +8,5 @@ public interface LeaderWriteContext {
    *
    * @param leader
    */
-  void setLeader(BackendDTO.LeaderDetail leader);
+  void setLeader(Backend.LeaderDetail leader);
 }

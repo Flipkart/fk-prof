@@ -1,7 +1,9 @@
 package fk.prof.backend.mock;
 
-import proto.PolicyDTO;
-import recording.Recorder;
+
+import fk.prof.idl.Entities;
+import fk.prof.idl.PolicyEntities;
+import fk.prof.idl.WorkEntities;
 
 import java.util.Arrays;
 import java.util.List;
@@ -11,46 +13,46 @@ import java.util.List;
  * Created by rohit.patiyal on 10/05/17.
  */
 public class MockPolicyData {
-    private static PolicyDTO.CpuSampleWork mockCpuSampleWork = PolicyDTO.CpuSampleWork.newBuilder().setFrequency(50).setMaxFrames(64).build();
-    private static PolicyDTO.Work mockWork = PolicyDTO.Work.newBuilder().setWType(PolicyDTO.WorkType.cpu_sample_work).setCpuSample(mockCpuSampleWork).build();
+    private static WorkEntities.CpuSampleWork mockCpuSampleWork = WorkEntities.CpuSampleWork.newBuilder().setFrequency(50).setMaxFrames(64).build();
+    private static WorkEntities.Work mockWork = WorkEntities.Work.newBuilder().setWType(WorkEntities.WorkType.cpu_sample_work).setCpuSample(mockCpuSampleWork).build();
 
-    private static List<PolicyDTO.Schedule> mockSchedules = Arrays.asList(
-        PolicyDTO.Schedule.newBuilder().setAfter("0").setDuration(120).setPgCovPct(100).build(),
-        PolicyDTO.Schedule.newBuilder().setAfter("0").setDuration(120).setPgCovPct(100).setMinHealthy(1).build(),
-        PolicyDTO.Schedule.newBuilder().setAfter("0").setDuration(120).setPgCovPct(100).setMinHealthy(2).build()
+    private static List<PolicyEntities.Schedule> mockSchedules = Arrays.asList(
+        PolicyEntities.Schedule.newBuilder().setAfter("0").setDuration(120).setPgCovPct(100).build(),
+        PolicyEntities.Schedule.newBuilder().setAfter("0").setDuration(120).setPgCovPct(100).setMinHealthy(1).build(),
+        PolicyEntities.Schedule.newBuilder().setAfter("0").setDuration(120).setPgCovPct(100).setMinHealthy(2).build()
     );
 
-    private static List<PolicyDTO.Policy> mockPolicies = Arrays.asList(
-        PolicyDTO.Policy.newBuilder().addWork(mockWork).setSchedule(mockSchedules.get(0)).setDescription("Test policy").build(),
-        PolicyDTO.Policy.newBuilder().addWork(mockWork).setSchedule(mockSchedules.get(1)).setDescription("Test policy").build(),
-        PolicyDTO.Policy.newBuilder().addWork(mockWork).setSchedule(mockSchedules.get(2)).setDescription("Test policy").build()
+    private static List<PolicyEntities.Policy> mockPolicies = Arrays.asList(
+        PolicyEntities.Policy.newBuilder().addWork(mockWork).setSchedule(mockSchedules.get(0)).setDescription("Test policy").build(),
+        PolicyEntities.Policy.newBuilder().addWork(mockWork).setSchedule(mockSchedules.get(1)).setDescription("Test policy").build(),
+        PolicyEntities.Policy.newBuilder().addWork(mockWork).setSchedule(mockSchedules.get(2)).setDescription("Test policy").build()
 
     );
 
-    public static List<Recorder.ProcessGroup> mockProcessGroups = Arrays.asList(
-            Recorder.ProcessGroup.newBuilder().setAppId("a1").setCluster("c1").setProcName("p1").build(),
-            Recorder.ProcessGroup.newBuilder().setAppId("a1").setCluster("c1").setProcName("p2").build(),
-            Recorder.ProcessGroup.newBuilder().setAppId("a1").setCluster("c2").setProcName("p3").build(),
-            Recorder.ProcessGroup.newBuilder().setAppId("a2").setCluster("c1").setProcName("p1").build(),
-            Recorder.ProcessGroup.newBuilder().setAppId("b1").setCluster("c1").setProcName("p1").build()
+    public static List<Entities.ProcessGroup> mockProcessGroups = Arrays.asList(
+            Entities.ProcessGroup.newBuilder().setAppId("a1").setCluster("c1").setProcName("p1").build(),
+            Entities.ProcessGroup.newBuilder().setAppId("a1").setCluster("c1").setProcName("p2").build(),
+            Entities.ProcessGroup.newBuilder().setAppId("a1").setCluster("c2").setProcName("p3").build(),
+            Entities.ProcessGroup.newBuilder().setAppId("a2").setCluster("c1").setProcName("p1").build(),
+            Entities.ProcessGroup.newBuilder().setAppId("b1").setCluster("c1").setProcName("p1").build()
     );
 
-    public static List<PolicyDTO.PolicyDetails> mockPolicyDetails = Arrays.asList(
-            PolicyDTO.PolicyDetails.newBuilder().setPolicy(mockPolicies.get(0)).setModifiedBy("admin").setCreatedAt("3").setModifiedAt("3").build(),
-            PolicyDTO.PolicyDetails.newBuilder().setPolicy(mockPolicies.get(0)).setModifiedBy("admin").setCreatedAt("4").setModifiedAt("4").build(),
-            PolicyDTO.PolicyDetails.newBuilder().setPolicy(mockPolicies.get(0)).setModifiedBy("admin").setCreatedAt("5").setModifiedAt("5").build(),
-            PolicyDTO.PolicyDetails.newBuilder().setPolicy(mockPolicies.get(1)).setModifiedBy("admin").setCreatedAt("5").setModifiedAt("5").build(),
-            PolicyDTO.PolicyDetails.newBuilder().setPolicy(mockPolicies.get(2)).setModifiedBy("admin").setCreatedAt("5").setModifiedAt("5").build()
+    public static List<PolicyEntities.PolicyDetails> mockPolicyDetails = Arrays.asList(
+            PolicyEntities.PolicyDetails.newBuilder().setPolicy(mockPolicies.get(0)).setModifiedBy("admin").setCreatedAt("3").setModifiedAt("3").build(),
+            PolicyEntities.PolicyDetails.newBuilder().setPolicy(mockPolicies.get(0)).setModifiedBy("admin").setCreatedAt("4").setModifiedAt("4").build(),
+            PolicyEntities.PolicyDetails.newBuilder().setPolicy(mockPolicies.get(0)).setModifiedBy("admin").setCreatedAt("5").setModifiedAt("5").build(),
+            PolicyEntities.PolicyDetails.newBuilder().setPolicy(mockPolicies.get(1)).setModifiedBy("admin").setCreatedAt("5").setModifiedAt("5").build(),
+            PolicyEntities.PolicyDetails.newBuilder().setPolicy(mockPolicies.get(2)).setModifiedBy("admin").setCreatedAt("5").setModifiedAt("5").build()
     );
 
-    public static List<PolicyDTO.VersionedPolicyDetails> mockVersionedPolicyDetails = Arrays.asList(
-            PolicyDTO.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(0)).setVersion(-1).build(),
-            PolicyDTO.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(1)).setVersion(0).build(),
-            PolicyDTO.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(2)).setVersion(0).build(),
-            PolicyDTO.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(2)).setVersion(1).build()
+    public static List<PolicyEntities.VersionedPolicyDetails> mockVersionedPolicyDetails = Arrays.asList(
+            PolicyEntities.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(0)).setVersion(-1).build(),
+            PolicyEntities.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(1)).setVersion(0).build(),
+            PolicyEntities.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(2)).setVersion(0).build(),
+            PolicyEntities.VersionedPolicyDetails.newBuilder().setPolicyDetails(mockPolicyDetails.get(2)).setVersion(1).build()
     );
 
-    public static PolicyDTO.VersionedPolicyDetails getMockVersionedPolicyDetails(PolicyDTO.PolicyDetails policyDetails, int version) {
-        return PolicyDTO.VersionedPolicyDetails.newBuilder().setPolicyDetails(policyDetails).setVersion(version).build();
+    public static PolicyEntities.VersionedPolicyDetails getMockVersionedPolicyDetails(PolicyEntities.PolicyDetails policyDetails, int version) {
+        return PolicyEntities.VersionedPolicyDetails.newBuilder().setPolicyDetails(policyDetails).setVersion(version).build();
     }
 }
