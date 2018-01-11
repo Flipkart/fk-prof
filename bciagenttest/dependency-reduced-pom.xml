@@ -16,7 +16,7 @@
         <configuration>
           <archive>
             <manifestEntries>
-              <Main-Class>fk.prof.bciagent.BciAgent</Main-Class>
+              <Main-Class>fk.prof.bciagenttest.BciTest</Main-Class>
             </manifestEntries>
           </archive>
         </configuration>

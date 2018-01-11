@@ -2,7 +2,6 @@ package fk.prof.backend;
 
 import com.google.protobuf.CodedOutputStream;
 import fk.prof.aggregation.model.*;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.state.AggregationState;
 import fk.prof.backend.aggregator.AggregationWindow;
 import fk.prof.backend.deployer.VerticleDeployer;
@@ -15,6 +14,7 @@ import fk.prof.backend.model.election.LeaderReadContext;
 import fk.prof.backend.model.election.impl.InMemoryLeaderStore;
 import fk.prof.backend.model.aggregation.impl.ActiveAggregationWindowsImpl;
 import fk.prof.idl.Recording;
+import fk.prof.idl.WorkEntities;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -93,8 +93,8 @@ public class ProfileApiTest {
         AggregationWindow aggregationWindow = activeAggregationWindows.getAssociatedAggregationWindow(workId);
         FinalizedAggregationWindow actual = aggregationWindow.finalizeEntity();
         FinalizedCpuSamplingAggregationBucket expectedAggregationBucket = getExpectedAggregationBucketOfPredefinedSamples();
-        Map<AggregatedProfileModel.WorkType, Integer> expectedSamplesMap = new HashMap<>();
-        expectedSamplesMap.put(AggregatedProfileModel.WorkType.cpu_sample_work, 3);
+        Map<WorkEntities.WorkType, Integer> expectedSamplesMap = new HashMap<>();
+        expectedSamplesMap.put(WorkEntities.WorkType.cpu_sample_work, 3);
         FinalizedProfileWorkInfo expectedWorkInfo = getExpectedWorkInfo(actual.getDetailsForWorkId(workId).getStartedAt(),
             actual.getDetailsForWorkId(workId).getEndedAt(), expectedSamplesMap);
         Map<Long, FinalizedProfileWorkInfo> expectedWorkLookup = new HashMap<>();
@@ -135,18 +135,18 @@ public class ProfileApiTest {
         FinalizedAggregationWindow actual = aggregationWindow.finalizeEntity();
         FinalizedCpuSamplingAggregationBucket expectedAggregationBucket = getExpectedAggregationBucketOfPredefinedSamples();
 
-        Map<AggregatedProfileModel.WorkType, Integer> expectedSamplesMap1 = new HashMap<>();
-        expectedSamplesMap1.put(AggregatedProfileModel.WorkType.cpu_sample_work, 1);
+        Map<WorkEntities.WorkType, Integer> expectedSamplesMap1 = new HashMap<>();
+        expectedSamplesMap1.put(WorkEntities.WorkType.cpu_sample_work, 1);
         FinalizedProfileWorkInfo expectedWorkInfo1 = getExpectedWorkInfo(actual.getDetailsForWorkId(workId1).getStartedAt(),
             actual.getDetailsForWorkId(workId1).getEndedAt(), expectedSamplesMap1);
 
-        Map<AggregatedProfileModel.WorkType, Integer> expectedSamplesMap2 = new HashMap<>();
-        expectedSamplesMap2.put(AggregatedProfileModel.WorkType.cpu_sample_work, 1);
+        Map<WorkEntities.WorkType, Integer> expectedSamplesMap2 = new HashMap<>();
+        expectedSamplesMap2.put(WorkEntities.WorkType.cpu_sample_work, 1);
         FinalizedProfileWorkInfo expectedWorkInfo2 = getExpectedWorkInfo(actual.getDetailsForWorkId(workId2).getStartedAt(),
             actual.getDetailsForWorkId(workId2).getEndedAt(), expectedSamplesMap2);
 
-        Map<AggregatedProfileModel.WorkType, Integer> expectedSamplesMap3 = new HashMap<>();
-        expectedSamplesMap3.put(AggregatedProfileModel.WorkType.cpu_sample_work, 1);
+        Map<WorkEntities.WorkType, Integer> expectedSamplesMap3 = new HashMap<>();
+        expectedSamplesMap3.put(WorkEntities.WorkType.cpu_sample_work, 1);
         FinalizedProfileWorkInfo expectedWorkInfo3 = getExpectedWorkInfo(actual.getDetailsForWorkId(workId3).getStartedAt(),
             actual.getDetailsForWorkId(workId3).getEndedAt(), expectedSamplesMap3);
 
@@ -517,7 +517,7 @@ public class ProfileApiTest {
     return expected;
   }
 
-  private FinalizedProfileWorkInfo getExpectedWorkInfo(LocalDateTime startedAt, LocalDateTime endedAt, Map<AggregatedProfileModel.WorkType, Integer> samplesMap) {
+  private FinalizedProfileWorkInfo getExpectedWorkInfo(LocalDateTime startedAt, LocalDateTime endedAt, Map<WorkEntities.WorkType, Integer> samplesMap) {
     Map<String, Integer> expectedTraceCoverages = new HashMap<>();
     expectedTraceCoverages.put("1", 5);
     FinalizedProfileWorkInfo expectedProfileWorkInfo = new FinalizedProfileWorkInfo(1, null, AggregationState.COMPLETED,

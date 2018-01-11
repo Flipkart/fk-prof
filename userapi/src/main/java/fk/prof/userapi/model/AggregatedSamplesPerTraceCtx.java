@@ -1,6 +1,6 @@
 package fk.prof.userapi.model;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.idl.Profile;
 import fk.prof.userapi.util.StackLineParser;
 
 import java.util.List;
@@ -14,7 +14,7 @@ public class AggregatedSamplesPerTraceCtx {
     private final AggregatedSamples aggregatedSamples;
     private final List<String> methodLookup;
 
-    public AggregatedSamplesPerTraceCtx(AggregatedProfileModel.MethodLookUp methodIdlookup, AggregatedSamples aggregatedSamples) {
+    public AggregatedSamplesPerTraceCtx(Profile.MethodLookUp methodIdlookup, AggregatedSamples aggregatedSamples) {
         this.aggregatedSamples = aggregatedSamples;
         this.methodLookup = methodIdlookup.getFqdnList().stream().map(StackLineParser::convertJVMTypeSignToJava).collect(Collectors.toList());
     }

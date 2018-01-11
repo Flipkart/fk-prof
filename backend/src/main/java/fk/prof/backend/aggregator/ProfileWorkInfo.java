@@ -2,7 +2,6 @@ package fk.prof.backend.aggregator;
 
 import com.koloboke.collect.map.hash.HashObjIntMap;
 import com.koloboke.collect.map.hash.HashObjIntMaps;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.state.AggregationState;
 import fk.prof.aggregation.state.AggregationStateEvent;
 import fk.prof.aggregation.FinalizableBuilder;
@@ -119,9 +118,9 @@ public class ProfileWorkInfo extends FinalizableBuilder<FinalizedProfileWorkInfo
 
   @Override
   protected FinalizedProfileWorkInfo buildFinalizedEntity() {
-    Map<AggregatedProfileModel.WorkType, Integer> mappedWorkTypeSamples = new HashMap<>();
+    Map<WorkEntities.WorkType, Integer> mappedWorkTypeSamples = new HashMap<>();
     for(Map.Entry<WorkEntities.WorkType, Integer> entry: workTypeSamples.entrySet()) {
-      AggregatedProfileModel.WorkType mappedWorkType = ProtoUtil.mapRecorderToAggregatorWorkType(entry.getKey());
+      WorkEntities.WorkType mappedWorkType = ProtoUtil.mapRecorderToAggregatorWorkType(entry.getKey());
       if(mappedWorkType == null) {
         throw new AggregationFailure(String.format("Unable to map recorder work_type=%s to corresponding aggregation work_type", entry.getKey()), true);
       }

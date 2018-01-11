@@ -6,7 +6,8 @@ import com.amazonaws.services.s3.model.ObjectListing;
 import com.mashape.unirest.http.HttpResponse;
 import fk.prof.backend.ConfigManager;
 import fk.prof.backend.Configuration;
-import fk.prof.backend.proto.BackendDTO;
+import fk.prof.idl.Backend;
+import fk.prof.idl.WorkEntities;
 import fk.prof.recorder.main.Burn20And80PctCpu;
 import fk.prof.recorder.main.Burn50And50PctCpu;
 import fk.prof.recorder.utils.AgentRunner;
@@ -425,13 +426,13 @@ public class E2EIntegrationTest {
         }
 
         // add policy data
-        BackendDTO.RecordingPolicy policy = BackendDTO.RecordingPolicy.newBuilder()
+        Backend.RecordingPolicy policy = Backend.RecordingPolicy.newBuilder()
             .setDuration(30)
             .setCoveragePct(100)
             .setDescription("Test work profile")
-            .addWork(BackendDTO.Work.newBuilder()
-                    .setWType(BackendDTO.WorkType.cpu_sample_work)
-                    .setCpuSample(BackendDTO.CpuSampleWork.newBuilder().setFrequency(50).setMaxFrames(64))
+            .addWork(WorkEntities.Work.newBuilder()
+                    .setWType(WorkEntities.WorkType.cpu_sample_work)
+                    .setCpuSample(WorkEntities.CpuSampleWork.newBuilder().setFrequency(50).setMaxFrames(64))
                     .build())
             .build();
 

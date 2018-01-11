@@ -3,8 +3,9 @@ package fk.prof.userapi.api;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.CodedOutputStream;
 import fk.prof.aggregation.model.*;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.state.AggregationState;
+import fk.prof.idl.Profile;
+import fk.prof.idl.WorkEntities;
 import org.apache.commons.lang3.mutable.MutableInt;
 
 import java.io.ByteArrayOutputStream;
@@ -88,7 +89,7 @@ public class MockAggregationWindow {
 
     private static Map<Long, FinalizedProfileWorkInfo> buildProfilesWorkInfo(LocalDateTime aggregationStart, int count1, int count2) {
 
-        AggregatedProfileModel.RecorderInfo r1 = AggregatedProfileModel.RecorderInfo.newBuilder()
+        Profile.RecorderInfo r1 = Profile.RecorderInfo.newBuilder()
                 .setIp("192.168.1.1")
                 .setHostname("some-box-1")
                 .setAppId("app1")
@@ -100,7 +101,7 @@ public class MockAggregationWindow {
                 .setZone("chennai-1")
                 .setInstanceType("c1.xlarge").build();
 
-        AggregatedProfileModel.RecorderInfo r2 = AggregatedProfileModel.RecorderInfo.newBuilder()
+        Profile.RecorderInfo r2 = Profile.RecorderInfo.newBuilder()
                 .setIp("192.168.1.2")
                 .setHostname("some-box-2")
                 .setAppId("app1")
@@ -114,12 +115,12 @@ public class MockAggregationWindow {
 
         FinalizedProfileWorkInfo wi = new FinalizedProfileWorkInfo(1, r1, AggregationState.COMPLETED, aggregationStart.plusSeconds(10), aggregationStart.plusSeconds(10 + 60), 60,
                 buildMap("full-app-trace", 5),
-                buildMap(AggregatedProfileModel.WorkType.cpu_sample_work, count1)
+                buildMap(WorkEntities.WorkType.cpu_sample_work, count1)
         );
 
         FinalizedProfileWorkInfo wi2 = new FinalizedProfileWorkInfo(1, r2, AggregationState.RETRIED, aggregationStart.plusSeconds(24), aggregationStart.plusSeconds(24 + 60), 60,
                 buildMap("full-app-trace", 10),
-                buildMap(AggregatedProfileModel.WorkType.cpu_sample_work, count2)
+                buildMap(WorkEntities.WorkType.cpu_sample_work, count2)
         );
 
         return buildMap(101l, wi, 102l, wi2);
@@ -150,15 +151,15 @@ public class MockAggregationWindow {
         }
     }
 
-    private AggregatedProfileModel.Header getHeader() {
+    private Profile.Header getHeader() {
         ZonedDateTime now = ZonedDateTime.parse("2017-02-07T07:30:10Z", DateTimeFormatter.ISO_ZONED_DATE_TIME);
-        return AggregatedProfileModel.Header.newBuilder().setAppId("app1")
+        return Profile.Header.newBuilder().setAppId("app1")
                 .setClusterId("cluster1")
                 .setProcId("proc1")
                 .setAggregationStartTime(now.toString())
                 .setAggregationEndTime(now.plusMinutes(30).toString())
                 .setFormatVersion(1)
-                .setWorkType(AggregatedProfileModel.WorkType.cpu_sample_work)
+                .setWorkType(WorkEntities.WorkType.cpu_sample_work)
                 .build();
     }
 
@@ -176,7 +177,7 @@ public class MockAggregationWindow {
         int limit = 1_000_000;
 
         for(count = 0; count < limit; count++) {
-            AggregatedProfileModel.Header h = getHeader();
+            Profile.Header h = getHeader();
 
             CodedOutputStream cos = CodedOutputStream.newInstance(b);
             h.writeTo(cos);
@@ -211,7 +212,7 @@ public class MockAggregationWindow {
         int limit = 1_000_000;
 
         for(count = 0; count < limit; count++) {
-            AggregatedProfileModel.Header h = getHeader();
+            Profile.Header h = getHeader();
 
             h.writeDelimitedTo(bos);
 

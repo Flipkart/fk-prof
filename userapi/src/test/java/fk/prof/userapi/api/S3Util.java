@@ -11,7 +11,7 @@ import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.model.AggregationWindowSerializer;
 import fk.prof.aggregation.model.AggregationWindowSummarySerializer;
 import fk.prof.aggregation.model.FinalizedAggregationWindow;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.idl.WorkEntities;
 import io.vertx.core.Future;
 
 import java.io.ByteArrayInputStream;
@@ -44,7 +44,7 @@ public class S3Util {
         ByteArrayOutputStream boutSummary = new ByteArrayOutputStream();
         GZIPOutputStream zoutSummary = new GZIPOutputStream(boutSummary);
 
-        AggregationWindowSerializer windowsSer = new AggregationWindowSerializer(window, AggregatedProfileModel.WorkType.cpu_sample_work);
+        AggregationWindowSerializer windowsSer = new AggregationWindowSerializer(window, WorkEntities.WorkType.cpu_sample_work);
         AggregationWindowSummarySerializer windowSummarySer = new AggregationWindowSummarySerializer(window);
 
         windowsSer.serialize(zoutWS);
@@ -60,7 +60,7 @@ public class S3Util {
         // check for validity
         AggregatedProfileLoader loader = new AggregatedProfileLoader(null);
         Future f1 =  Future.future();
-        AggregatedProfileNamingStrategy file1 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, durationInSeconds, AggregatedProfileModel.WorkType.cpu_sample_work);
+        AggregatedProfileNamingStrategy file1 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, durationInSeconds, WorkEntities.WorkType.cpu_sample_work);
         loader.loadFromInputStream(f1, file1, new GZIPInputStream(new ByteArrayInputStream(boutWS.toByteArray())));
         assert f1.succeeded();
 

@@ -1,8 +1,9 @@
 package fk.prof.aggregation.model;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel.*;
-import fk.prof.aggregation.proto.AggregatedProfileModel.ProfileWorkInfo.TraceCtxToCoveragePctMap;
+import fk.prof.idl.Profile.*;
+import fk.prof.idl.Profile.ProfileWorkInfo.*;
 import fk.prof.aggregation.state.AggregationState;
+import fk.prof.idl.WorkEntities;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -17,7 +18,7 @@ public class FinalizedProfileWorkInfo {
   private final LocalDateTime endedAt;
   private final int durationInSec;
   private final Map<String, Integer> traceCoverages;
-  private final Map<WorkType, Integer> samples;
+  private final Map<WorkEntities.WorkType, Integer> samples;
 
   public FinalizedProfileWorkInfo(int recorderVersion,
                                   RecorderInfo recorderInfo,
@@ -26,7 +27,7 @@ public class FinalizedProfileWorkInfo {
                                   LocalDateTime endedAt,
                                   int durationInSec,
                                   Map<String, Integer> traceCoverages,
-                                  Map<WorkType, Integer> samples) {
+                                  Map<WorkEntities.WorkType, Integer> samples) {
     this.recorderVersion = recorderVersion;
     this.recorderInfo = recorderInfo;
     this.state = state;
@@ -75,7 +76,7 @@ public class FinalizedProfileWorkInfo {
     return traceCoverages.keySet();
   }
 
-  protected ProfileWorkInfo buildProfileWorkInfoProto(WorkType workType, LocalDateTime aggregationStartTime, TraceCtxNames traces) {
+  protected ProfileWorkInfo buildProfileWorkInfoProto(WorkEntities.WorkType workType, LocalDateTime aggregationStartTime, TraceCtxNames traces) {
     if(workType == null || (samples != null && samples.containsKey(workType))) {
       ProfileWorkInfo.Builder builder = ProfileWorkInfo.newBuilder()
               .setRecorderVersion(recorderVersion)
@@ -95,7 +96,7 @@ public class FinalizedProfileWorkInfo {
       }
       else {
         // add all the sample counts
-        for(Map.Entry<WorkType, Integer> wsSample : samples.entrySet()) {
+        for(Map.Entry<WorkEntities.WorkType, Integer> wsSample : samples.entrySet()) {
           builder.addSampleCount(ProfileWorkInfo.SampleCount.newBuilder().setWorkType(wsSample.getKey()).setSampleCount(wsSample.getValue()));
         }
       }

@@ -1,8 +1,9 @@
 package fk.prof.aggregation.model;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.serialize.SerializationException;
 import fk.prof.aggregation.serialize.Serializer;
+import fk.prof.idl.Profile;
+import fk.prof.idl.WorkEntities;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -20,10 +21,10 @@ public class AggregationWindowSerializer implements Serializer {
     public static final int AGGREGATION_FILE_MAGIC_NUM = 0x19A9F5C2;
     public static final int STACKTRACETREE_SERIAL_BATCHSIZE = 1000;
 
-    private AggregatedProfileModel.WorkType workType;
+    private WorkEntities.WorkType workType;
     private FinalizedAggregationWindow aggregation;
 
-    public AggregationWindowSerializer(FinalizedAggregationWindow aggregation, AggregatedProfileModel.WorkType workType) {
+    public AggregationWindowSerializer(FinalizedAggregationWindow aggregation, WorkEntities.WorkType workType) {
         this.aggregation = aggregation;
         this.workType = workType;
     }
@@ -36,10 +37,10 @@ public class AggregationWindowSerializer implements Serializer {
         Serializer.writeVariantInt32(AGGREGATION_FILE_MAGIC_NUM, cout);
 
         // header
-        Serializer.writeCheckedDelimited(aggregation.buildHeaderProto(VERSION, AggregatedProfileModel.WorkType.cpu_sample_work), cout);
+        Serializer.writeCheckedDelimited(aggregation.buildHeaderProto(VERSION, WorkEntities.WorkType.cpu_sample_work), cout);
 
-        AggregatedProfileModel.TraceCtxNames traceNames = aggregation.buildTraceCtxNamesProto(workType);
-        AggregatedProfileModel.TraceCtxDetailList traceDetails = aggregation.buildTraceCtxDetailListProto(workType, traceNames);
+        Profile.TraceCtxNames traceNames = aggregation.buildTraceCtxNamesProto(workType);
+        Profile.TraceCtxDetailList traceDetails = aggregation.buildTraceCtxDetailListProto(workType, traceNames);
 
         // traces
         Serializer.writeCheckedDelimited(traceNames, cout);
@@ -47,7 +48,7 @@ public class AggregationWindowSerializer implements Serializer {
 
         // profiles summary
         checksum.reset();
-        for(AggregatedProfileModel.ProfileWorkInfo workInfo: aggregation.buildProfileWorkInfoProto(workType, traceNames)) {
+        for(Profile.ProfileWorkInfo workInfo: aggregation.buildProfileWorkInfoProto(workType, traceNames)) {
             if(workInfo != null) {
                 workInfo.writeDelimitedTo(cout);
             }
@@ -66,9 +67,9 @@ public class AggregationWindowSerializer implements Serializer {
     private static class CpuSamplingAggregatedSamplesSerializer implements Serializer {
 
         private FinalizedCpuSamplingAggregationBucket cpuSamplingAggregation;
-        private AggregatedProfileModel.TraceCtxNames traces;
+        private Profile.TraceCtxNames traces;
 
-        public CpuSamplingAggregatedSamplesSerializer(FinalizedCpuSamplingAggregationBucket cpuSamplingAggregation, AggregatedProfileModel.TraceCtxNames traces) {
+        public CpuSamplingAggregatedSamplesSerializer(FinalizedCpuSamplingAggregationBucket cpuSamplingAggregation, Profile.TraceCtxNames traces) {
             this.cpuSamplingAggregation = cpuSamplingAggregation;
             this.traces = traces;
         }
