@@ -1,0 +1,49 @@
+syntax = "proto2";
+package fk.prof.idl;
+
+import "work_entities.proto";
+
+message RecorderInfo {
+    required string ip = 1;
+    required string hostname = 2;
+    required string app_id = 3;
+    required string instance_grp = 4;
+    required string cluster = 5;
+    required string instance_id = 6;
+    required string proc_name = 7;
+    required string vm_id = 8;
+    required string zone = 9;
+    required string instance_type = 10;
+    required string local_time = 11;
+    required uint32 recorder_version = 12;
+    required uint32 recorder_uptime = 13;
+    required uint64 recorder_tick = 14;
+    required RecorderCapabilities capabilities = 15;
+}
+
+message RecorderCapabilities {
+    optional bool can_cpu_sample = 1 [default = false];
+    optional bool can_trace_elapsed_time = 2 [default = false];
+    optional bool can_trace_offcpu_time = 3 [default = false];
+    optional bool can_trace_alloc = 4 [default = false];
+    optional bool can_trace_io = 5 [default = false];
+    optional bool can_trace_monitor = 6 [default = false];
+    optional bool can_instrument_java = 7 [default = false];
+};
+
+message PollReq {
+    required RecorderInfo recorder_info = 1;
+    required WorkResponse work_last_issued = 2;
+}
+
+message PollRes {
+    required string local_time = 1;
+    optional WorkAssignment assignment = 2;
+    required uint32 controller_id = 4;
+    required uint32 controller_version = 5;
+}
+
+message AssignedBackend {
+    required string host = 1;
+    required uint32 port = 2;
+}
