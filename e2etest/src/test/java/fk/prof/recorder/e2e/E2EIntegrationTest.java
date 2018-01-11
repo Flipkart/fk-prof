@@ -7,6 +7,7 @@ import com.mashape.unirest.http.HttpResponse;
 import fk.prof.backend.ConfigManager;
 import fk.prof.backend.Configuration;
 import fk.prof.idl.Backend;
+import fk.prof.idl.Entities;
 import fk.prof.idl.WorkEntities;
 import fk.prof.recorder.main.Burn20And80PctCpu;
 import fk.prof.recorder.main.Burn50And50PctCpu;
@@ -25,7 +26,6 @@ import org.apache.curator.test.TestingServer;
 import org.apache.zookeeper.KeeperException;
 import org.hamcrest.Matchers;
 import org.junit.*;
-import recording.Recorder;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Path;
@@ -436,7 +436,7 @@ public class E2EIntegrationTest {
                     .build())
             .build();
 
-        Recorder.ProcessGroup.Builder pgBuilder = Recorder.ProcessGroup.newBuilder();
+        Entities.ProcessGroup.Builder pgBuilder = Entities.ProcessGroup.newBuilder();
         ByteArrayOutputStream bout = new ByteArrayOutputStream();
 
         pgBuilder.setAppId("bar-app_1").setCluster("quux-cluster_1").setProcName("grault-proc_1");

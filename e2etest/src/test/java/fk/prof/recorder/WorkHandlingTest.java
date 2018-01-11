@@ -1,6 +1,9 @@
 package fk.prof.recorder;
 
 import com.google.protobuf.CodedInputStream;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.Recording;
+import fk.prof.idl.WorkEntities;
 import fk.prof.recorder.main.Burn20And80PctCpu;
 import fk.prof.recorder.utils.AgentRunner;
 import fk.prof.recorder.utils.TestBackendServer;
@@ -12,7 +15,6 @@ import org.joda.time.format.ISODateTimeFormat;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import recording.Recorder;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -171,23 +173,23 @@ public class WorkHandlingTest {
             idx++;
         }
 
-        assertWorkStateAndResultIs(pollReqs[0].req.getWorkLastIssued(), 0, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
-        assertWorkStateAndResultIs(pollReqs[1].req.getWorkLastIssued(), 100, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+        assertWorkStateAndResultIs(pollReqs[0].req.getWorkLastIssued(), 0, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
+        assertWorkStateAndResultIs(pollReqs[1].req.getWorkLastIssued(), 100, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
         for (int i = 2; i < 4; i++) {
-            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), 101, Recorder.WorkResponse.WorkState.pre_start, Recorder.WorkResponse.WorkResult.unknown, 0);
+            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), 101, WorkEntities.WorkResponse.WorkState.pre_start, WorkEntities.WorkResponse.WorkResult.unknown, 0);
         }
         for (int i = 4; i < 13; i++) {
-            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), 101, Recorder.WorkResponse.WorkState.running, Recorder.WorkResponse.WorkResult.unknown, i - 4);
+            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), 101, WorkEntities.WorkResponse.WorkState.running, WorkEntities.WorkResponse.WorkResult.unknown, i - 4);
         }
-        if (pollReqs[13].req.getWorkLastIssued().getWorkState() == Recorder.WorkResponse.WorkState.complete) {//if it finished just before this poll
-            assertWorkStateAndResultIs(pollReqs[13].req.getWorkLastIssued(), 101, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 9);
-            assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), 113, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+        if (pollReqs[13].req.getWorkLastIssued().getWorkState() == WorkEntities.WorkResponse.WorkState.complete) {//if it finished just before this poll
+            assertWorkStateAndResultIs(pollReqs[13].req.getWorkLastIssued(), 101, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 9);
+            assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), 113, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
         } else {//if it finished just after this poll
-            assertWorkStateAndResultIs(pollReqs[13].req.getWorkLastIssued(), 101, Recorder.WorkResponse.WorkState.running, Recorder.WorkResponse.WorkResult.unknown, 9);
-            assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), 101, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 10);
+            assertWorkStateAndResultIs(pollReqs[13].req.getWorkLastIssued(), 101, WorkEntities.WorkResponse.WorkState.running, WorkEntities.WorkResponse.WorkResult.unknown, 9);
+            assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), 101, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 10);
         }
         for (int i = 15; i < pollReqs.length; i++) {
-            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), i + 99, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), i + 99, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
         }
         assertThat(profileCalled.getValue(), is(false));
     }
@@ -204,8 +206,8 @@ public class WorkHandlingTest {
         for (int i = 2; i < poll.length; i++) {
             poll[i] = tellRecorderWeHaveNoWork(pollReqs, i);
         }
-        MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
-        List<Recorder.RecordingChunk> profileEntries = new ArrayList<>();
+        MutableObject<Recording.RecordingHeader> hdr = new MutableObject<>();
+        List<Recording.RecordingChunk> profileEntries = new ArrayList<>();
 
         wireUpProfileAction(true);
 
@@ -228,35 +230,35 @@ public class WorkHandlingTest {
 
         assertPollingWasAllGood(pollReqs, prevTime, rc(true));
 
-        assertWorkStateAndResultIs(pollReqs[0].req.getWorkLastIssued(), 0, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
-        assertWorkStateAndResultIs(pollReqs[1].req.getWorkLastIssued(), 100, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+        assertWorkStateAndResultIs(pollReqs[0].req.getWorkLastIssued(), 0, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
+        assertWorkStateAndResultIs(pollReqs[1].req.getWorkLastIssued(), 100, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
         for (int i = 2; i < 4; i++) {
-            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.pre_start, Recorder.WorkResponse.WorkResult.unknown, 0);
+            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.pre_start, WorkEntities.WorkResponse.WorkResult.unknown, 0);
         }
         for (int i = 4; i < 13; i++) {
-            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.running, Recorder.WorkResponse.WorkResult.unknown, i - 4);
+            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.running, WorkEntities.WorkResponse.WorkResult.unknown, i - 4);
         }
-        if (pollReqs[13].req.getWorkLastIssued().getWorkState() == Recorder.WorkResponse.WorkState.complete) {//if it finished just before this poll
-            assertWorkStateAndResultIs(pollReqs[13].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 9);
-            assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), 113, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+        if (pollReqs[13].req.getWorkLastIssued().getWorkState() == WorkEntities.WorkResponse.WorkState.complete) {//if it finished just before this poll
+            assertWorkStateAndResultIs(pollReqs[13].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 9);
+            assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), 113, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
         } else {//if it finished just after this poll
-            assertWorkStateAndResultIs(pollReqs[13].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.running, Recorder.WorkResponse.WorkResult.unknown, 9);
-            assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 10);
+            assertWorkStateAndResultIs(pollReqs[13].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.running, WorkEntities.WorkResponse.WorkResult.unknown, 9);
+            assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 10);
         }
 
-        assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 10);
+        assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 10);
         for (int i = 15; i < pollReqs.length; i++) {
-            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), i + 99, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), i + 99, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
         }
 
-        Recorder.Work w = Recorder.Work.newBuilder()
-                .setWType(Recorder.WorkType.cpu_sample_work)
-                .setCpuSample(Recorder.CpuSampleWork.newBuilder()
+        WorkEntities.Work w = WorkEntities.Work.newBuilder()
+                .setWType(WorkEntities.WorkType.cpu_sample_work)
+                .setCpuSample(WorkEntities.CpuSampleWork.newBuilder()
                         .setMaxFrames(CPU_SAMPLING_MAX_FRAMES)
                         .setFrequency(CPU_SAMPLING_FREQ)
                         .build())
                 .build();
-        assertRecordingHeaderIsGood(hdr.getValue(), CONTROLLER_ID, CPU_SAMPLING_WORK_ID, cpuSamplingWorkIssueTime, 10, 2, 1, new Recorder.Work[]{w});
+        assertRecordingHeaderIsGood(hdr.getValue(), CONTROLLER_ID, CPU_SAMPLING_WORK_ID, cpuSamplingWorkIssueTime, 10, 2, 1, new WorkEntities.Work[]{w});
 
         assertThat(profileCalledSecondTime.getValue(), is(false));
     }
@@ -288,7 +290,7 @@ public class WorkHandlingTest {
         for (int i = 2; i < poll.length; i++) {
             poll[i] = tellRecorderWeHaveNoWork(pollReqs, i);
         }
-        MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
+        MutableObject<Recording.RecordingHeader> hdr = new MutableObject<>();
 
         wireUpProfileAction(false);
         profile[0] = (req) -> {
@@ -310,14 +312,14 @@ public class WorkHandlingTest {
 
         assertPollingWasAllGood(pollReqs, prevTime, rc(true));
 
-        assertWorkStateAndResultIs(pollReqs[0].req.getWorkLastIssued(), 0, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
-        assertWorkStateAndResultIs(pollReqs[1].req.getWorkLastIssued(), 100, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+        assertWorkStateAndResultIs(pollReqs[0].req.getWorkLastIssued(), 0, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
+        assertWorkStateAndResultIs(pollReqs[1].req.getWorkLastIssued(), 100, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
         for (int i = 2; i < 4; i++) {
-            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.pre_start, Recorder.WorkResponse.WorkResult.unknown, 0);
+            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.pre_start, WorkEntities.WorkResponse.WorkResult.unknown, 0);
         }
-        assertWorkStateAndResultIs(pollReqs[4].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.failure, 0);
+        assertWorkStateAndResultIs(pollReqs[4].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.failure, 0);
         for (int i = 5; i < pollReqs.length; i++) {
-            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), i + 99, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), i + 99, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
         }
 
         assertThat(profileCalled, is(array(equalTo(true), equalTo(false))));
@@ -335,7 +337,7 @@ public class WorkHandlingTest {
         for (int i = 2; i < poll.length; i++) {
             poll[i] = tellRecorderWeHaveNoWork(pollReqs, i);
         }
-        MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
+        MutableObject<Recording.RecordingHeader> hdr = new MutableObject<>();
 
         wireUpProfileAction(false);
         profile[0] = (req) -> {
@@ -363,17 +365,17 @@ public class WorkHandlingTest {
 
         assertPollingWasAllGood(pollReqs, prevTime, rc(true));
 
-        assertWorkStateAndResultIs(pollReqs[0].req.getWorkLastIssued(), 0, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
-        assertWorkStateAndResultIs(pollReqs[1].req.getWorkLastIssued(), 100, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+        assertWorkStateAndResultIs(pollReqs[0].req.getWorkLastIssued(), 0, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
+        assertWorkStateAndResultIs(pollReqs[1].req.getWorkLastIssued(), 100, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
         for (int i = 2; i < 4; i++) {
-            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.pre_start, Recorder.WorkResponse.WorkResult.unknown, 0);
+            assertWorkStateAndResultIs("i = " + i, pollReqs[i].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.pre_start, WorkEntities.WorkResponse.WorkResult.unknown, 0);
         }
         for (int i = 4; i < 14; i++) {
-            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.running, Recorder.WorkResponse.WorkResult.unknown, i - 4);
+            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.running, WorkEntities.WorkResponse.WorkResult.unknown, i - 4);
         }
-        assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.failure, 10);
+        assertWorkStateAndResultIs(pollReqs[14].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.failure, 10);
         for (int i = 15; i < pollReqs.length; i++) {
-            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), i + 99, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), i + 99, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
         }
 
         assertThat(profileCalled, is(array(equalTo(true), equalTo(false))));
@@ -391,7 +393,7 @@ public class WorkHandlingTest {
         for (int i = 2; i < poll.length; i++) {
             poll[i] = tellRecorderWeHaveNoWork(pollReqs, i);
         }
-        MutableObject<Recorder.RecordingHeader> hdr = new MutableObject<>();
+        MutableObject<Recording.RecordingHeader> hdr = new MutableObject<>();
 
         wireUpProfileAction(false);
         profile[0] = (req) -> {
@@ -410,34 +412,34 @@ public class WorkHandlingTest {
 
         assertPollingWasAllGood(pollReqs, prevTime, rc(false));
 
-        assertWorkStateAndResultIs(pollReqs[0].req.getWorkLastIssued(), 0, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
-        assertWorkStateAndResultIs(pollReqs[1].req.getWorkLastIssued(), 100, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
-        assertWorkStateAndResultIs(pollReqs[2].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.failure, 0);
+        assertWorkStateAndResultIs(pollReqs[0].req.getWorkLastIssued(), 0, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
+        assertWorkStateAndResultIs(pollReqs[1].req.getWorkLastIssued(), 100, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
+        assertWorkStateAndResultIs(pollReqs[2].req.getWorkLastIssued(), CPU_SAMPLING_WORK_ID, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.failure, 0);
         for (int i = 3; i < pollReqs.length; i++) {
-            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), i + 99, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+            assertWorkStateAndResultIs(pollReqs[i].req.getWorkLastIssued(), i + 99, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
         }
 
         assertThat(profileCalled, is(array(equalTo(false))));
     }
 
-    public static void assertRecordingHeaderIsGood(Recorder.RecordingHeader rh, final int controllerId, final long workId, String cpuSamplingWorkIssueTime, final int duration, final int delay, final int workCount, final Recorder.Work[] expectedWork) {
+    public static void assertRecordingHeaderIsGood(Recording.RecordingHeader rh, final int controllerId, final long workId, String cpuSamplingWorkIssueTime, final int duration, final int delay, final int workCount, final WorkEntities.Work[] expectedWork) {
         assertThat(rh, notNullValue());
         assertThat(rh.getRecorderVersion(), is(Versions.RECORDER_VERSION));
         assertThat(rh.getControllerVersion(), is(Versions.CONTROLLER_VERSION));
         assertThat(rh.getControllerId(), is(controllerId));
-        Recorder.WorkAssignment wa = rh.getWorkAssignment();
+        WorkEntities.WorkAssignment wa = rh.getWorkAssignment();
         assertThat(wa.getWorkId(), is(workId));
         assertThat(wa.getIssueTime(), is(cpuSamplingWorkIssueTime));
         assertThat(wa.getDuration(), is(duration));
         assertThat(wa.getDelay(), is(delay));
         assertThat(wa.getWorkCount(), is(expectedWork.length));
         for (int i = 0; i < expectedWork.length; i++) {
-            Recorder.Work w = wa.getWork(i);
+            WorkEntities.Work w = wa.getWork(i);
             assertThat(w, is(expectedWork[i]));
         }
     }
 
-    public static void recordProfile(byte[] req, MutableObject<Recorder.RecordingHeader> hdr, List<Recorder.RecordingChunk> entries) {
+    public static void recordProfile(byte[] req, MutableObject<Recording.RecordingHeader> hdr, List<Recording.RecordingChunk> entries) {
         try {
             recordProfile_(req, hdr, entries);
         } catch (IOException e) {
@@ -445,18 +447,18 @@ public class WorkHandlingTest {
         }
     }
 
-    public static void recordProfile_(byte[] req, MutableObject<Recorder.RecordingHeader> hdr, List<Recorder.RecordingChunk> entries) throws IOException {
+    public static void recordProfile_(byte[] req, MutableObject<Recording.RecordingHeader> hdr, List<Recording.RecordingChunk> entries) throws IOException {
         CodedInputStream is = CodedInputStream.newInstance(req);
         assertThat(is.readUInt32(), is(Versions.RECORDER_ENCODING_VERSION));
 
         int headerLen = is.readUInt32();
 
         int hdrLimit = is.pushLimit(headerLen);
-        Recorder.RecordingHeader.Builder rhBuilder = Recorder.RecordingHeader.newBuilder();
+        Recording.RecordingHeader.Builder rhBuilder = Recording.RecordingHeader.newBuilder();
         rhBuilder.mergeFrom(is);
         is.popLimit(hdrLimit);
 
-        Recorder.RecordingHeader rh = rhBuilder.build();
+        Recording.RecordingHeader rh = rhBuilder.build();
         hdr.setValue(rh);
         //// Hdr len and chksum
         int bytesBeforeChksum = is.getTotalBytesRead();
@@ -475,7 +477,7 @@ public class WorkHandlingTest {
             if (bytesAfterChksum >= req.length)
                 throw new IllegalStateException("Stream ended before recorder EoF-marker");
             int recLim = is.pushLimit(recLen);
-            Recorder.RecordingChunk.Builder recBuilder = Recorder.RecordingChunk.newBuilder();
+            Recording.RecordingChunk.Builder recBuilder = Recording.RecordingChunk.newBuilder();
             recBuilder.mergeFrom(is);
             is.popLimit(recLim);
             entries.add(recBuilder.build());
@@ -491,32 +493,32 @@ public class WorkHandlingTest {
         }
     }
 
-    public static void assertItHadNoWork(Recorder.WorkResponse workLastIssued, long expectedId) {
-        assertWorkStateAndResultIs(workLastIssued, expectedId, Recorder.WorkResponse.WorkState.complete, Recorder.WorkResponse.WorkResult.success, 0);
+    public static void assertItHadNoWork(WorkEntities.WorkResponse workLastIssued, long expectedId) {
+        assertWorkStateAndResultIs(workLastIssued, expectedId, WorkEntities.WorkResponse.WorkState.complete, WorkEntities.WorkResponse.WorkResult.success, 0);
     }
 
-    public static void assertWorkStateAndResultIs(String ctx, Recorder.WorkResponse workLastIssued, long expectedId, final Recorder.WorkResponse.WorkState state, final Recorder.WorkResponse.WorkResult result, final int elapsedTime) {
+    public static void assertWorkStateAndResultIs(String ctx, WorkEntities.WorkResponse workLastIssued, long expectedId, final WorkEntities.WorkResponse.WorkState state, final WorkEntities.WorkResponse.WorkResult result, final int elapsedTime) {
         assertThat(ctx, workLastIssued.getWorkId(), is(expectedId));
         assertThat(ctx, workLastIssued.getWorkResult(), is(result));
         assertThat(ctx, workLastIssued.getWorkState(), is(state));
         assertThat(ctx, (long) workLastIssued.getElapsedTime(), approximately(elapsedTime, 1));
     }
 
-    public static void assertWorkStateAndResultIs(Recorder.WorkResponse workLastIssued, long expectedId, final Recorder.WorkResponse.WorkState state, final Recorder.WorkResponse.WorkResult result, final int elapsedTime) {
+    public static void assertWorkStateAndResultIs(WorkEntities.WorkResponse workLastIssued, long expectedId, final WorkEntities.WorkResponse.WorkState state, final WorkEntities.WorkResponse.WorkResult result, final int elapsedTime) {
         assertWorkStateAndResultIs("UNKNOWN", workLastIssued, expectedId, state, result, elapsedTime);
     }
 
     public static Function<byte[], byte[]> issueCpuProfilingWork(PollReqWithTime[] pollReqs, int idx, final int duration, final int delay, final String issueTime, final int workId, final int cpuSamplingMaxFrames) {
         return cookPollResponse(pollReqs, idx, (nowString, builder) -> {
-            Recorder.WorkAssignment.Builder workAssignmentBuilder = prepareWorkAssignment(nowString, builder, delay, duration, CPU_SAMPLING_WORK_DESCRIPTION, workId);
-            Recorder.Work.Builder workBuilder = workAssignmentBuilder.addWorkBuilder();
-            workBuilder.setWType(Recorder.WorkType.cpu_sample_work).getCpuSampleBuilder()
+            WorkEntities.WorkAssignment.Builder workAssignmentBuilder = prepareWorkAssignment(nowString, builder, delay, duration, CPU_SAMPLING_WORK_DESCRIPTION, workId);
+            WorkEntities.Work.Builder workBuilder = workAssignmentBuilder.addWorkBuilder();
+            workBuilder.setWType(WorkEntities.WorkType.cpu_sample_work).getCpuSampleBuilder()
                     .setFrequency(CPU_SAMPLING_FREQ)
                     .setMaxFrames(cpuSamplingMaxFrames);
         }, issueTime);
     }
 
-    public static Recorder.WorkAssignment.Builder prepareWorkAssignment(String nowString, Recorder.PollRes.Builder builder, int delay, int duration, final String desc, int workId) {
+    public static WorkEntities.WorkAssignment.Builder prepareWorkAssignment(String nowString, Recorder.PollRes.Builder builder, int delay, int duration, final String desc, int workId) {
         return builder.getAssignmentBuilder()
                 .setWorkId(workId)
                 .setDelay(delay)
