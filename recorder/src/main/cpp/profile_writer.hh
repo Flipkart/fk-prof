@@ -3,6 +3,7 @@
 
 #include <google/protobuf/io/coded_stream.h>
 #include "checksum.hh"
+#include "recording.pb.h"
 #include "recorder.pb.h"
 #include "buff.hh"
 #include <memory>
@@ -10,6 +11,8 @@
 #include "circular_queue.hh"
 #include <unordered_map>
 #include <unordered_set>
+
+namespace recording = fk::prof::idl;
 
 class RawWriter {
 public:
