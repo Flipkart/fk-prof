@@ -13,35 +13,31 @@
   <artifactId>bciagent</artifactId>
 
   <dependencies>
+
     <dependency>
       <groupId>org.javassist</groupId>
       <artifactId>javassist</artifactId>
       <version>3.22.0-GA</version>
+    </dependency>
+
+    <!--test-->
+
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.11</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
   <build>
     <plugins>
       <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>${maven.jar.version}</version>
-        <configuration>
-          <archive>
-            <manifestEntries>
-              <Premain-Class>fk.prof.bciagent.BciAgent</Premain-Class>
-              <Can-Retransform-Classes>true</Can-Retransform-Classes>
-              <Can-Redefine-Classes>true</Can-Redefine-Classes>
-              <Boot-Class-Path>../../perfctx/target/perfctx-2.0-SNAPSHOT.jar</Boot-Class-Path>
-            </manifestEntries>
-          </archive>
-        </configuration>
-      </plugin>
-
-      <plugin>
         <artifactId>maven-shade-plugin</artifactId>
         <version>2.4.3</version>
         <executions>
           <execution>
+            <id>bciagent-shade</id>
             <phase>package</phase>
             <goals>
               <goal>shade</goal>
@@ -54,9 +50,82 @@
                 </relocation>
               </relocations>
               <createDependencyReducedPom>false</createDependencyReducedPom>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <manifestEntries>
+                    <Premain-Class>fk.prof.bciagent.BciAgent</Premain-Class>
+                    <Can-Retransform-Classes>true</Can-Retransform-Classes>
+                    <Can-Redefine-Classes>true</Can-Redefine-Classes>
+                    <Boot-Class-Path>./bciagent-${project.version}-fat.jar</Boot-Class-Path>
+                  </manifestEntries>
+                </transformer>
+              </transformers>
+              <outputFile>${project.build.directory}/bciagent-${project.version}-fat.jar</outputFile>
+            </configuration>
+          </execution>
+          <execution>
+            <id>bciagent-shade-for-test</id>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <relocations>
+                <relocation>
+                  <pattern>org.javassist</pattern>
+                  <shadedPattern>fk.prof.bciagent.org.javassist</shadedPattern>
+                </relocation>
+              </relocations>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <manifestEntries>
+                    <Premain-Class>fk.prof.bciagent.TestBciAgent</Premain-Class>
+                    <Can-Retransform-Classes>true</Can-Retransform-Classes>
+                    <Can-Redefine-Classes>true</Can-Redefine-Classes>
+                    <Boot-Class-Path>./bciagent-${project.version}-fat-test.jar</Boot-Class-Path>
+                  </manifestEntries>
+                </transformer>
+              </transformers>
+              <outputFile>${project.build.directory}/bciagent-${project.version}-test-fat.jar</outputFile>
             </configuration>
           </execution>
         </executions>
+      </plugin>
+
+      <!--tests-->
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.20.1</version>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>2.20.1</version>
+        <executions>
+          <execution>
+            <id>run-it-tests</id>
+            <phase>integration-test</phase>
+            <goals>
+              <goal>integration-test</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>verify-it-tests</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <argLine>-javaagent:${project.build.directory}/bciagent-${project.version}-test-fat.jar</argLine>
+        </configuration>
       </plugin>
     </plugins>
   </build>

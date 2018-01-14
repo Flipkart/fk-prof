@@ -1,4 +1,4 @@
-package fk.prof;
+package fk.prof.bciagent;
 
 import java.io.FileDescriptor;
 import java.lang.reflect.Field;

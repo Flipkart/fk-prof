@@ -1,13 +1,14 @@
 package fk.prof.bciagent;
 
+import fk.prof.bciagent.tracer.IOTracer;
+
 import java.lang.instrument.Instrumentation;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 
 public class BciAgent {
 
     /**
-     * native method to signal that we are now initialized and ready to instrument. It enables the io tracing from recorder side.
+     * native method to signal that we are now initialized and ready to instrument. It enables io tracing from the recorder side.
      */
     private static native void bciAgentLoaded();
 
@@ -20,6 +21,8 @@ public class BciAgent {
         if (!verifyPrerequisites()) {
             return;
         }
+
+        GlobalCtx.setIOTracer(new IOTracer());
 
         ProfileMethodTransformer transformer = new ProfileMethodTransformer();
 
@@ -49,27 +52,11 @@ public class BciAgent {
         }
     }
 
-    private static boolean verifyPrerequisites() {
-
-        Class<?> fdaccessor;
-        try {
-            Class tracer = Class.forName("fk.prof.trace.IOTrace", true, ClassLoader.getSystemClassLoader());
-            fdaccessor = Class.forName("fk.prof.FdAccessor", true, ClassLoader.getSystemClassLoader());
-        } catch (ClassNotFoundException | LinkageError e) {
-            System.err.println(e.getMessage());
-            return false;
+    public static boolean verifyPrerequisites() {
+        Boolean initialised = FdAccessor.isInitialized();
+        if (!initialised) {
+            System.err.println("Unable to get the fd field from FileDescriptor class. Disabling instrumentation.");
         }
-
-        try {
-            Method m = fdaccessor.getDeclaredMethod("isInitialized");
-            Boolean initialised = (Boolean) m.invoke(null);
-            if (!initialised) {
-                System.err.println("Unable to get the fd field from FileDescriptor class. Disabling instrumentation.");
-            }
-            return initialised;
-        } catch (Exception e) {
-            System.err.println(e.getMessage());
-            return false;
-        }
+        return initialised;
     }
 }

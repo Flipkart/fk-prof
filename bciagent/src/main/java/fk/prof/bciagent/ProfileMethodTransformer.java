@@ -9,6 +9,7 @@ import java.util.*;
 import java.util.function.Function;
 
 public class ProfileMethodTransformer implements ClassFileTransformer {
+
   private final Map<String, ClassInstrumentHooks> INSTRUMENTED_CLASSES = new HashMap<>();
   private final ClassPool pool;
 
@@ -40,13 +41,13 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     hooks.methods.put("read([B)I", fs_read);
     hooks.methods.put("read([BII)I", fs_read);
 
-//    klass = "java.io.FileOutputStream";
-//    hooks = new ClassInstrumentHooks();
-//    INSTRUMENTED_CLASSES.put(klass, hooks);
-//    hooks.methods.put("open(Ljava/lang/String;Z)V", fs_open);
-//    hooks.methods.put("write(I)V", fs_write.apply(1));
-//    hooks.methods.put("write([B)V", fs_write.apply(2));
-//    hooks.methods.put("write([BII)V", fs_write.apply(3));
+    klass = "java.io.FileOutputStream";
+    hooks = new ClassInstrumentHooks();
+    INSTRUMENTED_CLASSES.put(klass, hooks);
+    hooks.methods.put("open(Ljava/lang/String;Z)V", fs_open);
+    hooks.methods.put("write(I)V", fs_write.apply(1));
+    hooks.methods.put("write([B)V", fs_write.apply(2));
+    hooks.methods.put("write([BII)V", fs_write.apply(3));
 
     CtClass socketTimeoutExClass;
     try {
@@ -56,22 +57,22 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
       return false;
     }
 
-    EntryExitHooks<CtMethod> sock_input_default = new EntryExitHooks<>(Instrumenter.MethodEntry::ss_read, m -> Instrumenter.MethodExit.ss_read(m, socketTimeoutExClass));
-    EntryExitHooks<CtMethod> sock_output_default = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::ss_write);
+    EntryExitHooks<CtMethod> sock_input = new EntryExitHooks<>(Instrumenter.MethodEntry::ss_read, m -> Instrumenter.MethodExit.ss_read(m, socketTimeoutExClass));
+    EntryExitHooks<CtMethod> sock_output = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::ss_write);
     EntryExitHooks<CtMethod> sock_connect = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::sock_connect);
     EntryExitHooks<CtMethod> sock_accept = new EntryExitHooks<>(Instrumenter.MethodEntry::elapsed, Instrumenter.MethodExit::sock_accept);
 
     klass = "java.net.SocketInputStream";
     hooks = new ClassInstrumentHooks();
     INSTRUMENTED_CLASSES.put(klass, hooks);
-    hooks.methods.put("read([BIII)I", sock_input_default);
-//    hooks.methods.put("skip(J)J", sock_input_default);
-//    hooks.methods.put("available()I", sock_input_default);
+    hooks.methods.put("read([BIII)I", sock_input);
+//    hooks.methods.put("skip(J)J", sock_input);
+//    hooks.methods.put("available()I", sock_input);
 
     klass = "java.net.SocketOutputStream";
     hooks = new ClassInstrumentHooks();
     INSTRUMENTED_CLASSES.put(klass, hooks);
-    hooks.methods.put("socketWrite([BII)V", sock_output_default);
+    hooks.methods.put("socketWrite([BII)V", sock_output);
 
     klass = "java.net.Socket";
     hooks = new ClassInstrumentHooks();
@@ -130,6 +131,8 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
       }
     } catch (Exception e) {
       System.err.println(e);
+      e.printStackTrace();
+
       bciFailed(className);
     }
     return null;

@@ -30,7 +30,6 @@ class ClassInstrumentHooks {
       for (CtMethod currentMethod : cclass.getDeclaredMethods()) {
         EntryExitHooks<CtMethod> hooks;
         if (((hooks = methods.get(currentMethod.getName() + currentMethod.getSignature())) != null) && !Modifier.isNative(currentMethod.getModifiers()) && !currentMethod.isEmpty()) {
-          System.out.println("Transformed method=" + currentMethod.getLongName() + " identifier=" + currentMethod.getName() + currentMethod.getSignature());
           if (hooks.entry != null) {
             hooks.entry.apply(currentMethod);
             modified = true;
@@ -49,10 +48,8 @@ class ClassInstrumentHooks {
     boolean modified = false;
     if (constructors.size() > 0) {
       for (CtConstructor constructor : cclass.getDeclaredConstructors()) {
-        System.out.println("Declared constructor=" + constructor.getLongName() + " identifier=" + constructor.getName() + constructor.getSignature());
         EntryExitHooks<CtConstructor> hooks;
         if ((hooks = constructors.get(constructor.getName() + constructor.getSignature())) != null) {
-          System.out.println("Transformed constructor=" + constructor.getLongName() + " identifier=" + constructor.getName() + constructor.getSignature());
           if (hooks.entry != null) {
             hooks.entry.apply(constructor);
             modified = true;

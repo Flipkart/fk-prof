@@ -1,7 +1,5 @@
 package fk.prof.bciagent;
 
-import javassist.CtConstructor;
-
 class EntryExitHooks<T> {
   final BciHook<T> entry;
   final BciHook<T> exit;
