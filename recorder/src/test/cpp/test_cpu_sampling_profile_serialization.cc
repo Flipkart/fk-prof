@@ -359,7 +359,7 @@ TEST(ProfileSerializer__should_write_cpu_samples_native_and_java) {
 
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse.w_type());
     auto idx_data = wse.indexed_data();
-    CHECK_EQUAL(0, idx_data.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data.monitor_info_size());
     
     CHECK_EQUAL(2, idx_data.thread_info_size());
     ASSERT_THREAD_INFO_IS(idx_data.thread_info(0), 3, "Thread No. 25", 5, true, 25);
@@ -501,7 +501,7 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_scoped_ctx) {
 
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse.w_type());
     auto idx_data = wse.indexed_data();
-    CHECK_EQUAL(0, idx_data.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data.monitor_info_size());
     
     CHECK_EQUAL(1, idx_data.thread_info_size());
     ASSERT_THREAD_INFO_IS(idx_data.thread_info(0), 3, "some thread", 8, false, 25);
@@ -615,7 +615,7 @@ TEST(ProfileSerializer__should_auto_flush__at_buffering_threshold) {
 
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse.w_type());
     auto idx_data = wse.indexed_data();
-    CHECK_EQUAL(0, idx_data.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data.monitor_info_size());
     
     CHECK_EQUAL(1, idx_data.thread_info_size());
     ASSERT_THREAD_INFO_IS(idx_data.thread_info(0), 3, "some thread", 8, false, 25);
@@ -769,7 +769,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse2.w_type());
 
     auto idx_data0 = wse0.indexed_data();
-    CHECK_EQUAL(0, idx_data0.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data0.monitor_info_size());
     
     CHECK_EQUAL(1, idx_data0.thread_info_size());
     ASSERT_THREAD_INFO_IS(idx_data0.thread_info(0), 3, "some thread", 8, false, 25);
@@ -794,7 +794,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     }
 
     auto idx_data1 = wse1.indexed_data();
-    CHECK_EQUAL(0, idx_data1.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data1.monitor_info_size());
     CHECK_EQUAL(0, idx_data1.thread_info_size());
     CHECK_EQUAL(0, idx_data1.method_info_size());
     CHECK_EQUAL(0, idx_data1.trace_ctx_size());
@@ -806,7 +806,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     }
 
     auto idx_data2 = wse2.indexed_data();
-    CHECK_EQUAL(0, idx_data2.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data2.monitor_info_size());
     
     CHECK_EQUAL(1, idx_data2.thread_info_size());
     ASSERT_THREAD_INFO_IS(idx_data2.thread_info(0), 4, "some other thread", 6, true, 10);
@@ -924,7 +924,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse2.w_type());
 
     auto idx_data0 = wse0.indexed_data();
-    CHECK_EQUAL(0, idx_data0.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data0.monitor_info_size());
 
     CHECK_EQUAL(1, idx_data0.thread_info_size());
     ASSERT_THREAD_INFO_IS(idx_data0.thread_info(0), 3, "some thread", 8, false, 25);
@@ -951,7 +951,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     }
 
     auto idx_data1 = wse1.indexed_data();
-    CHECK_EQUAL(0, idx_data1.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data1.monitor_info_size());
     CHECK_EQUAL(0, idx_data1.thread_info_size());
     CHECK_EQUAL(0, idx_data1.method_info_size());
     CHECK_EQUAL(0, idx_data1.trace_ctx_size());
@@ -963,7 +963,7 @@ TEST(ProfileSerializer__should_auto_flush_correctly__after_first_flush___and_sho
     }
 
     auto idx_data2 = wse2.indexed_data();
-    CHECK_EQUAL(0, idx_data2.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data2.monitor_info_size());
 
     CHECK_EQUAL(1, idx_data2.thread_info_size());
     ASSERT_THREAD_INFO_IS(idx_data2.thread_info(0), 4, "some other thread", 6, true, 10);
@@ -1047,7 +1047,7 @@ TEST(ProfileSerializer__should_write_cpu_samples__with_forte_error) {
 
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse.w_type());
     auto idx_data = wse.indexed_data();
-    CHECK_EQUAL(0, idx_data.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data.monitor_info_size());
     CHECK_EQUAL(0, idx_data.thread_info_size());
     CHECK_EQUAL(3, idx_data.method_info_size());
     ASSERT_METHOD_INFO_IS(idx_data.method_info(0), 0, "?", "?", "?", "?", Java_Sym);
@@ -1167,7 +1167,7 @@ TEST(ProfileSerializer__should_snip_short__very_long_cpu_sample_backtraces) {
 
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse.w_type());
     auto idx_data = wse.indexed_data();
-    CHECK_EQUAL(0, idx_data.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data.monitor_info_size());
     
     CHECK_EQUAL(1, idx_data.thread_info_size());
     ASSERT_THREAD_INFO_IS(idx_data.thread_info(0), 3, "Thread No. 25", 5, true, 25);
@@ -1310,7 +1310,7 @@ void play_last_flush_scenario(recording::Wse& wse1, int additional_traces) {
     CHECK_EQUAL(recording::WorkType::cpu_sample_work, wse1.w_type());
 
     auto idx_data0 = wse0.indexed_data();
-    CHECK_EQUAL(0, idx_data0.monitor_info_size());
+//    CHECK_EQUAL(0, idx_data0.monitor_info_size());
 
     CHECK_EQUAL(1, idx_data0.thread_info_size());
     ASSERT_THREAD_INFO_IS(idx_data0.thread_info(0), 3, "some thread", 8, false, 25);
@@ -1349,7 +1349,7 @@ TEST(ProfileSerializer__should_report_unflushed_trace__and_EOF_after_last_flush)
     auto s0_ctxs = {5};
 
     auto last_data = last.indexed_data();
-    CHECK_EQUAL(0, last_data.monitor_info_size());
+//    CHECK_EQUAL(0, last_data.monitor_info_size());
     CHECK_EQUAL(0, last_data.thread_info_size());
     CHECK_EQUAL(0, last_data.method_info_size());
 
@@ -1384,7 +1384,7 @@ TEST(ProfileSerializer__should_report_all_user_tracepoints_that_were_never_repor
     //Anyway, we are better off with tests that are more readable than DRY.
 
     auto last_data = last.indexed_data();
-    CHECK_EQUAL(0, last_data.monitor_info_size());
+//    CHECK_EQUAL(0, last_data.monitor_info_size());
     CHECK_EQUAL(0, last_data.thread_info_size());
     CHECK_EQUAL(0, last_data.method_info_size());
 
