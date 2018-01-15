@@ -3,8 +3,10 @@ package fk.prof.backend.model.policy;
 import fk.prof.backend.exception.PolicyException;
 import fk.prof.backend.util.PathNamingUtil;
 import fk.prof.backend.util.ZookeeperUtil;
-import fk.prof.backend.util.proto.PolicyDTOProtoUtil;
+import fk.prof.backend.util.proto.PolicyEntitiesProtoUtil;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
+import fk.prof.idl.Entities;
+import fk.prof.idl.PolicyEntities;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.logging.Logger;
@@ -12,8 +14,6 @@ import io.vertx.core.logging.LoggerFactory;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.utils.ZKPaths;
 import org.apache.zookeeper.CreateMode;
-import proto.PolicyDTO;
-import recording.Recorder;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -38,7 +38,7 @@ public class ZookeeperBasedPolicyStore implements PolicyStore {
     private final String policyPath;
     private final String policyVersion;
     private final Vertx vertx;
-    private final Map<Recorder.ProcessGroup, PolicyDTO.VersionedPolicyDetails> policyCache = new ConcurrentHashMap<>();
+    private final Map<Entities.ProcessGroup, PolicyEntities.VersionedPolicyDetails> policyCache = new ConcurrentHashMap<>();
     private final Map<String, Map<String, ConcurrentHashMap.KeySetView<String, Boolean>>> processGroupHierarchy = new ConcurrentHashMap<>();
     private boolean initialized;
 
@@ -88,14 +88,14 @@ public class ZookeeperBasedPolicyStore implements PolicyStore {
                 String clusterNodePath = appNodePath + DELIMITER + clusterId;
                 for (String procName : curatorClient.getChildren().forPath(clusterNodePath)) {
                     String procNamePath = clusterNodePath + DELIMITER + procName;
-                    Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId(PathNamingUtil.decode32(appId))
+                    Entities.ProcessGroup processGroup = Entities.ProcessGroup.newBuilder().setAppId(PathNamingUtil.decode32(appId))
                             .setCluster(PathNamingUtil.decode32(clusterId))
                             .setProcName(PathNamingUtil.decode32(procName)).build();
 
                     Map.Entry<String, byte[]> policyNode = ZookeeperUtil.readLatestSeqZNodeChild(curatorClient, procNamePath);
-                    PolicyDTO.PolicyDetails policyDetails = PolicyDTO.PolicyDetails.parseFrom(policyNode.getValue());
+                    PolicyEntities.PolicyDetails policyDetails = PolicyEntities.PolicyDetails.parseFrom(policyNode.getValue());
                     int version = Integer.parseInt(policyNode.getKey());
-                    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = PolicyDTO.VersionedPolicyDetails.newBuilder().setPolicyDetails(policyDetails).setVersion(version).build();
+                    PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = PolicyEntities.VersionedPolicyDetails.newBuilder().setPolicyDetails(policyDetails).setVersion(version).build();
 
                     policyCache.put(processGroup, versionedPolicyDetails);
                     updateProcessGroupHierarchy(processGroup);
@@ -133,7 +133,7 @@ public class ZookeeperBasedPolicyStore implements PolicyStore {
     }
 
     @Override
-    public PolicyDTO.VersionedPolicyDetails getVersionedPolicy(Recorder.ProcessGroup processGroup) {
+    public PolicyEntities.VersionedPolicyDetails getVersionedPolicy(Entities.ProcessGroup processGroup) {
         if (processGroup == null) {
             throw new IllegalArgumentException("Process group is required");
         }
@@ -141,30 +141,30 @@ public class ZookeeperBasedPolicyStore implements PolicyStore {
     }
 
     @Override
-    public Future<PolicyDTO.VersionedPolicyDetails> createVersionedPolicy(Recorder.ProcessGroup processGroup, PolicyDTO.VersionedPolicyDetails versionedPolicyDetails) {
+    public Future<PolicyEntities.VersionedPolicyDetails> createVersionedPolicy(Entities.ProcessGroup processGroup, PolicyEntities.VersionedPolicyDetails versionedPolicyDetails) {
         return putVersionedPolicy(processGroup, versionedPolicyDetails, true);
     }
 
     @Override
-    public Future<PolicyDTO.VersionedPolicyDetails> updateVersionedPolicy(Recorder.ProcessGroup processGroup, PolicyDTO.VersionedPolicyDetails versionedPolicyDetails) {
+    public Future<PolicyEntities.VersionedPolicyDetails> updateVersionedPolicy(Entities.ProcessGroup processGroup, PolicyEntities.VersionedPolicyDetails versionedPolicyDetails) {
         return putVersionedPolicy(processGroup, versionedPolicyDetails, false);
     }
 
-    private Future<PolicyDTO.VersionedPolicyDetails> putVersionedPolicy(Recorder.ProcessGroup processGroup, PolicyDTO.VersionedPolicyDetails requestedVersionedPolicyDetails, boolean create) {
+    private Future<PolicyEntities.VersionedPolicyDetails> putVersionedPolicy(Entities.ProcessGroup processGroup, PolicyEntities.VersionedPolicyDetails requestedVersionedPolicyDetails, boolean create) {
         if (processGroup == null) {
             throw new IllegalArgumentException("Process group is required");
         }
         if (requestedVersionedPolicyDetails == null) {
             throw new IllegalArgumentException("PolicyDetails is required");
         }
-        Future<PolicyDTO.VersionedPolicyDetails> future = Future.future();
+        Future<PolicyEntities.VersionedPolicyDetails> future = Future.future();
         String policyNodePath = PathNamingUtil.getPolicyNodePath(processGroup, policyPath, policyVersion);
 
         vertx.executeBlocking(fut -> {
             try {
-                PolicyDTO.VersionedPolicyDetails newVersionedPolicy = policyCache.compute(processGroup, (k, v) -> {
+                PolicyEntities.VersionedPolicyDetails newVersionedPolicy = policyCache.compute(processGroup, (k, v) -> {
                     if (v != null && create) {
-                        throw new PolicyException(String.format("Failing create of policy, Policy for ProcessGroup = %s already exists, policyDetails = %s", RecorderProtoUtil.processGroupCompactRepr(processGroup), PolicyDTOProtoUtil.versionedPolicyDetailsCompactRepr(getVersionedPolicy(processGroup))), true);
+                        throw new PolicyException(String.format("Failing create of policy, Policy for ProcessGroup = %s already exists, policyDetails = %s", RecorderProtoUtil.processGroupCompactRepr(processGroup), PolicyEntitiesProtoUtil.versionedPolicyDetailsCompactRepr(getVersionedPolicy(processGroup))), true);
                     }
                     if (v == null && !create) {
                         throw new PolicyException(String.format("Failing update of policy, Policy for ProcessGroup = %s does not exist", RecorderProtoUtil.processGroupCompactRepr(processGroup)), true);
@@ -182,9 +182,9 @@ public class ZookeeperBasedPolicyStore implements PolicyStore {
                     }
                 });
                 if (create) {
-                    LOGGER.info("Policy : {} created for process group: {}", PolicyDTOProtoUtil.versionedPolicyDetailsCompactRepr(newVersionedPolicy), RecorderProtoUtil.processGroupCompactRepr(processGroup));
+                    LOGGER.info("Policy : {} created for process group: {}", PolicyEntitiesProtoUtil.versionedPolicyDetailsCompactRepr(newVersionedPolicy), RecorderProtoUtil.processGroupCompactRepr(processGroup));
                 } else {
-                    LOGGER.info("Policy : {} updated for process group: {}", PolicyDTOProtoUtil.versionedPolicyDetailsCompactRepr(newVersionedPolicy), RecorderProtoUtil.processGroupCompactRepr(processGroup));
+                    LOGGER.info("Policy : {} updated for process group: {}", PolicyEntitiesProtoUtil.versionedPolicyDetailsCompactRepr(newVersionedPolicy), RecorderProtoUtil.processGroupCompactRepr(processGroup));
                 }
                 fut.complete(newVersionedPolicy);
             } catch (Exception e) {
@@ -194,26 +194,26 @@ public class ZookeeperBasedPolicyStore implements PolicyStore {
         return future;
     }
 
-    private PolicyDTO.VersionedPolicyDetails putPolicyDetailsInZK(Recorder.ProcessGroup processGroup, PolicyDTO.VersionedPolicyDetails requestedVersionedPolicyDetails, String policyNodePath, boolean create) throws Exception {
+    private PolicyEntities.VersionedPolicyDetails putPolicyDetailsInZK(Entities.ProcessGroup processGroup, PolicyEntities.VersionedPolicyDetails requestedVersionedPolicyDetails, String policyNodePath, boolean create) throws Exception {
         String currentTime = ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-        PolicyDTO.PolicyDetails.Builder policyDetailsBuilder = requestedVersionedPolicyDetails.getPolicyDetails().toBuilder().setModifiedAt(currentTime);
+        PolicyEntities.PolicyDetails.Builder policyDetailsBuilder = requestedVersionedPolicyDetails.getPolicyDetails().toBuilder().setModifiedAt(currentTime);
         if (create) {
           policyDetailsBuilder.setCreatedAt(currentTime);
         }
-        PolicyDTO.PolicyDetails policyDetailsWithCurrentTime = policyDetailsBuilder.build();
+        PolicyEntities.PolicyDetails policyDetailsWithCurrentTime = policyDetailsBuilder.build();
         String policyNodePathWithNodeName = curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.PERSISTENT_SEQUENTIAL).
             forPath(policyNodePath, policyDetailsWithCurrentTime.toByteArray());
 
-        PolicyDTO.VersionedPolicyDetails.Builder versionedPolicyDetailsBuilder = requestedVersionedPolicyDetails.toBuilder();
+        PolicyEntities.VersionedPolicyDetails.Builder versionedPolicyDetailsBuilder = requestedVersionedPolicyDetails.toBuilder();
         Integer newVersion = Integer.parseInt(ZKPaths.getNodeFromPath(policyNodePathWithNodeName)); //Policy Node names are incrementing numbers (the versions)
 
         versionedPolicyDetailsBuilder.setVersion(newVersion).setPolicyDetails(policyDetailsWithCurrentTime);
-        PolicyDTO.VersionedPolicyDetails updatedVersionedPolicyDetails = versionedPolicyDetailsBuilder.build();
+        PolicyEntities.VersionedPolicyDetails updatedVersionedPolicyDetails = versionedPolicyDetailsBuilder.build();
         updateProcessGroupHierarchy(processGroup);
         return updatedVersionedPolicyDetails;
     }
 
-    private void updateProcessGroupHierarchy(Recorder.ProcessGroup processGroup) {
+    private void updateProcessGroupHierarchy(Entities.ProcessGroup processGroup) {
         processGroupHierarchy.putIfAbsent(processGroup.getAppId(), new ConcurrentHashMap<>());
         processGroupHierarchy.get(processGroup.getAppId()).putIfAbsent(processGroup.getCluster(), ConcurrentHashMap.newKeySet());
         processGroupHierarchy.get(processGroup.getAppId()).get(processGroup.getCluster()).add(processGroup.getProcName());

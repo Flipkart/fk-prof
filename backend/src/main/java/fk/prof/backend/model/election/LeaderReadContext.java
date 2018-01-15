@@ -1,6 +1,6 @@
 package fk.prof.backend.model.election;
 
-import fk.prof.backend.proto.BackendDTO;
+import fk.prof.idl.Backend;
 
 public interface LeaderReadContext {
   /**
@@ -8,7 +8,7 @@ public interface LeaderReadContext {
    *
    * @return
    */
-  BackendDTO.LeaderDetail getLeader();
+  Backend.LeaderDetail getLeader();
 
   /**
    * Returns true if self is leader, false otherwise

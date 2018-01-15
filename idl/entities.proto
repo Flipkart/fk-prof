@@ -1,0 +1,12 @@
+syntax = "proto2";
+package fk.prof.idl;
+
+message ProcessGroup {
+    required string app_id = 1;
+    required string cluster = 2;
+    required string proc_name = 3;
+}
+
+message ProcessGroups {
+    repeated ProcessGroup processGroup = 1;
+}

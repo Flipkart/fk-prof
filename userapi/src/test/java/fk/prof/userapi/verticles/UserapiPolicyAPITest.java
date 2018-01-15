@@ -2,6 +2,7 @@ package fk.prof.userapi.verticles;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
+import fk.prof.idl.PolicyEntities;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPI;
@@ -26,7 +27,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
-import proto.PolicyDTO;
 
 import java.io.IOException;
 
@@ -83,7 +83,7 @@ public class UserapiPolicyAPITest {
         UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET,
                 UserapiApiPathConstants.GET_POLICY_FOR_APP_CLUSTER_PROC, req ->{
                     try {
-                        PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),0);
+                        PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),0);
                         req.response().end(ProtoUtil.buildBufferFromProto(versionedPolicyDetails));
                     } catch (IOException e) {
                         context.fail(e);
@@ -124,8 +124,8 @@ public class UserapiPolicyAPITest {
                 UserapiApiPathConstants.PUT_POLICY_FOR_APP_CLUSTER_PROC,
                 BodyHandler.create().setBodyLimit(1024 * 10), req -> {
                     try {
-                        PolicyDTO.VersionedPolicyDetails expected = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),0);
-                        PolicyDTO.VersionedPolicyDetails got = PolicyDTO.VersionedPolicyDetails.parseFrom(req.getBody().getBytes());
+                        PolicyEntities.VersionedPolicyDetails expected = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),0);
+                        PolicyEntities.VersionedPolicyDetails got = PolicyEntities.VersionedPolicyDetails.parseFrom(req.getBody().getBytes());
                         context.assertEquals(expected, got);
                         req.response().end(ProtoUtil.buildBufferFromProto(got.toBuilder().setVersion(got.getVersion() + 1).build()));
                     } catch (IOException e) {
@@ -168,8 +168,8 @@ public class UserapiPolicyAPITest {
                 UserapiApiPathConstants.POST_POLICY_FOR_APP_CLUSTER_PROC,
                 BodyHandler.create().setBodyLimit(1024 * 10), req -> {
                     try {
-                        PolicyDTO.VersionedPolicyDetails expected = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),-1);
-                        PolicyDTO.VersionedPolicyDetails got = PolicyDTO.VersionedPolicyDetails.parseFrom(req.getBody().getBytes());
+                        PolicyEntities.VersionedPolicyDetails expected = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),-1);
+                        PolicyEntities.VersionedPolicyDetails got = PolicyEntities.VersionedPolicyDetails.parseFrom(req.getBody().getBytes());
                         context.assertEquals(expected, got);
                         req.response().end(ProtoUtil.buildBufferFromProto(got.toBuilder().setVersion(got.getVersion() + 1).build()));
                     } catch (IOException e) {

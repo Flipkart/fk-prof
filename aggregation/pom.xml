@@ -63,7 +63,7 @@
             <configuration>
               <protocVersion>3.1.0</protocVersion>
               <inputDirectories>
-                <include>src/idl/</include>
+                <include>../idl/</include>
               </inputDirectories>
             </configuration>
           </execution>

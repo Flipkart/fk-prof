@@ -2,14 +2,15 @@ package fk.prof.backend.aggregator;
 
 import com.koloboke.collect.map.hash.HashObjIntMap;
 import com.koloboke.collect.map.hash.HashObjIntMaps;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.state.AggregationState;
 import fk.prof.aggregation.state.AggregationStateEvent;
 import fk.prof.aggregation.FinalizableBuilder;
 import fk.prof.aggregation.model.FinalizedProfileWorkInfo;
 import fk.prof.backend.util.ProtoUtil;
 import fk.prof.backend.exception.AggregationFailure;
-import recording.Recorder;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.Recording;
+import fk.prof.idl.WorkEntities;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -30,7 +31,7 @@ public class ProfileWorkInfo extends FinalizableBuilder<FinalizedProfileWorkInfo
   private int durationInSec;
   private Recorder.RecorderInfo recorderInfo;
   private final HashObjIntMap<String> traceCoverages = HashObjIntMaps.newUpdatableMap();
-  private final HashObjIntMap<Recorder.WorkType> workTypeSamples = HashObjIntMaps.newUpdatableMap();
+  private final HashObjIntMap<WorkEntities.WorkType> workTypeSamples = HashObjIntMaps.newUpdatableMap();
 
   public ProfileWorkInfo(int durationInSec) {
     this.durationInSec = durationInSec;
@@ -40,11 +41,14 @@ public class ProfileWorkInfo extends FinalizableBuilder<FinalizedProfileWorkInfo
     this.recorderInfo = recorderInfo;
   }
 
-  public void updateWSESpecificDetails(Recorder.Wse wse) {
-    for (Recorder.TraceContext trace : wse.getIndexedData().getTraceCtxList()) {
+  public void updateWSEDetails(Recording.RecordingChunk recordingChunk) {
+    for (Recording.TraceContext trace : recordingChunk.getIndexedData().getTraceCtxList()) {
       traceCoverages.put(trace.getTraceName(), trace.getCoveragePct());
     }
-    workTypeSamples.put(wse.getWType(), workTypeSamples.getOrDefault(wse.getWType(), 0) + getSampleCount(wse));
+    for(int i = 0; i < recordingChunk.getWseCount(); i++) {
+      Recording.Wse wse = recordingChunk.getWse(i);
+      workTypeSamples.put(wse.getWType(), workTypeSamples.getOrDefault(wse.getWType(), 0) + getSampleCount(wse));
+    }
   }
 
   public AggregationState startProfile(int recorderVersion, LocalDateTime startedAt) {
@@ -103,7 +107,7 @@ public class ProfileWorkInfo extends FinalizableBuilder<FinalizedProfileWorkInfo
     }
   }
 
-  private int getSampleCount(Recorder.Wse wse) {
+  private int getSampleCount(Recording.Wse wse) {
     switch(wse.getWType()) {
       case cpu_sample_work:
         return wse.getCpuSampleEntry().getStackSampleCount();
@@ -114,9 +118,9 @@ public class ProfileWorkInfo extends FinalizableBuilder<FinalizedProfileWorkInfo
 
   @Override
   protected FinalizedProfileWorkInfo buildFinalizedEntity() {
-    Map<AggregatedProfileModel.WorkType, Integer> mappedWorkTypeSamples = new HashMap<>();
-    for(Map.Entry<Recorder.WorkType, Integer> entry: workTypeSamples.entrySet()) {
-      AggregatedProfileModel.WorkType mappedWorkType = ProtoUtil.mapRecorderToAggregatorWorkType(entry.getKey());
+    Map<WorkEntities.WorkType, Integer> mappedWorkTypeSamples = new HashMap<>();
+    for(Map.Entry<WorkEntities.WorkType, Integer> entry: workTypeSamples.entrySet()) {
+      WorkEntities.WorkType mappedWorkType = ProtoUtil.mapRecorderToAggregatorWorkType(entry.getKey());
       if(mappedWorkType == null) {
         throw new AggregationFailure(String.format("Unable to map recorder work_type=%s to corresponding aggregation work_type", entry.getKey()), true);
       }

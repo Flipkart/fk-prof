@@ -1,21 +1,22 @@
 package fk.prof.backend.util;
 
 import com.google.protobuf.*;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.idl.Profile;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.WorkEntities;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.vertx.core.buffer.Buffer;
-import recording.Recorder;
 
 import java.io.IOException;
 
 public class ProtoUtil {
-  public static AggregatedProfileModel.WorkType mapRecorderToAggregatorWorkType(Recorder.WorkType recorderWorkType) {
-    return AggregatedProfileModel.WorkType.forNumber(recorderWorkType.getNumber());
+  public static WorkEntities.WorkType mapRecorderToAggregatorWorkType(WorkEntities.WorkType recorderWorkType) {
+    return WorkEntities.WorkType.forNumber(recorderWorkType.getNumber());
   }
 
-  public static AggregatedProfileModel.RecorderInfo mapToAggregatorRecorderInfo(Recorder.RecorderInfo r) {
-    return AggregatedProfileModel.RecorderInfo.newBuilder()
+  public static Profile.RecorderInfo mapToAggregatorRecorderInfo(Recorder.RecorderInfo r) {
+    return Profile.RecorderInfo.newBuilder()
             .setAppId(r.getAppId())
             .setCluster(r.getCluster())
             .setProcessName(r.getProcName())

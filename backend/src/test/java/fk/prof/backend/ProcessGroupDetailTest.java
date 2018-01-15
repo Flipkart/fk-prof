@@ -3,6 +3,9 @@ package fk.prof.backend;
 import fk.prof.backend.model.assignment.RecorderIdentifier;
 import fk.prof.backend.model.assignment.WorkAssignmentSchedule;
 import fk.prof.backend.model.assignment.impl.ProcessGroupDetail;
+import fk.prof.idl.Entities;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.WorkEntities;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import io.vertx.ext.unit.TestContext;
@@ -10,7 +13,6 @@ import io.vertx.ext.unit.junit.VertxUnitRunner;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import recording.Recorder;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -25,12 +27,12 @@ import static org.mockito.Mockito.when;
 public class ProcessGroupDetailTest {
   private Vertx vertx;
   private Configuration config;
-  private Recorder.ProcessGroup mockPG;
+  private Entities.ProcessGroup mockPG;
   private List<Recorder.RecorderInfo.Builder> mockRIBuilders;
 
   @Before
   public void setBefore() throws Exception {
-    mockPG = Recorder.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
+    mockPG = Entities.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
     mockRIBuilders = Arrays.asList(
         buildRecorderInfo("1"),
         buildRecorderInfo("2"),
@@ -45,7 +47,7 @@ public class ProcessGroupDetailTest {
   @Test
   public void testWorkAssignmentReturnedInResponseToVaryingPollRequests(TestContext context) {
     ProcessGroupDetail processGroupDetail = new ProcessGroupDetail(mockPG, 1);
-    Recorder.WorkAssignment wa = Recorder.WorkAssignment.getDefaultInstance();
+    WorkEntities.WorkAssignment wa = WorkEntities.WorkAssignment.getDefaultInstance();
 //    when(wa.getWorkId()).thenReturn(1L);
     WorkAssignmentSchedule was = mock(WorkAssignmentSchedule.class);
     when(was.getNextWorkAssignment(RecorderIdentifier.from(mockRIBuilders.get(0).build())))
@@ -55,13 +57,13 @@ public class ProcessGroupDetailTest {
 
     Recorder.PollReq pollReq1 = Recorder.PollReq.newBuilder()
         .setRecorderInfo(mockRIBuilders.get(0).setRecorderTick(1).build())
-        .setWorkLastIssued(Recorder.WorkResponse.newBuilder()
+        .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(0)
-            .setWorkResult(Recorder.WorkResponse.WorkResult.success)
-            .setWorkState(Recorder.WorkResponse.WorkState.complete).build())
+            .setWorkResult(WorkEntities.WorkResponse.WorkResult.success)
+            .setWorkState(WorkEntities.WorkResponse.WorkState.complete).build())
         .build();
-    Recorder.WorkAssignment response = processGroupDetail.getWorkAssignment(pollReq1);
+    WorkEntities.WorkAssignment response = processGroupDetail.getWorkAssignment(pollReq1);
     context.assertNull(response);
 
     //Update wa such that it returns non-null for mockRIBuilders.get(0), null for mockRIBuilders.get(1)
@@ -69,22 +71,22 @@ public class ProcessGroupDetailTest {
 
     Recorder.PollReq pollReq2 = Recorder.PollReq.newBuilder()
         .setRecorderInfo(mockRIBuilders.get(0).setRecorderTick(2).build())
-        .setWorkLastIssued(Recorder.WorkResponse.newBuilder()
+        .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(100)
-            .setWorkResult(Recorder.WorkResponse.WorkResult.success)
-            .setWorkState(Recorder.WorkResponse.WorkState.complete).build())
+            .setWorkResult(WorkEntities.WorkResponse.WorkResult.success)
+            .setWorkState(WorkEntities.WorkResponse.WorkState.complete).build())
         .build();
     response = processGroupDetail.getWorkAssignment(pollReq2);
     context.assertEquals(wa, response);
 
     Recorder.PollReq pollReq3 = Recorder.PollReq.newBuilder()
         .setRecorderInfo(mockRIBuilders.get(1).setRecorderTick(1).build())
-        .setWorkLastIssued(Recorder.WorkResponse.newBuilder()
+        .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(100)
-            .setWorkResult(Recorder.WorkResponse.WorkResult.success)
-            .setWorkState(Recorder.WorkResponse.WorkState.complete).build())
+            .setWorkResult(WorkEntities.WorkResponse.WorkResult.success)
+            .setWorkState(WorkEntities.WorkResponse.WorkState.complete).build())
         .build();
     response = processGroupDetail.getWorkAssignment(pollReq3);
     context.assertNull(response);
@@ -95,11 +97,11 @@ public class ProcessGroupDetailTest {
     ProcessGroupDetail processGroupDetail = new ProcessGroupDetail(mockPG, 1);
     Recorder.PollReq pollReq1 = Recorder.PollReq.newBuilder()
         .setRecorderInfo(mockRIBuilders.get(0).setRecorderTick(1).build())
-        .setWorkLastIssued(Recorder.WorkResponse.newBuilder()
+        .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(0)
-            .setWorkResult(Recorder.WorkResponse.WorkResult.success)
-            .setWorkState(Recorder.WorkResponse.WorkState.complete).build())
+            .setWorkResult(WorkEntities.WorkResponse.WorkResult.success)
+            .setWorkState(WorkEntities.WorkResponse.WorkState.complete).build())
         .build();
     processGroupDetail.getWorkAssignment(pollReq1);
 
@@ -108,21 +110,21 @@ public class ProcessGroupDetailTest {
 
     Recorder.PollReq pollReq2 = Recorder.PollReq.newBuilder()
         .setRecorderInfo(mockRIBuilders.get(1).setRecorderTick(1).build())
-        .setWorkLastIssued(Recorder.WorkResponse.newBuilder()
+        .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(100)
-            .setWorkResult(Recorder.WorkResponse.WorkResult.unknown)
-            .setWorkState(Recorder.WorkResponse.WorkState.running).build())
+            .setWorkResult(WorkEntities.WorkResponse.WorkResult.unknown)
+            .setWorkState(WorkEntities.WorkResponse.WorkState.running).build())
         .build();
     processGroupDetail.getWorkAssignment(pollReq2);
 
     Recorder.PollReq pollReq3 = Recorder.PollReq.newBuilder()
         .setRecorderInfo(mockRIBuilders.get(2).setRecorderTick(1).build())
-        .setWorkLastIssued(Recorder.WorkResponse.newBuilder()
+        .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(0)
-            .setWorkResult(Recorder.WorkResponse.WorkResult.success)
-            .setWorkState(Recorder.WorkResponse.WorkState.complete).build())
+            .setWorkResult(WorkEntities.WorkResponse.WorkResult.success)
+            .setWorkState(WorkEntities.WorkResponse.WorkState.complete).build())
         .build();
     processGroupDetail.getWorkAssignment(pollReq3);
 
@@ -135,11 +137,11 @@ public class ProcessGroupDetailTest {
     //first recorder comes back up
     Recorder.PollReq pollReq4 = Recorder.PollReq.newBuilder()
         .setRecorderInfo(mockRIBuilders.get(0).setRecorderTick(1).build())
-        .setWorkLastIssued(Recorder.WorkResponse.newBuilder()
+        .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(0)
-            .setWorkResult(Recorder.WorkResponse.WorkResult.success)
-            .setWorkState(Recorder.WorkResponse.WorkState.complete).build())
+            .setWorkResult(WorkEntities.WorkResponse.WorkResult.success)
+            .setWorkState(WorkEntities.WorkResponse.WorkState.complete).build())
         .build();
     processGroupDetail.getWorkAssignment(pollReq4);
 

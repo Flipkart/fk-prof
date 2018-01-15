@@ -5,8 +5,8 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import com.google.common.base.Preconditions;
 import fk.prof.backend.ConfigManager;
-import fk.prof.backend.proto.BackendDTO;
-import fk.prof.backend.util.proto.BackendDTOProtoUtil;
+import fk.prof.backend.util.proto.BackendProtoUtil;
+import fk.prof.idl.Backend;
 import fk.prof.metrics.MetricName;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -22,7 +22,7 @@ public class LeaderSelectorListenerImpl extends LeaderSelectorListenerAdapter {
   private final String leaderWatchingPath;
   private KillBehavior killBehavior;
   private final Runnable leaderElectedTask;
-  private final BackendDTO.LeaderDetail selfLeaderDetail;
+  private final Backend.LeaderDetail selfLeaderDetail;
 
   private MetricRegistry metricRegistry = SharedMetricRegistries.getOrCreate(ConfigManager.METRIC_REGISTRY);
   private Counter ctrLeaderElect = metricRegistry.counter(MetricName.Election_Completed.get());
@@ -32,7 +32,7 @@ public class LeaderSelectorListenerImpl extends LeaderSelectorListenerAdapter {
 
 
   public LeaderSelectorListenerImpl(String ipAddress, int leaderHttpPort, String leaderWatchingPath, KillBehavior killBehavior, Runnable leaderElectedTask) {
-    this.selfLeaderDetail = BackendDTO.LeaderDetail.newBuilder().setHost(ipAddress).setPort(leaderHttpPort).build();
+    this.selfLeaderDetail = Backend.LeaderDetail.newBuilder().setHost(ipAddress).setPort(leaderHttpPort).build();
     this.leaderWatchingPath = Preconditions.checkNotNull(leaderWatchingPath);
     this.killBehavior = Preconditions.checkNotNull(killBehavior);
     this.leaderElectedTask = leaderElectedTask;
@@ -46,7 +46,7 @@ public class LeaderSelectorListenerImpl extends LeaderSelectorListenerAdapter {
         .create()
         .creatingParentsIfNeeded()
         .withMode(CreateMode.EPHEMERAL)
-        .forPath(leaderWatchingPath + "/" + BackendDTOProtoUtil.leaderDetailCompactRepr(selfLeaderDetail),
+        .forPath(leaderWatchingPath + "/" + BackendProtoUtil.leaderDetailCompactRepr(selfLeaderDetail),
             selfLeaderDetail.toByteArray());
 
     // NOTE: There is a race here. Other backend nodes can be communicated about the new leader before leaderElectedTask has run

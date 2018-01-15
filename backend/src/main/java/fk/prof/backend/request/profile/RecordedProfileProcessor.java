@@ -10,8 +10,9 @@ import fk.prof.backend.model.profile.RecordedProfileHeader;
 import fk.prof.backend.model.profile.RecordedProfileIndexes;
 import fk.prof.backend.request.CompositeByteBufInputStream;
 import fk.prof.backend.request.profile.parser.RecordedProfileHeaderParser;
-import fk.prof.backend.request.profile.parser.WseParser;
+import fk.prof.backend.request.profile.parser.RecordingChunkParser;
 import fk.prof.backend.model.aggregation.AggregationWindowDiscoveryContext;
+import fk.prof.idl.Recording;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
 import io.vertx.core.Handler;
@@ -19,7 +20,6 @@ import io.vertx.core.buffer.Buffer;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
-import recording.Recorder;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -33,7 +33,7 @@ public class RecordedProfileProcessor implements Handler<Buffer> {
   private final AggregationWindowDiscoveryContext aggregationWindowDiscoveryContext;
   private final ISingleProcessingOfProfileGate singleProcessingOfProfileGate;
   private final RecordedProfileHeaderParser headerParser;
-  private final WseParser wseParser;
+  private final RecordingChunkParser recordingChunkParser;
   private final CompositeByteBufInputStream inputStream;
   private final RecordedProfileIndexes indexes = new RecordedProfileIndexes();
 
@@ -49,7 +49,7 @@ public class RecordedProfileProcessor implements Handler<Buffer> {
   private Histogram histChunkSize;
   private Timer tmrChunkIdle;
   private Meter mtrChunkBytes, mtrPayloadInvalid, mtrPayloadCorrupt;
-  private Histogram histWseSize, histHeaderSize;
+  private Histogram histRecChunkSize, histHeaderSize;
   private final Counter ctrAggrWinMiss = metricRegistry.counter(MetricName.Profile_Window_Miss.get());
 
   public RecordedProfileProcessor(RoutingContext context,
@@ -62,7 +62,7 @@ public class RecordedProfileProcessor implements Handler<Buffer> {
     this.singleProcessingOfProfileGate = singleProcessingOfProfileGate;
     this.inputStream = new CompositeByteBufInputStream();
     setupMetrics(ProcessGroupTag.EMPTY);
-    this.wseParser = new WseParser(maxAllowedBytesForWse, histWseSize);
+    this.recordingChunkParser = new RecordingChunkParser(maxAllowedBytesForWse, histRecChunkSize);
     this.headerParser = new RecordedProfileHeaderParser(maxAllowedBytesForRecordingHeader, histHeaderSize);
   }
 
@@ -94,7 +94,7 @@ public class RecordedProfileProcessor implements Handler<Buffer> {
    * @return processed a valid recorded profile object or not
    */
   public boolean isProcessed() {
-    return aggregationWindow != null && wseParser.isEndMarkerReceived();
+    return aggregationWindow != null && recordingChunkParser.isEndMarkerReceived();
   }
 
   /**
@@ -177,13 +177,13 @@ public class RecordedProfileProcessor implements Handler<Buffer> {
 
       if (aggregationWindow != null) {
         while (inputStream.available() > 0) {
-          wseParser.parse(inputStream);
-          if(wseParser.isEndMarkerReceived()) {
+          recordingChunkParser.parse(inputStream);
+          if(recordingChunkParser.isEndMarkerReceived()) {
             return;
-          } else if (wseParser.isParsed()) {
-            Recorder.Wse wse = wseParser.get();
-            processWse(wse);
-            wseParser.reset();
+          } else if (recordingChunkParser.isParsed()) {
+            Recording.RecordingChunk chunk = recordingChunkParser.get();
+            processRecordingChunk(chunk);
+            recordingChunkParser.reset();
           } else {
             break;
           }
@@ -198,10 +198,12 @@ public class RecordedProfileProcessor implements Handler<Buffer> {
     }
   }
 
-  private void processWse(Recorder.Wse wse) throws AggregationFailure {
-    indexes.update(wse.getIndexedData());
-    aggregationWindow.updateWorkInfoWithWSE(workId, wse);
-    aggregationWindow.aggregate(wse, indexes);
+  private void processRecordingChunk(Recording.RecordingChunk chunk) throws AggregationFailure {
+    indexes.update(chunk.getIndexedData());
+    aggregationWindow.updateWorkInfo(workId, chunk);
+    for(int i = 0; i < chunk.getWseCount(); ++i) {
+      aggregationWindow.aggregate(chunk.getWse(i), indexes);
+    }
   }
 
   private void setupMetrics(ProcessGroupTag processGroupTag) {
@@ -211,7 +213,7 @@ public class RecordedProfileProcessor implements Handler<Buffer> {
     this.mtrChunkBytes = metricRegistry.meter(MetricRegistry.name(MetricName.Profile_Chunk_Bytes.get(), processGroupTagStr));
     this.mtrPayloadInvalid = metricRegistry.meter(MetricRegistry.name(MetricName.Profile_Payload_Invalid.get(), processGroupTagStr));
     this.mtrPayloadCorrupt = metricRegistry.meter(MetricRegistry.name(MetricName.Profile_Payload_Corrupt.get(), processGroupTagStr));
-    this.histWseSize = metricRegistry.histogram(MetricRegistry.name(MetricName.Profile_Wse_Size.get(), processGroupTagStr));
+    this.histRecChunkSize = metricRegistry.histogram(MetricRegistry.name(MetricName.Profile_RecChunk_Size.get(), processGroupTagStr));
     this.histHeaderSize = metricRegistry.histogram(MetricRegistry.name(MetricName.Profile_Header_Size.get(), processGroupTagStr));
   }
 }
