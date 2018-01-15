@@ -47,10 +47,10 @@ void ProfileWriter::write_header(const recording::RecordingHeader& rh) {
     write_unchecked(csum);
 }
 
-void ProfileWriter::append_wse(const recording::Wse& e) {
-    ensure_freebuff(e);
+void ProfileWriter::write_recording(const recording::RecordingChunk& recording) {
+    ensure_freebuff(recording);
     auto old_offset = data.write_end;
-    write_unchecked_obj(e);
+    write_unchecked_obj(recording);
     chksum.reset();
     auto data_sz = data.write_end - old_offset;
     auto csum = chksum.chksum(data.buff + old_offset, data_sz);
@@ -77,7 +77,7 @@ recording::StackSample::Error translate_backtrace_error(BacktraceError error) {
 }
 
 void ProfileSerializingWriter::report_new_ctx(const ProfileSerializingWriter::CtxId ctx_id, const std::string& name, const bool is_generated, const std::uint8_t coverage_pct, const PerfCtx::MergeSemantic m_sem) {
-    auto idx_dat = cpu_sample_accumulator.mutable_indexed_data();
+    auto idx_dat = recording.mutable_indexed_data();
     auto new_ctx = idx_dat->add_trace_ctx();
     new_ctx->set_trace_id(ctx_id);
     new_ctx->set_is_generated(is_generated);
@@ -116,8 +116,8 @@ void ProfileSerializingWriter::record(const Backtrace &trace, ThreadBucket *info
     if (cpu_samples_flush_ctr >= sft.cpu_samples) flush();
     cpu_samples_flush_ctr++;
     
-    auto idx_dat = cpu_sample_accumulator.mutable_indexed_data();
-    auto cse = cpu_sample_accumulator.mutable_cpu_sample_entry();
+    auto idx_dat = recording.mutable_indexed_data();
+    auto cse = cpu_samples_accumulator->mutable_cpu_sample_entry();
     auto ss = cse->add_stack_sample();
 
     ss->set_start_offset_micros(0);
@@ -238,7 +238,7 @@ void ProfileSerializingWriter::fill_frame(const NativeFrame& pc, recording::Fram
 ProfileSerializingWriter::MthId ProfileSerializingWriter::report_new_mthd_info(const char *file_name, const char *class_name, const char *method_name, const char *method_signature, const BacktraceType bt_type) {
     MthId my_id = next_mthd_id++;
 
-    auto idx_dat = cpu_sample_accumulator.mutable_indexed_data();
+    auto idx_dat = recording.mutable_indexed_data();
     auto mi = idx_dat->add_method_info();
 
     mi->set_method_id(my_id);
@@ -280,9 +280,8 @@ ProfileSerializingWriter::MthId ProfileSerializingWriter::recordNewMethod(const 
 }
 
 void ProfileSerializingWriter::flush() {
-    cpu_sample_accumulator.set_w_type(recording::WorkType::cpu_sample_work);
-    w.append_wse(cpu_sample_accumulator);
-    cpu_sample_accumulator.Clear();
+    w.write_recording(recording);
+    clear_proto();
     cpu_samples_flush_ctr = 0;
     w.flush();
 }
@@ -292,7 +291,9 @@ void ProfileSerializingWriter::flush() {
 ProfileSerializingWriter::ProfileSerializingWriter(jvmtiEnv* _jvmti, ProfileWriter& _w, SiteResolver::MethodInfoResolver _fir, SiteResolver::LineNoResolver _lnr,
                                                    PerfCtx::Registry& _reg, const SerializationFlushThresholds& _sft, const TruncationThresholds& _trunc_thresholds,
                                                    std::uint8_t _noctx_cov_pct) :
-    jvmti(_jvmti), w(_w), fir(_fir), lnr(_lnr), reg(_reg), next_mthd_id(0), next_thd_id(3), next_ctx_id(5), sft(_sft), cpu_samples_flush_ctr(0),
+    jvmti(_jvmti), w(_w), fir(_fir), lnr(_lnr), reg(_reg), 
+    cpu_samples_accumulator(recording.add_wse()),
+    next_mthd_id(0), next_thd_id(3), next_ctx_id(5), sft(_sft), cpu_samples_flush_ctr(0),
     trunc_thresholds(_trunc_thresholds),
 
     s_c_new_thd_info(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "thd_rpt", "new"})),
@@ -318,12 +319,21 @@ ProfileSerializingWriter::ProfileSerializingWriter(jvmtiEnv* _jvmti, ProfileWrit
     s_c_bad_lineno.clear();
 
     s_c_frame_snipped.clear();
+    
+    clear_proto();
 
     report_new_ctx(DEFAULT_CTX_ID, DEFAULT_CTX_NAME, false, _noctx_cov_pct, PerfCtx::MergeSemantic::to_parent);
     report_new_ctx(UNKNOWN_CTX_ID, UNKNOWN_CTX_NAME, true, 0, PerfCtx::MergeSemantic::to_parent);
 
     report_new_mthd_info("?", "?", "?", "?", BacktraceType::Java);
 }
+
+void ProfileSerializingWriter::clear_proto() {
+    recording.clear_indexed_data();
+    cpu_samples_accumulator->clear_cpu_sample_entry();
+    cpu_samples_accumulator->set_w_type(recording::WorkType::cpu_sample_work);
+}
+
 
 ProfileSerializingWriter::~ProfileSerializingWriter() {
     std::vector<PerfCtx::TracePt> user_ctxs;
@@ -335,4 +345,3 @@ ProfileSerializingWriter::~ProfileSerializingWriter() {
         (next_ctx_to_be_reported != next_ctx_id)) flush();
     assert(cpu_samples_flush_ctr == 0);
 }
-

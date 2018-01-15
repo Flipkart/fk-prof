@@ -48,7 +48,7 @@ public:
 
     void write_header(const recording::RecordingHeader& rh);
 
-    void append_wse(const recording::Wse& e);
+    void write_recording(const recording::RecordingChunk& recording);
 
     void flush();
 };
@@ -87,7 +87,8 @@ private:
     SiteResolver::LineNoResolver lnr;
     PerfCtx::Registry& reg;
 
-    recording::Wse cpu_sample_accumulator;
+    recording::RecordingChunk recording;
+    recording::Wse* cpu_samples_accumulator;
     
     std::unordered_map<MthId, MthId> known_methods;
     std::unordered_map<Pc, std::pair<MthId, PcOffset>> known_symbols;
@@ -128,7 +129,9 @@ private:
     CtxId report_new_ctx(const std::string& name, const bool is_generated, const std::uint8_t coverage_pct, const PerfCtx::MergeSemantic m_sem);
 
     void report_new_ctx(const CtxId ctx_id, const std::string& name, const bool is_generated, const std::uint8_t coverage_pct, const PerfCtx::MergeSemantic m_sem);
-
+    
+    void clear_proto();
+    
 public:
     ProfileSerializingWriter(jvmtiEnv* _jvmti, ProfileWriter& _w, SiteResolver::MethodInfoResolver _fir, SiteResolver::LineNoResolver _lnr,
                              PerfCtx::Registry& _reg, const SerializationFlushThresholds& _sft, const TruncationThresholds& _trunc_thresholds,
