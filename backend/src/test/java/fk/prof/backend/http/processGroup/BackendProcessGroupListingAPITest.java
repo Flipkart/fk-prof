@@ -11,7 +11,7 @@ import fk.prof.backend.model.aggregation.impl.ActiveAggregationWindowsImpl;
 import fk.prof.backend.model.assignment.AssociatedProcessGroups;
 import fk.prof.backend.model.assignment.impl.AssociatedProcessGroupsImpl;
 import fk.prof.backend.model.election.impl.InMemoryLeaderStore;
-import fk.prof.backend.proto.BackendDTO;
+import fk.prof.idl.Backend;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Vertx;
@@ -103,7 +103,7 @@ public class BackendProcessGroupListingAPITest {
         leaderServer.requestHandler(router::accept);
         leaderServer.listen(leaderPort, result -> {
             if (result.succeeded()) {
-                when(inMemoryLeaderStore.getLeader()).thenReturn(BackendDTO.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
+                when(inMemoryLeaderStore.getLeader()).thenReturn(Backend.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
                 client.getNow(backendPort, "localhost", ApiPathConstants.BACKEND_GET_APPS + "?prefix=" + APP_ID.substring(0, 1 + new Random().nextInt(APP_ID.length() - 1)), httpClientResponse -> {
                     context.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
                     httpClientResponse.bodyHandler(buffer -> {
@@ -128,7 +128,7 @@ public class BackendProcessGroupListingAPITest {
         leaderServer.requestHandler(router::accept);
         leaderServer.listen(leaderPort, result -> {
             if (result.succeeded()) {
-                when(inMemoryLeaderStore.getLeader()).thenReturn(BackendDTO.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
+                when(inMemoryLeaderStore.getLeader()).thenReturn(Backend.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
                 client.getNow(backendPort, "localhost", "/clusters/" + APP_ID + "?prefix=" + CLUSTER_ID.substring(0, 1 + new Random().nextInt(CLUSTER_ID.length() - 1)), httpClientResponse -> {
                     context.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
                     httpClientResponse.bodyHandler(buffer -> {
@@ -154,7 +154,7 @@ public class BackendProcessGroupListingAPITest {
         leaderServer.requestHandler(router::accept);
         leaderServer.listen(leaderPort, result -> {
             if (result.succeeded()) {
-                when(inMemoryLeaderStore.getLeader()).thenReturn(BackendDTO.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
+                when(inMemoryLeaderStore.getLeader()).thenReturn(Backend.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
                 client.getNow(backendPort, "localhost", "/procs/" + APP_ID + DELIMITER + CLUSTER_ID + "?prefix=" + PROC.substring(0, 1 + new Random().nextInt(PROC.length() - 1)), httpClientResponse -> {
                     context.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.OK.code());
                     httpClientResponse.bodyHandler(buffer -> {

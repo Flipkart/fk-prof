@@ -4,12 +4,15 @@
 #include <google/protobuf/io/coded_stream.h>
 #include "checksum.hh"
 #include "recorder.pb.h"
+#include "recording.pb.h"
 #include "buff.hh"
 #include <memory>
 #include "site_resolver.hh"
 #include "circular_queue.hh"
 #include <unordered_map>
 #include <unordered_set>
+
+namespace recording = fk::prof::idl;
 
 class RawWriter {
 public:
@@ -26,7 +29,7 @@ private:
 
     // raw bytes writer. can be a http / file writer
     std::shared_ptr<RawWriter> w;
-    
+
     Checksum chksum;
     Buff &data;
     bool header_written;
@@ -47,16 +50,16 @@ public:
     ~ProfileWriter();
 
     void write_header(const recording::RecordingHeader& rh);
-    
+
     void write_recording(const recording::RecordingChunk& recording);
 
     void flush();
 };
 
 struct SerializationFlushThresholds {
-    
+
     typedef std::uint32_t FlushCtr;
-    
+
     FlushCtr cpu_samples;
     FlushCtr io_trace_evts;
 
@@ -66,9 +69,9 @@ struct SerializationFlushThresholds {
 };
 
 struct TruncationThresholds {
-    
+
     typedef std::uint32_t TruncationCap;
-    
+
     TruncationCap cpu_samples_max_stack_sz;
     TruncationCap io_trace_max_stack_sz;
 
@@ -133,9 +136,9 @@ private:
     SiteResolver::SymInfo syms;
 
     CtxId report_ctx(PerfCtx::TracePt trace_pt);
-    
+
     ThdId report_thd_info(const ThreadBucket* const thd_bucket);
-    
+
     FdId report_fd_info(const FdBucket* const fd_bucket);
 
     void fill_frame(const JVMPI_CallFrame& jvmpi_cf, recording::Frame* f);
@@ -147,18 +150,18 @@ private:
     CtxId report_new_ctx(const std::string& name, const bool is_generated, const std::uint8_t coverage_pct, const PerfCtx::MergeSemantic m_sem);
 
     void report_new_ctx(const CtxId ctx_id, const std::string& name, const bool is_generated, const std::uint8_t coverage_pct, const PerfCtx::MergeSemantic m_sem);
-    
+
     /* helper methods to populate proto structures */
     void populate_ctx_in_ss(recording::StackSample* const ss, const PerfCtx::ThreadTracker::EffectiveCtx& ctx, std::uint8_t ctx_len, bool default_ctx);
-    
+
     void populate_bt_in_ss(recording::StackSample* const ss, const Backtrace& bt, std::uint32_t frames_to_write, bool snipped);
-    
+
     void populate_fdread(recording::IOTrace* const evt, const blocking::FdReadEvt& read_evt, blocking::EvtType type);
-    
+
     void populate_fdwrite(recording::IOTrace* const evt, const blocking::FdWriteEvt& write_evt, blocking::EvtType type);
-    
+
     void clear_proto();
-    
+
 public:
     ProfileSerializingWriter(jvmtiEnv* _jvmti, ProfileWriter& _w, SiteResolver::MethodInfoResolver _fir, SiteResolver::LineNoResolver _lnr,
                              PerfCtx::Registry& _reg, const SerializationFlushThresholds& _sft, const TruncationThresholds& _trunc_thresholds,
@@ -167,7 +170,7 @@ public:
     ~ProfileSerializingWriter();
 
     virtual void record(const cpu::Sample& entry) override;
-    
+
     virtual void record(const iotrace::Sample& entry) override;
 
     virtual MthId recordNewMethod(const jmethodID method_id, const char *file_name, const char *class_name, const char *method_name, const char *method_signature) override;

@@ -1,24 +1,25 @@
 package fk.prof.backend;
 
 import fk.prof.backend.model.association.BackendDetail;
+import fk.prof.idl.Entities;
+import fk.prof.idl.Recorder;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import recording.Recorder;
 
 import java.io.IOException;
 import java.util.*;
 
 public class BackendDetailTest {
-  List<Recorder.ProcessGroup> mockProcessGroups;
+  List<Entities.ProcessGroup> mockProcessGroups;
   List<Recorder.AssignedBackend> mockBackends;
 
   @Before
   public void setBefore() {
     mockProcessGroups = Arrays.asList(
-        Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build(),
-        Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p2").build(),
-        Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p3").build()
+        Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build(),
+        Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p2").build(),
+        Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p3").build()
     );
     mockBackends = Arrays.asList(
         Recorder.AssignedBackend.newBuilder().setHost("1").setPort(0).build(),
@@ -30,7 +31,7 @@ public class BackendDetailTest {
   @Test
   public void testEqualityOfBackendOnIPAddress()
     throws IOException {
-    Set<Recorder.ProcessGroup> processGroups = new HashSet<>(mockProcessGroups);
+    Set<Entities.ProcessGroup> processGroups = new HashSet<>(mockProcessGroups);
     BackendDetail b1 = new BackendDetail(mockBackends.get(0), 1, 2, processGroups);
     BackendDetail b2 = new BackendDetail(mockBackends.get(0), 1, 2);
     Assert.assertTrue(b1.equals(b2));
@@ -41,7 +42,7 @@ public class BackendDetailTest {
   @Test
   public void testInitializationOfBackendWithProcessGroups()
       throws IOException {
-    Set<Recorder.ProcessGroup> processGroups = new HashSet<>(mockProcessGroups);
+    Set<Entities.ProcessGroup> processGroups = new HashSet<>(mockProcessGroups);
     BackendDetail backendDetail = new BackendDetail(mockBackends.get(0), 1, 2, processGroups);
     Assert.assertEquals(mockBackends.get(0), backendDetail.getBackend());
     Assert.assertEquals(processGroups, backendDetail.getAssociatedProcessGroups());

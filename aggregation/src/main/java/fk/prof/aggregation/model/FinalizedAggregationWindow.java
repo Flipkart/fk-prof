@@ -1,6 +1,7 @@
 package fk.prof.aggregation.model;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel.*;
+import fk.prof.idl.Profile.*;
+import fk.prof.idl.WorkEntities;
 import fk.prof.metrics.ProcessGroupTag;
 
 import java.time.LocalDateTime;
@@ -83,7 +84,7 @@ public class FinalizedAggregationWindow {
         && this.cpuSamplingAggregationBucket.equals(other.cpuSamplingAggregationBucket);
   }
 
-  protected Header buildHeaderProto(int version, WorkType workType) {
+  protected Header buildHeaderProto(int version, WorkEntities.WorkType workType) {
     Header.Builder builder = Header.newBuilder()
         .setFormatVersion(version)
         .setAggregationEndTime(endedAt == null ? null : endedAt.atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
@@ -110,7 +111,7 @@ public class FinalizedAggregationWindow {
    * @param traces
    * @return {@link ProfileWorkInfo} iterable
    */
-  protected Iterable<ProfileWorkInfo> buildProfileWorkInfoProto(WorkType workType, TraceCtxNames traces) {
+  protected Iterable<ProfileWorkInfo> buildProfileWorkInfoProto(WorkEntities.WorkType workType, TraceCtxNames traces) {
     return workInfoLookup.entrySet().stream().map(e -> e.getValue().buildProfileWorkInfoProto(workType, start, traces))::iterator;
   }
 
@@ -148,7 +149,7 @@ public class FinalizedAggregationWindow {
    * @param workType
    * @return
    */
-  protected TraceCtxNames buildTraceCtxNamesProto(WorkType workType) {
+  protected TraceCtxNames buildTraceCtxNamesProto(WorkEntities.WorkType workType) {
     switch (workType) {
       case cpu_sample_work:
         return cpuSamplingAggregationBucket.buildTraceNamesProto();
@@ -157,7 +158,7 @@ public class FinalizedAggregationWindow {
     }
   }
 
-  protected TraceCtxDetailList buildTraceCtxDetailListProto(WorkType workType, TraceCtxNames traces) {
+  protected TraceCtxDetailList buildTraceCtxDetailListProto(WorkEntities.WorkType workType, TraceCtxNames traces) {
     switch (workType) {
       case cpu_sample_work:
         return cpuSamplingAggregationBucket.buildTraceCtxListProto(traces);

@@ -15,10 +15,11 @@ import fk.prof.backend.model.assignment.AggregationWindowPlannerStore;
 import fk.prof.backend.model.assignment.AssociatedProcessGroups;
 import fk.prof.backend.model.election.LeaderReadContext;
 import fk.prof.backend.model.slot.WorkSlotPool;
-import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.ProtoUtil;
 import fk.prof.backend.util.URLUtil;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
+import fk.prof.idl.Backend;
+import fk.prof.idl.Entities;
 import fk.prof.metrics.MetricName;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
@@ -26,7 +27,6 @@ import io.vertx.core.WorkerExecutor;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import recording.Recorder;
 
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
@@ -103,7 +103,7 @@ public class BackendDaemon extends AbstractVerticle {
   }
 
   private void postLoadToLeader() {
-    BackendDTO.LeaderDetail leaderDetail;
+    Backend.LeaderDetail leaderDetail;
     if((leaderDetail = leaderReadContext.getLeader()) != null) {
 
       //TODO: load = 0.5 hard-coded right now. Replace this with dynamic load computation in future
@@ -116,7 +116,7 @@ public class BackendDaemon extends AbstractVerticle {
             leaderDetail.getPort(),
             ApiPathConstants.LEADER_POST_LOAD,
             ProtoUtil.buildBufferFromProto(
-                BackendDTO.LoadReportRequest.newBuilder()
+                Backend.LoadReportRequest.newBuilder()
                     .setIp(ipAddress)
                     .setPort(backendHttpPort)
                     .setLoad(load)
@@ -133,7 +133,7 @@ public class BackendDaemon extends AbstractVerticle {
                 } else {
                   try {
                     loadTickCounter++;
-                    Recorder.ProcessGroups assignedProcessGroups = ProtoUtil.buildProtoFromBuffer(Recorder.ProcessGroups.parser(), ar.result().getResponse());
+                    Entities.ProcessGroups assignedProcessGroups = ProtoUtil.buildProtoFromBuffer(Entities.ProcessGroups.parser(), ar.result().getResponse());
                     associatedProcessGroups.updateProcessGroupAssociations(assignedProcessGroups, (processGroupDetail, processGroupAssociationResult) -> {
                       switch (processGroupAssociationResult) {
                         case ADDED:
@@ -173,9 +173,9 @@ public class BackendDaemon extends AbstractVerticle {
     vertx.setTimer(config.getLoadReportItvlSecs() * 1000, timerId -> postLoadToLeader());
   }
 
-  private Future<BackendDTO.RecordingPolicy> getWorkFromLeader(Recorder.ProcessGroup processGroup, Meter mtrSuccess, Meter mtrFailure) {
-    Future<BackendDTO.RecordingPolicy> result = Future.future();
-    BackendDTO.LeaderDetail leaderDetail;
+  private Future<Backend.RecordingPolicy> getWorkFromLeader(Entities.ProcessGroup processGroup, Meter mtrSuccess, Meter mtrFailure) {
+    Future<Backend.RecordingPolicy> result = Future.future();
+    Backend.LeaderDetail leaderDetail;
     if((leaderDetail = leaderReadContext.getLeader()) != null) {
       try {
         String requestPath = URLUtil.buildPathWithRequestParams(ApiPathConstants.LEADER_GET_WORK,
@@ -207,7 +207,7 @@ public class BackendDaemon extends AbstractVerticle {
                 return;
               }
               try {
-                BackendDTO.RecordingPolicy recordingPolicy = ProtoUtil.buildProtoFromBuffer(BackendDTO.RecordingPolicy.parser(), ar.result().getResponse());
+                Backend.RecordingPolicy recordingPolicy = ProtoUtil.buildProtoFromBuffer(Backend.RecordingPolicy.parser(), ar.result().getResponse());
                 result.complete(recordingPolicy);
                 mtrSuccess.mark();
               } catch (Exception ex) {

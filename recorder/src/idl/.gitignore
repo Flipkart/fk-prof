@@ -1,3 +1,7 @@
 libproto.a
 recorder.pb.cc
 recorder.pb.h
+recording.pb.cc
+recording.pb.h
+work_entities.pb.cc
+work_entities.pb.h

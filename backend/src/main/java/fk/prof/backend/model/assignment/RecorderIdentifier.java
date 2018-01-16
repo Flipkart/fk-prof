@@ -1,8 +1,8 @@
 package fk.prof.backend.model.assignment;
 
 import com.google.common.base.Preconditions;
+import fk.prof.idl.Recorder;
 import fk.prof.metrics.RecorderTag;
-import recording.Recorder;
 
 public class RecorderIdentifier {
   private final String ip;

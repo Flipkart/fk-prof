@@ -11,8 +11,9 @@ import fk.prof.backend.model.aggregation.impl.ActiveAggregationWindowsImpl;
 import fk.prof.backend.model.assignment.AssociatedProcessGroups;
 import fk.prof.backend.model.assignment.impl.AssociatedProcessGroupsImpl;
 import fk.prof.backend.model.election.impl.InMemoryLeaderStore;
-import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.ProtoUtil;
+import fk.prof.idl.Backend;
+import fk.prof.idl.PolicyEntities;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
@@ -29,7 +30,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import proto.PolicyDTO;
 
 import java.io.IOException;
 
@@ -91,7 +91,7 @@ public class BackendPolicyAPITest {
         Router router = Router.router(vertx);
         HttpHelper.attachHandlersToRoute(router, HttpMethod.GET,
                 ApiPathConstants.LEADER_GET_POLICY_FOR_APP_CLUSTER_PROC, req -> {
-                    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0), 0);
+                    PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0), 0);
                     try {
                         req.response().end(ProtoUtil.buildBufferFromProto(versionedPolicyDetails));
                     } catch (IOException e) {
@@ -101,7 +101,7 @@ public class BackendPolicyAPITest {
         leaderServer.requestHandler(router::accept);
         leaderServer.listen(leaderPort, result -> {
             if (result.succeeded()) {
-                when(inMemoryLeaderStore.getLeader()).thenReturn(BackendDTO.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
+                when(inMemoryLeaderStore.getLeader()).thenReturn(Backend.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
                 String backendPolicyPath = ApiPathConstants.POLICY_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
 
                 client.getNow(backendPort, "localhost", backendPolicyPath, res -> {
@@ -135,8 +135,8 @@ public class BackendPolicyAPITest {
                 ApiPathConstants.LEADER_GET_POLICY_FOR_APP_CLUSTER_PROC,
                 BodyHandler.create().setBodyLimit(1024 * 10), req -> {
                     try {
-                        PolicyDTO.VersionedPolicyDetails expected = PolicyDTO.VersionedPolicyDetails.parseFrom(finalPayloadAsBuffer.getBytes());
-                        PolicyDTO.VersionedPolicyDetails got = PolicyDTO.VersionedPolicyDetails.parseFrom(req.getBody().getBytes());
+                        PolicyEntities.VersionedPolicyDetails expected = PolicyEntities.VersionedPolicyDetails.parseFrom(finalPayloadAsBuffer.getBytes());
+                        PolicyEntities.VersionedPolicyDetails got = PolicyEntities.VersionedPolicyDetails.parseFrom(req.getBody().getBytes());
                         context.assertEquals(expected, got);
                         req.response().end(ProtoUtil.buildBufferFromProto(got.toBuilder().setVersion(got.getVersion() + 1).build()));
                     } catch (IOException e) {
@@ -146,7 +146,7 @@ public class BackendPolicyAPITest {
         leaderServer.requestHandler(router::accept);
         leaderServer.listen(leaderPort, result -> {
             if (result.succeeded()) {
-                when(inMemoryLeaderStore.getLeader()).thenReturn(BackendDTO.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
+                when(inMemoryLeaderStore.getLeader()).thenReturn(Backend.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
                 String backendPolicyPath = ApiPathConstants.POLICY_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
 
                 client.put(backendPort, "localhost", backendPolicyPath, res -> {
@@ -180,8 +180,8 @@ public class BackendPolicyAPITest {
                 ApiPathConstants.LEADER_GET_POLICY_FOR_APP_CLUSTER_PROC,
                 BodyHandler.create().setBodyLimit(1024 * 10), req -> {
                     try {
-                        PolicyDTO.VersionedPolicyDetails expected = PolicyDTO.VersionedPolicyDetails.parseFrom(finalPayloadAsBuffer.getBytes());
-                        PolicyDTO.VersionedPolicyDetails got = PolicyDTO.VersionedPolicyDetails.parseFrom(req.getBody().getBytes());
+                        PolicyEntities.VersionedPolicyDetails expected = PolicyEntities.VersionedPolicyDetails.parseFrom(finalPayloadAsBuffer.getBytes());
+                        PolicyEntities.VersionedPolicyDetails got = PolicyEntities.VersionedPolicyDetails.parseFrom(req.getBody().getBytes());
                         context.assertEquals(expected, got);
                         req.response().end(ProtoUtil.buildBufferFromProto(got.toBuilder().setVersion(got.getVersion() + 1).build()));
                     } catch (IOException e) {
@@ -191,7 +191,7 @@ public class BackendPolicyAPITest {
         leaderServer.requestHandler(router::accept);
         leaderServer.listen(leaderPort, result -> {
             if (result.succeeded()) {
-                when(inMemoryLeaderStore.getLeader()).thenReturn(BackendDTO.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
+                when(inMemoryLeaderStore.getLeader()).thenReturn(Backend.LeaderDetail.newBuilder().setHost(LEADER_IP).setPort(leaderPort).build());
                 String backendPolicyPath = ApiPathConstants.POLICY_PREFIX + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getAppId() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getCluster() + DELIMITER + MockPolicyData.mockProcessGroups.get(0).getProcName();
 
                 client.post(backendPort, "localhost", backendPolicyPath, res -> {

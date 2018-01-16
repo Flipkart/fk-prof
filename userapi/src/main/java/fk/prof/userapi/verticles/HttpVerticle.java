@@ -3,7 +3,8 @@ package fk.prof.userapi.verticles;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.idl.PolicyEntities;
+import fk.prof.idl.WorkEntities;
 import fk.prof.storage.StreamTransformer;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.api.ProfileStoreAPI;
@@ -30,7 +31,6 @@ import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.LoggerHandler;
 import io.vertx.ext.web.handler.TimeoutHandler;
-import proto.PolicyDTO;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -205,7 +205,7 @@ public class HttpVerticle extends AbstractVerticle {
         String appId = routingContext.request().getParam("appId");
         String clusterId = routingContext.request().getParam("clusterId");
         String procName = routingContext.request().getParam("procName");
-        AggregatedProfileModel.WorkType workType = AggregatedProfileModel.WorkType.cpu_sample_work;
+        WorkEntities.WorkType workType = WorkEntities.WorkType.cpu_sample_work;
         String traceName = routingContext.request().getParam("traceName");
 
         ZonedDateTime startTime;
@@ -245,9 +245,9 @@ public class HttpVerticle extends AbstractVerticle {
     private void proxyPutPostPolicyToBackend(RoutingContext routingContext) {
         String payloadVersionedPolicyDetailsJsonString = routingContext.getBodyAsString("utf-8");
         try {
-            PolicyDTO.VersionedPolicyDetails.Builder payloadVersionedPolicyDetailsBuilder = PolicyDTO.VersionedPolicyDetails.newBuilder();
+            PolicyEntities.VersionedPolicyDetails.Builder payloadVersionedPolicyDetailsBuilder = PolicyEntities.VersionedPolicyDetails.newBuilder();
             JsonFormat.parser().merge(payloadVersionedPolicyDetailsJsonString, payloadVersionedPolicyDetailsBuilder);
-            PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = payloadVersionedPolicyDetailsBuilder.build();
+            PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = payloadVersionedPolicyDetailsBuilder.build();
             makeRequestToBackend(routingContext.request().method(), routingContext.normalisedPath(), ProtoUtil.buildBufferFromProto(versionedPolicyDetails), false)
                     .setHandler(ar -> proxyBufferedPolicyResponseFromBackend(routingContext, ar));
         } catch (Exception ex) {
@@ -290,7 +290,7 @@ public class HttpVerticle extends AbstractVerticle {
             context.response().setStatusCode(ar.result().getStatusCode());
             if (ar.result().getStatusCode() == 200 || ar.result().getStatusCode() == 201) {
                 try {
-                    PolicyDTO.VersionedPolicyDetails responseVersionedPolicyDetails = ProtoUtil.buildProtoFromBuffer(PolicyDTO.VersionedPolicyDetails.parser(), ar.result().getResponse());
+                    PolicyEntities.VersionedPolicyDetails responseVersionedPolicyDetails = ProtoUtil.buildProtoFromBuffer(PolicyEntities.VersionedPolicyDetails.parser(), ar.result().getResponse());
                     String jsonStr = JsonFormat.printer().print(responseVersionedPolicyDetails);
                     context.response().end(jsonStr);
                 } catch (InvalidProtocolBufferException e) {

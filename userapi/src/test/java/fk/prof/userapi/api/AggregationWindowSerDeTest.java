@@ -5,7 +5,7 @@ import com.codahale.metrics.Timer;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.model.AggregationWindowStorage;
 import fk.prof.aggregation.model.FinalizedAggregationWindow;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.idl.WorkEntities;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.ObjectNotFoundException;
 import fk.prof.storage.buffer.ByteBufferPoolFactory;
@@ -71,7 +71,7 @@ public class AggregationWindowSerDeTest {
         AggregatedProfileLoader loader = new AggregatedProfileLoader(asyncStorage);
 
         Future f1 =  Future.future();
-        AggregatedProfileNamingStrategy file1 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, 1800, AggregatedProfileModel.WorkType.cpu_sample_work);
+        AggregatedProfileNamingStrategy file1 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, 1800, WorkEntities.WorkType.cpu_sample_work);
         loader.load(f1, file1);
         Assert.assertTrue("aggregated profiles were not loaded", f1.succeeded());
 

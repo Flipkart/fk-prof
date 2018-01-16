@@ -2,6 +2,8 @@ package fk.prof.backend.model.policy;
 
 import fk.prof.backend.mock.MockPolicyData;
 import fk.prof.backend.util.ZookeeperUtil;
+import fk.prof.idl.Entities;
+import fk.prof.idl.PolicyEntities;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -17,8 +19,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import proto.PolicyDTO;
-import recording.Recorder;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -78,7 +78,7 @@ public class ZookeeperBasedPolicyStoreTest {
         policyStoreAPI.createVersionedPolicy(MockPolicyData.mockProcessGroups.get(0), MockPolicyData.mockVersionedPolicyDetails.get(0)).setHandler(ar -> {
             if (ar.succeeded()) {
                 System.out.println("CREATING SUCCEEDED");
-                PolicyDTO.VersionedPolicyDetails got = policyStoreAPI.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(0));
+                PolicyEntities.VersionedPolicyDetails got = policyStoreAPI.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(0));
                 //GET GIVES THE JUST CREATED POLICY WITH VERSION BUMP
                 context.assertEquals(got.getVersion(), MockPolicyData.mockVersionedPolicyDetails.get(0).getVersion() + 1);
                 context.assertEquals(got.getPolicyDetails().toBuilder().setCreatedAt(curTime).setModifiedAt(curTime).build(), MockPolicyData.mockVersionedPolicyDetails.get(0).getPolicyDetails().toBuilder().setCreatedAt(curTime).setModifiedAt(curTime).build());
@@ -92,7 +92,7 @@ public class ZookeeperBasedPolicyStoreTest {
     @Test(timeout = 2000)
     public void testCreatePolicy(TestContext context) throws Exception {
         final Async async = context.async();
-        Recorder.ProcessGroup pg = MockPolicyData.mockProcessGroups.get(0);
+        Entities.ProcessGroup pg = MockPolicyData.mockProcessGroups.get(0);
         String curTime = ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
         policyStoreAPI.createVersionedPolicy(pg, MockPolicyData.mockVersionedPolicyDetails.get(0)).setHandler(ar -> {
             //SUCCESS ON CREATION OF A NEW POLICY
@@ -102,20 +102,20 @@ public class ZookeeperBasedPolicyStoreTest {
             String procNamePath = DELIMITER + POLICY_BASEDIR + DELIMITER + POLICY_VERSION + DELIMITER + encode32(pg.getAppId()) + DELIMITER + encode32(pg.getCluster()) + DELIMITER + encode32(pg.getProcName());
             try {
                 //DATA IS ACTUALLY WRITTEN TO ZK
-                context.assertEquals(PolicyDTO.PolicyDetails.parseFrom(ZookeeperUtil.readLatestSeqZNodeChild(curatorClient, procNamePath).getValue()).getPolicy(), MockPolicyData.mockVersionedPolicyDetails.get(0).getPolicyDetails().getPolicy());
+                context.assertEquals(PolicyEntities.PolicyDetails.parseFrom(ZookeeperUtil.readLatestSeqZNodeChild(curatorClient, procNamePath).getValue()).getPolicy(), MockPolicyData.mockVersionedPolicyDetails.get(0).getPolicyDetails().getPolicy());
                 int gotVersion = Integer.parseInt(ZookeeperUtil.getLatestSeqZNodeChildName(curatorClient, procNamePath));
                 //VERSION OF WRITTEN TO ZK IS ONE PLUS THE OLD VERSION
                 context.assertEquals(gotVersion, MockPolicyData.mockVersionedPolicyDetails.get(0).getVersion() + 1);
 
                 //GET GIVES THE CREATED VERSIONED POLICY
-                PolicyDTO.VersionedPolicyDetails got = policyStoreAPI.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(0));
+                PolicyEntities.VersionedPolicyDetails got = policyStoreAPI.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(0));
                 context.assertEquals(got.getPolicyDetails().toBuilder().setCreatedAt(curTime).setModifiedAt(curTime).build(), MockPolicyData.mockVersionedPolicyDetails.get(0).getPolicyDetails().toBuilder().setCreatedAt(curTime).setModifiedAt(curTime).build());
                 context.assertEquals(got.getVersion(), MockPolicyData.mockVersionedPolicyDetails.get(0).getVersion() + 1);
 
                 policyStoreAPI.createVersionedPolicy(MockPolicyData.mockProcessGroups.get(0), MockPolicyData.mockVersionedPolicyDetails.get(1)).setHandler(ar2 -> {
                     //FAILURE ON RECREATING A POLICY FOR AN EXISTING PROCESS GROUP
                     context.assertTrue(ar2.failed());
-                    PolicyDTO.VersionedPolicyDetails got2 = policyStoreAPI.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(0));
+                    PolicyEntities.VersionedPolicyDetails got2 = policyStoreAPI.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(0));
                     //POLICY IS SAME AS ORIGINAL
                     context.assertEquals(got2.getPolicyDetails().toBuilder().setCreatedAt(curTime).setModifiedAt(curTime).build(), MockPolicyData.mockVersionedPolicyDetails.get(0).getPolicyDetails().toBuilder().setCreatedAt(curTime).setModifiedAt(curTime).build());
                     context.assertEquals(got2.getVersion(), MockPolicyData.mockVersionedPolicyDetails.get(0).getVersion() + 1);
@@ -234,7 +234,7 @@ public class ZookeeperBasedPolicyStoreTest {
                     context.assertEquals(ar2.result().getPolicyDetails().toBuilder().setCreatedAt(curTime).setModifiedAt(curTime).build(), MockPolicyData.mockVersionedPolicyDetails.get(1).getPolicyDetails().toBuilder().setCreatedAt(curTime).setModifiedAt(curTime).build());
 
 
-                    PolicyDTO.VersionedPolicyDetails got2 = policyStoreAPI.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(0));
+                    PolicyEntities.VersionedPolicyDetails got2 = policyStoreAPI.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(0));
                     //GET GIVES THE NEW POLICY
                     context.assertEquals(got2.getVersion(), MockPolicyData.mockVersionedPolicyDetails.get(1).getVersion() + 1);
                     context.assertEquals(got2.getPolicyDetails().toBuilder().setCreatedAt(curTime).setModifiedAt(curTime).build(), MockPolicyData.mockVersionedPolicyDetails.get(1).getPolicyDetails().toBuilder().setCreatedAt(curTime).setModifiedAt(curTime).build());
@@ -250,7 +250,7 @@ public class ZookeeperBasedPolicyStoreTest {
         policyStoreAPI.updateVersionedPolicy(MockPolicyData.mockProcessGroups.get(1), MockPolicyData.mockVersionedPolicyDetails.get(0)).setHandler(ar -> {
             //FAILURE ON UPDATING A NON EXISTING POLICY
             context.assertTrue(ar.failed());
-            PolicyDTO.VersionedPolicyDetails got2 = policyStoreAPI.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(1));
+            PolicyEntities.VersionedPolicyDetails got2 = policyStoreAPI.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(1));
             //POLICY IS STILL NULL
             context.assertNull(got2);
             future2.complete();
@@ -313,8 +313,8 @@ public class ZookeeperBasedPolicyStoreTest {
     public void testInit(TestContext context) throws Exception {
         final Async async = context.async();
 
-        Future<PolicyDTO.VersionedPolicyDetails> future1 = policyStoreAPI.createVersionedPolicy(MockPolicyData.mockProcessGroups.get(0), MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0), -1));
-        Future<PolicyDTO.VersionedPolicyDetails> future2 = Future.future();
+        Future<PolicyEntities.VersionedPolicyDetails> future1 = policyStoreAPI.createVersionedPolicy(MockPolicyData.mockProcessGroups.get(0), MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0), -1));
+        Future<PolicyEntities.VersionedPolicyDetails> future2 = Future.future();
         policyStoreAPI.createVersionedPolicy(MockPolicyData.mockProcessGroups.get(1), MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(1), -1)).setHandler(ar -> {
             if (ar.succeeded()) {
                 policyStoreAPI.updateVersionedPolicy(MockPolicyData.mockProcessGroups.get(1), MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(2), 0)).setHandler(ar2 -> {
@@ -332,8 +332,8 @@ public class ZookeeperBasedPolicyStoreTest {
             ZookeeperBasedPolicyStore anotherPolicyStore = new ZookeeperBasedPolicyStore(vertx, curatorClient, POLICY_BASEDIR, POLICY_VERSION);
             try {
                 //GET RETURNS NULL RESULTS FROM ANOTHERSTORE BEFORE INIT
-                PolicyDTO.VersionedPolicyDetails got1 = anotherPolicyStore.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(0));
-                PolicyDTO.VersionedPolicyDetails got2 = anotherPolicyStore.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(1));
+                PolicyEntities.VersionedPolicyDetails got1 = anotherPolicyStore.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(0));
+                PolicyEntities.VersionedPolicyDetails got2 = anotherPolicyStore.getVersionedPolicy(MockPolicyData.mockProcessGroups.get(1));
                 context.assertNull(got1);
                 context.assertNull(got2);
 
@@ -354,7 +354,7 @@ public class ZookeeperBasedPolicyStoreTest {
     public void testGetAppIds(TestContext context) {
         final Async async = context.async();
         List<Future> futures = new ArrayList<>();
-        for (Recorder.ProcessGroup pg : MockPolicyData.mockProcessGroups) {
+        for (Entities.ProcessGroup pg : MockPolicyData.mockProcessGroups) {
             futures.add(policyStoreAPI.createVersionedPolicy(pg, MockPolicyData.mockVersionedPolicyDetails.get(0)));
         }
         Map<String, Set<String>> testPairs = new HashMap<String, Set<String>>() {{
@@ -386,7 +386,7 @@ public class ZookeeperBasedPolicyStoreTest {
     public void testGetClusterIds(TestContext context) {
         final Async async = context.async();
         List<Future> futures = new ArrayList<>();
-        for (Recorder.ProcessGroup pg : MockPolicyData.mockProcessGroups) {
+        for (Entities.ProcessGroup pg : MockPolicyData.mockProcessGroups) {
             futures.add(policyStoreAPI.createVersionedPolicy(pg, MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(2), -1)));
         }
         Map<List<String>, Set<String>> testPairs = new HashMap<List<String>, Set<String>>() {{
@@ -423,7 +423,7 @@ public class ZookeeperBasedPolicyStoreTest {
     public void testGetProcNames(TestContext context) {
         final Async async = context.async();
         List<Future> futures = new ArrayList<>();
-        for (Recorder.ProcessGroup pg : MockPolicyData.mockProcessGroups) {
+        for (Entities.ProcessGroup pg : MockPolicyData.mockProcessGroups) {
             futures.add(policyStoreAPI.createVersionedPolicy(pg, MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(2), -1)));
         }
         Map<List<String>, Set<String>> testPairs = new HashMap<List<String>, Set<String>>() {{

@@ -11,17 +11,18 @@ import fk.prof.backend.aggregator.AggregationWindow;
 import fk.prof.backend.model.aggregation.ActiveAggregationWindows;
 import fk.prof.backend.model.slot.WorkSlotPool;
 import fk.prof.backend.model.slot.WorkSlotWeightCalculator;
-import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.BitOperationUtil;
-import fk.prof.backend.util.proto.BackendDTOProtoUtil;
+import fk.prof.backend.util.proto.BackendProtoUtil;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
+import fk.prof.idl.Backend;
+import fk.prof.idl.Entities;
+import fk.prof.idl.WorkEntities;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import recording.Recorder;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -43,14 +44,14 @@ public class AggregationWindowPlanner {
   private final PolicyRequestor policyForBackendRequestor;
   private final Consumer<FinalizedAggregationWindow> aggregationWindowWriter;
 
-  private final Recorder.ProcessGroup processGroup;
+  private final Entities.ProcessGroup processGroup;
   private final int aggregationWindowDurationInSecs;
   private final int policyRefreshBufferInSecs;
   private final long aggregationWindowStartupTimer;
   private final Future<Long> aggregationWindowScheduleTimer;
 
   private AggregationWindow currentAggregationWindow = null;
-  private BackendDTO.RecordingPolicy latestRecordingPolicy = null;
+  private Backend.RecordingPolicy latestRecordingPolicy = null;
 
   private int currentAggregationWindowIndex = 0;
   private int relevantAggregationWindowIndexForRecordingPolicy = 0;
@@ -171,7 +172,7 @@ public class AggregationWindowPlanner {
       if(logger.isDebugEnabled()) {
         logger.debug("Initializing aggregation window with index=" + currentAggregationWindowIndex +
             ", process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup) +
-            ", recording_policy=" + BackendDTOProtoUtil.recordingPolicyCompactRepr(latestRecordingPolicy));
+            ", recording_policy=" + BackendProtoUtil.recordingPolicyCompactRepr(latestRecordingPolicy));
       }
 
       try {
@@ -203,7 +204,7 @@ public class AggregationWindowPlanner {
               ctrActiveWindows.inc();
               logger.info("Initialized aggregation window with index=" + currentAggregationWindowIndex +
                   ", process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup) +
-                  ", recording_policy=" + BackendDTOProtoUtil.recordingPolicyCompactRepr(latestRecordingPolicy) +
+                  ", recording_policy=" + BackendProtoUtil.recordingPolicyCompactRepr(latestRecordingPolicy) +
                   ", work_count=" + targetRecordersCount);
             }
           }
@@ -234,10 +235,10 @@ public class AggregationWindowPlanner {
 
   private void setupAggregationWindow(int targetRecordersCount)
       throws Exception {
-    Recorder.WorkAssignment.Builder[] workAssignmentBuilders = new Recorder.WorkAssignment.Builder[targetRecordersCount];
+    WorkEntities.WorkAssignment.Builder[] workAssignmentBuilders = new WorkEntities.WorkAssignment.Builder[targetRecordersCount];
     long workIds[] = new long[targetRecordersCount];
     for (int i = 0; i < workIds.length; i++) {
-      Recorder.WorkAssignment.Builder workAssignmentBuilder = Recorder.WorkAssignment.newBuilder()
+      WorkEntities.WorkAssignment.Builder workAssignmentBuilder = WorkEntities.WorkAssignment.newBuilder()
           .setWorkId(BitOperationUtil.constructLongFromInts(backendId, workIdCounter++))
           .addAllWork(latestRecordingPolicy.getWorkList().stream()
               .map(RecorderProtoUtil::translateWorkFromBackendDTO)

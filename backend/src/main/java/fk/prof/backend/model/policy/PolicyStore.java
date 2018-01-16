@@ -1,8 +1,8 @@
 package fk.prof.backend.model.policy;
 
+import fk.prof.idl.Entities;
+import fk.prof.idl.PolicyEntities;
 import io.vertx.core.Future;
-import proto.PolicyDTO;
-import recording.Recorder;
 
 import java.util.Set;
 
@@ -53,7 +53,7 @@ public interface PolicyStore {
      * @param processGroup of which the policy is to be retrieved
      * @return versionedPolicyDetail for the processGroup
      */
-    PolicyDTO.VersionedPolicyDetails getVersionedPolicy(Recorder.ProcessGroup processGroup);
+    PolicyEntities.VersionedPolicyDetails getVersionedPolicy(Entities.ProcessGroup processGroup);
 
     /**
      * Creates a VersionedPolicyDetails for the processGroup supplied if there exists no policy for it previously
@@ -61,7 +61,7 @@ public interface PolicyStore {
      * @param versionedPolicyDetails to be set for the processGroup
      * @return a void future which contains the created versionedPolicyDetails
      */
-    Future<PolicyDTO.VersionedPolicyDetails> createVersionedPolicy(Recorder.ProcessGroup processGroup, PolicyDTO.VersionedPolicyDetails versionedPolicyDetails);
+    Future<PolicyEntities.VersionedPolicyDetails> createVersionedPolicy(Entities.ProcessGroup processGroup, PolicyEntities.VersionedPolicyDetails versionedPolicyDetails);
 
     /**
      * Updates a VersionedPolicyDetails for the processGroup supplied if there exists a policy for it previously
@@ -69,5 +69,5 @@ public interface PolicyStore {
      * @param versionedPolicyDetails to be set for the processGroup
      * @return a void future which contains the created versionedPolicyDetails
      */
-    Future<PolicyDTO.VersionedPolicyDetails> updateVersionedPolicy(Recorder.ProcessGroup processGroup, PolicyDTO.VersionedPolicyDetails versionedPolicyDetails);
+    Future<PolicyEntities.VersionedPolicyDetails> updateVersionedPolicy(Entities.ProcessGroup processGroup, PolicyEntities.VersionedPolicyDetails versionedPolicyDetails);
 }

@@ -1,7 +1,8 @@
 package fk.prof.backend.model.assignment;
 
-import recording.Recorder;
+
+import fk.prof.idl.Entities;
 
 public interface ProcessGroupDiscoveryContext {
-  ProcessGroupContextForPolling getProcessGroupContextForPolling(Recorder.ProcessGroup processGroup);
+  ProcessGroupContextForPolling getProcessGroupContextForPolling(Entities.ProcessGroup processGroup);
 }

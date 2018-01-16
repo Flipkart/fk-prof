@@ -5,7 +5,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import fk.prof.backend.ConfigManager;
 import fk.prof.backend.model.election.LeaderWriteContext;
-import fk.prof.backend.proto.BackendDTO;
+import fk.prof.idl.Backend;
 import fk.prof.metrics.MetricName;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.logging.Logger;
@@ -81,7 +81,7 @@ public class LeaderElectionWatcher extends AbstractVerticle {
     if (childNodesList.size() == 1) {
       try {
         byte[] leaderDetailBytes = curatorClient.getData().forPath(leaderWatchingPath + "/" + childNodesList.get(0));
-        leaderWriteContext.setLeader(BackendDTO.LeaderDetail.parseFrom(leaderDetailBytes));
+        leaderWriteContext.setLeader(Backend.LeaderDetail.parseFrom(leaderDetailBytes));
         return;
       } catch (Exception ex) {
         ctrZKWatchFailure.inc();

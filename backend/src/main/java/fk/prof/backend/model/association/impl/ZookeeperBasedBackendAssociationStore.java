@@ -8,9 +8,11 @@ import fk.prof.backend.ConfigManager;
 import fk.prof.backend.exception.BackendAssociationException;
 import fk.prof.backend.model.association.BackendAssociationStore;
 import fk.prof.backend.model.association.BackendDetail;
-import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.ZookeeperUtil;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
+import fk.prof.idl.Backend;
+import fk.prof.idl.Entities;
+import fk.prof.idl.Recorder;
 import fk.prof.metrics.BackendTag;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
@@ -20,7 +22,6 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.zookeeper.CreateMode;
-import recording.Recorder;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,8 +43,8 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
   private final Map<Recorder.AssignedBackend, BackendDetail> backendDetailLookup = new ConcurrentHashMap<>();
   private final SortedSet<BackendDetail> availableBackendsByPriority;
 
-  private final Map<Recorder.ProcessGroup, Recorder.AssignedBackend> processGroupToBackendLookup = new ConcurrentHashMap<>();
-  private final Map<Recorder.ProcessGroup, String> processGroupToZNodePathLookup = new ConcurrentHashMap<>();
+  private final Map<Entities.ProcessGroup, Recorder.AssignedBackend> processGroupToBackendLookup = new ConcurrentHashMap<>();
+  private final Map<Entities.ProcessGroup, String> processGroupToZNodePathLookup = new ConcurrentHashMap<>();
   private final ReentrantLock backendAssignmentLock = new ReentrantLock();
 
   private final MetricRegistry metricRegistry = SharedMetricRegistries.getOrCreate(ConfigManager.METRIC_REGISTRY);
@@ -78,9 +79,9 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
   }
 
   @Override
-  public Future<Recorder.ProcessGroups> reportBackendLoad(BackendDTO.LoadReportRequest payload) {
+  public Future<Entities.ProcessGroups> reportBackendLoad(Backend.LoadReportRequest payload) {
     Recorder.AssignedBackend reportingBackend = Recorder.AssignedBackend.newBuilder().setHost(payload.getIp()).setPort(payload.getPort()).build();
-    Future<Recorder.ProcessGroups> result = Future.future();
+    Future<Entities.ProcessGroups> result = Future.future();
     BackendTag backendTag = new BackendTag(payload.getIp(), payload.getPort());
     Meter mtrExisting = metricRegistry.meter(MetricRegistry.name(MetricName.ZK_Backend_Assoc_LoadReport_Existing.get(), backendTag.toString()));
 
@@ -93,7 +94,7 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
         try {
           /**TODO: Implement a cleanup job for backends which have been defunct for a long time, remove them from backenddetaillookup map
            * When implementing above, ensure cleanup operations in backenddetaillookup are consistent wrt get/iteration/update in
-           * {@link #associateAndGetBackend(Recorder.ProcessGroup)} and {@link #reportBackendLoad(BackendDTO.LoadReportRequest)}
+           * {@link #associateAndGetBackend(Entities.ProcessGroup)} and {@link #reportBackendLoad(Backend.LoadReportRequest)}
            */
           BackendDetail backendDetail = backendDetailLookup.computeIfAbsent(reportingBackend, (key) -> {
             try {
@@ -119,13 +120,13 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
     return result;
   }
 
-  private void updateLoadOfBackend(BackendDetail existingBackendDetail, BackendDTO.LoadReportRequest payload, Future<Recorder.ProcessGroups> result) {
+  private void updateLoadOfBackend(BackendDetail existingBackendDetail, Backend.LoadReportRequest payload, Future<Entities.ProcessGroups> result) {
     /**
      * NOTE: There is a possible race condition here
-     * t0(time) => request1: a recorder belonging to pg1(process group) calls /association which invokes {@link #associateAndGetBackend(Recorder.ProcessGroup)}
+     * t0(time) => request1: a recorder belonging to pg1(process group) calls /association which invokes {@link #associateAndGetBackend(Entities.ProcessGroup)}
      *             pg1 is associated with b1(backend) which has become defunct so next operation to be executed is removal of b1 from available backends set
      * t1 => request2 b1 reports load and is added to available backend set (if not already present), response is returned
-     * t2 => request1: {@link #associateAndGetBackend(Recorder.ProcessGroup)} attempts to remove b1 from available backends set since it assumes it to be defunct and returns response by associating recorder with some other backend b2
+     * t2 => request1: {@link #associateAndGetBackend(Entities.ProcessGroup)} attempts to remove b1 from available backends set since it assumes it to be defunct and returns response by associating recorder with some other backend b2
      * Above results in inconsistent state of availableBackends because even though b1 has reported load, it is not present in the set
      *
      * This race-condition should not lead to a permanent inconsistent state because on subsequent load reports, b1 will get added to available backends set again
@@ -139,7 +140,7 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
   }
 
   @Override
-  public Future<Recorder.AssignedBackend> associateAndGetBackend(Recorder.ProcessGroup processGroup) {
+  public Future<Recorder.AssignedBackend> associateAndGetBackend(Entities.ProcessGroup processGroup) {
     Future<Recorder.AssignedBackend> result = Future.future();
     Recorder.AssignedBackend backendAssociation = processGroupToBackendLookup.get(processGroup);
     ProcessGroupTag processGroupTag = new ProcessGroupTag(processGroup.getAppId(), processGroup.getCluster(), processGroup.getProcName());
@@ -289,16 +290,16 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
   }
 
   @Override
-  public Recorder.AssignedBackend getAssociatedBackend(Recorder.ProcessGroup processGroup) {
+  public Recorder.AssignedBackend getAssociatedBackend(Entities.ProcessGroup processGroup) {
     return processGroupToBackendLookup.get(processGroup);
   }
 
   @Override
-  public Recorder.BackendAssociations getAssociations() {
-    Recorder.BackendAssociations.Builder builder = Recorder.BackendAssociations.newBuilder();
+  public Backend.BackendAssociations getAssociations() {
+    Backend.BackendAssociations.Builder builder = Backend.BackendAssociations.newBuilder();
     this.backendDetailLookup.entrySet().forEach(backendEntry ->
       builder.addAssociations(
-          Recorder.BackendAssociation.newBuilder()
+          Backend.BackendAssociation.newBuilder()
               .setBackend(backendEntry.getKey())
               .addAllProcessGroups(backendEntry.getValue().getAssociatedProcessGroups())));
     return builder.build();
@@ -312,7 +313,7 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
    * @throws BackendAssociationException
    */
   @Override
-  public Recorder.AssignedBackend removeAssociation(Recorder.ProcessGroup processGroup) throws BackendAssociationException {
+  public Recorder.AssignedBackend removeAssociation(Entities.ProcessGroup processGroup) throws BackendAssociationException {
     ProcessGroupTag processGroupTag = new ProcessGroupTag(processGroup.getAppId(), processGroup.getCluster(), processGroup.getProcName());
     String processGroupStr = processGroupTag.toString();
     try {
@@ -373,7 +374,7 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
         }
 
         for (BackendDetail backendDetail : this.backendDetailLookup.values()) {
-          for (Recorder.ProcessGroup processGroup : backendDetail.getAssociatedProcessGroups()) {
+          for (Entities.ProcessGroup processGroup : backendDetail.getAssociatedProcessGroups()) {
             if (this.processGroupToBackendLookup.putIfAbsent(processGroup, backendDetail.getBackend()) != null) {
               ctrLoadFailure.inc();
               throw new IllegalStateException(String.format("Backend mapping already exists for process group=%s", RecorderProtoUtil.processGroupCompactRepr(processGroup)));
@@ -424,7 +425,7 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
    * @param processGroup
    * @throws Exception
    */
-  private void associateBackendWithProcessGroup(BackendDetail backendDetail, Recorder.ProcessGroup processGroup)
+  private void associateBackendWithProcessGroup(BackendDetail backendDetail, Entities.ProcessGroup processGroup)
       throws Exception {
     String processGroupZNodeBasePath = getZNodePathForBackend(backendDetail.getBackend()) + "/pg_";
     String processGroupZNodeCreatedPath = curatorClient
@@ -444,7 +445,7 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
    * @param processGroup
    * @throws Exception
    */
-  private void deAssociateBackendWithProcessGroup(BackendDetail backendDetail, Recorder.ProcessGroup processGroup)
+  private void deAssociateBackendWithProcessGroup(BackendDetail backendDetail, Entities.ProcessGroup processGroup)
       throws Exception {
     String processGroupZNodePath = processGroupToZNodePathLookup.get(processGroup);
     if(processGroupZNodePath == null) {
@@ -482,11 +483,11 @@ public class ZookeeperBasedBackendAssociationStore implements BackendAssociation
       logger.debug("Found associations for : {}", backendZNodeName);
       String backendZNodePath = getZNodePathForBackend(backendZNodeName);
       List<String> processGroupNodes = curatorClient.getChildren().forPath(backendZNodePath);
-      Set<Recorder.ProcessGroup> processGroups = new HashSet<>();
+      Set<Entities.ProcessGroup> processGroups = new HashSet<>();
 
       for(String processGroupZNodeName: processGroupNodes) {
         String processGroupZNodePath = getZNodePathForProcessGroup(backendZNodeName, processGroupZNodeName);
-        Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.parseFrom(ZookeeperUtil.readZNode(curatorClient, processGroupZNodePath));
+        Entities.ProcessGroup processGroup = Entities.ProcessGroup.parseFrom(ZookeeperUtil.readZNode(curatorClient, processGroupZNodePath));
         if(logger.isDebugEnabled()) {
           logger.debug("\t{}", RecorderProtoUtil.processGroupCompactRepr(processGroup));
         }
