@@ -89,7 +89,7 @@ public class MockAggregationWindow {
 
     private static Map<Long, FinalizedProfileWorkInfo> buildProfilesWorkInfo(LocalDateTime aggregationStart, int count1, int count2) {
 
-        Profile.RecorderInfo r1 = Profile.RecorderInfo.newBuilder()
+        Profile.RecorderDetails r1 = Profile.RecorderDetails.newBuilder()
                 .setIp("192.168.1.1")
                 .setHostname("some-box-1")
                 .setAppId("app1")
@@ -101,7 +101,7 @@ public class MockAggregationWindow {
                 .setZone("chennai-1")
                 .setInstanceType("c1.xlarge").build();
 
-        Profile.RecorderInfo r2 = Profile.RecorderInfo.newBuilder()
+        Profile.RecorderDetails r2 = Profile.RecorderDetails.newBuilder()
                 .setIp("192.168.1.2")
                 .setHostname("some-box-2")
                 .setAppId("app1")

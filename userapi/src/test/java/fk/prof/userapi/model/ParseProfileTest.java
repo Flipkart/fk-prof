@@ -318,9 +318,9 @@ public class ParseProfileTest {
                         .setSampleCount(1280)).build();
     }
 
-    public static Profile.RecorderInfo[] buildRecordersList() {
-        return new Profile.RecorderInfo[] {
-            Profile.RecorderInfo.newBuilder()
+    public static Profile.RecorderDetails[] buildRecordersList() {
+        return new Profile.RecorderDetails[] {
+            Profile.RecorderDetails.newBuilder()
                 .setIp("192.168.1.1")
                 .setHostname("some-box-1")
                 .setAppId("app1")
@@ -331,7 +331,7 @@ public class ParseProfileTest {
                 .setVmId("vm1")
                 .setZone("chennai-1")
                 .setInstanceType("c1.xlarge").build(),
-            Profile.RecorderInfo.newBuilder()
+            Profile.RecorderDetails.newBuilder()
                 .setIp("192.168.1.2")
                 .setHostname("some-box-2")
                 .setAppId("app1")
@@ -346,13 +346,13 @@ public class ParseProfileTest {
 
     public static List<Profile.ProfileWorkInfo> buildProfilesSummary() {
         List<Profile.ProfileWorkInfo> workInfos = new ArrayList<>();
-        Profile.RecorderInfo[] recorders = buildRecordersList();
+        Profile.RecorderDetails[] recorders = buildRecordersList();
 
         workInfos.add(Profile.ProfileWorkInfo.newBuilder()
                 .setStartOffset(10)
                 .setDuration(60)
                 .setRecorderVersion(1)
-                .setRecorderInfo(recorders[0])
+                .setRecorderDetails(recorders[0])
                 .addSampleCount(Profile.ProfileWorkInfo.SampleCount.newBuilder().setWorkType(WorkEntities.WorkType.cpu_sample_work).setSampleCount(900))
                 .setStatus(Profile.AggregationStatus.Completed)
                 .addTraceCoverageMap(Profile.ProfileWorkInfo.TraceCtxToCoveragePctMap.newBuilder()
@@ -366,7 +366,7 @@ public class ParseProfileTest {
                 .setStartOffset(24)
                 .setDuration(60)
                 .setRecorderVersion(1)
-                .setRecorderInfo(recorders[1])
+                .setRecorderDetails(recorders[1])
                 .addSampleCount(Profile.ProfileWorkInfo.SampleCount.newBuilder().setWorkType(WorkEntities.WorkType.cpu_sample_work).setSampleCount(980))
                 .setStatus(Profile.AggregationStatus.Retried)
                 .addTraceCoverageMap(Profile.ProfileWorkInfo.TraceCtxToCoveragePctMap.newBuilder()

@@ -174,11 +174,11 @@ public class ModelToProtoTest {
         assertThat(in.available(), is(0));
     }
 
-    private Set<RecorderInfo> recorders() {
-        Set<RecorderInfo> recorders = new HashSet<>();
+    private Set<RecorderDetails> recorders() {
+        Set<RecorderDetails> recorders = new HashSet<>();
         recorders.addAll(
                 Arrays.asList(
-                    Profile.RecorderInfo.newBuilder()
+                    Profile.RecorderDetails.newBuilder()
                             .setIp("192.168.1.1")
                             .setHostname("some-box-1")
                             .setAppId("app1")
@@ -189,7 +189,7 @@ public class ModelToProtoTest {
                             .setVmId("vm1")
                             .setZone("chennai-1")
                             .setInstanceType("c1.xlarge").build(),
-                    Profile.RecorderInfo.newBuilder()
+                    Profile.RecorderDetails.newBuilder()
                             .setIp("192.168.1.2")
                             .setHostname("some-box-2")
                             .setAppId("app1")

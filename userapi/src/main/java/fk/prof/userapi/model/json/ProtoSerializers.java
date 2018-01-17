@@ -21,7 +21,7 @@ public class ProtoSerializers {
         module.addSerializer(Profile.FrameNode.class, new FrameNodeSerializer());
         module.addSerializer(Profile.CPUSamplingNodeProps.class, new CpuSampleFrameNodePropsSerializer());
         module.addSerializer(Profile.Header.class, new HeaderSerializer());
-        module.addSerializer(Profile.RecorderInfo.class, new RecorderInfoSerializer());
+        module.addSerializer(Profile.RecorderDetails.class, new RecorderDetailsSerializer());
         module.addSerializer(Profile.ProfileWorkInfo.class, new ProfileWorkInfoSerializer());
         module.addSerializer(Profile.TraceCtxDetail.class, new TraceCtxDetailsSerializer());
         om.registerModule(module);
@@ -101,13 +101,13 @@ public class ProtoSerializers {
         }
     }
 
-    static class RecorderInfoSerializer extends StdSerializer<Profile.RecorderInfo> {
-        public RecorderInfoSerializer() {
-            super(Profile.RecorderInfo.class);
+    static class RecorderDetailsSerializer extends StdSerializer<Profile.RecorderDetails> {
+        public RecorderDetailsSerializer() {
+            super(Profile.RecorderDetails.class);
         }
 
         @Override
-        public void serialize(Profile.RecorderInfo value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+        public void serialize(Profile.RecorderDetails value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             gen.writeStartObject();
             gen.writeStringField("ip", value.getIp());
             gen.writeStringField("hostname", value.getHostname());
@@ -135,10 +135,10 @@ public class ProtoSerializers {
             gen.writeNumberField("duration", value.getDuration());
             gen.writeNumberField("recorder_version", value.getRecorderVersion());
 
-            if(value.hasRecorderInfo()) {
+            if(value.hasRecorderDetails()) {
                 gen.writeFieldName("recorder_info");
-                JsonSerializer recorderInfoSerializer = serializers.findValueSerializer(Profile.RecorderInfo.class);
-                recorderInfoSerializer.serialize(value.getRecorderInfo(), gen, serializers);
+                JsonSerializer recorderInfoSerializer = serializers.findValueSerializer(Profile.RecorderDetails.class);
+                recorderInfoSerializer.serialize(value.getRecorderDetails(), gen, serializers);
             }
 
             gen.writeObjectFieldStart("sample_count");

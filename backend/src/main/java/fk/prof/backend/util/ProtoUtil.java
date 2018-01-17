@@ -15,8 +15,8 @@ public class ProtoUtil {
     return WorkEntities.WorkType.forNumber(recorderWorkType.getNumber());
   }
 
-  public static Profile.RecorderInfo mapToAggregatorRecorderInfo(Recorder.RecorderInfo r) {
-    return Profile.RecorderInfo.newBuilder()
+  public static Profile.RecorderDetails mapToAggregatorRecorderDetails(Recorder.RecorderInfo r) {
+    return Profile.RecorderDetails.newBuilder()
             .setAppId(r.getAppId())
             .setCluster(r.getCluster())
             .setProcessName(r.getProcName())

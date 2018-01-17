@@ -12,7 +12,7 @@ import java.util.Set;
 
 public class FinalizedProfileWorkInfo {
   private final int recorderVersion;
-  private final RecorderInfo recorderInfo;
+  private final RecorderDetails recorderDetails;
   private final AggregationState state;
   private final LocalDateTime startedAt;
   private final LocalDateTime endedAt;
@@ -21,7 +21,7 @@ public class FinalizedProfileWorkInfo {
   private final Map<WorkEntities.WorkType, Integer> samples;
 
   public FinalizedProfileWorkInfo(int recorderVersion,
-                                  RecorderInfo recorderInfo,
+                                  RecorderDetails recorderDetails,
                                   AggregationState state,
                                   LocalDateTime startedAt,
                                   LocalDateTime endedAt,
@@ -29,7 +29,7 @@ public class FinalizedProfileWorkInfo {
                                   Map<String, Integer> traceCoverages,
                                   Map<WorkEntities.WorkType, Integer> samples) {
     this.recorderVersion = recorderVersion;
-    this.recorderInfo = recorderInfo;
+    this.recorderDetails = recorderDetails;
     this.state = state;
     this.startedAt = startedAt;
     this.endedAt = endedAt;
@@ -69,7 +69,7 @@ public class FinalizedProfileWorkInfo {
         && (this.endedAt == null ? other.endedAt == null : this.endedAt.equals(other.endedAt))
         && (this.traceCoverages == null ? other.traceCoverages == null : this.traceCoverages.equals(other.traceCoverages))
         && (this.samples == null ? other.samples == null : this.samples.equals(other.samples))
-        && (this.recorderInfo == null ? other.recorderInfo == null : this.recorderInfo.equals(other.recorderInfo));
+        && (this.recorderDetails == null ? other.recorderDetails == null : this.recorderDetails.equals(other.recorderDetails));
   }
 
   protected Set<String> getRecordedTraces() {
@@ -87,8 +87,8 @@ public class FinalizedProfileWorkInfo {
         builder.setStartOffset((int) aggregationStartTime.until(startedAt, ChronoUnit.SECONDS));
       }
 
-      if(recorderInfo != null) {
-        builder.setRecorderInfo(recorderInfo);
+      if(recorderDetails != null) {
+        builder.setRecorderDetails(recorderDetails);
       }
 
       if(workType != null) {

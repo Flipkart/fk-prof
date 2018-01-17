@@ -19,7 +19,7 @@ message TraceCtxDetailList {
     repeated TraceCtxDetail traceCtx = 1;
 }
 
-message RecorderInfo {
+message RecorderDetails {
     optional string ip = 1;
     optional string hostname = 2;
     optional string appId = 3;
@@ -46,7 +46,7 @@ message ProfileWorkInfo {
     optional uint32 startOffset = 1;				// offset in seconds from the current header.aggregationStartTime
     optional uint32 duration = 2;
     optional uint32 recorderVersion = 3;
-    optional RecorderInfo recorderInfo = 7;
+    optional RecorderDetails recorderDetails = 7;
     repeated SampleCount sampleCount = 4;
     required AggregationStatus status = 5;
     repeated TraceCtxToCoveragePctMap traceCoverageMap = 6;
