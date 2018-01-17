@@ -13,9 +13,11 @@ import fk.prof.backend.model.slot.WorkSlotPool;
 import fk.prof.backend.model.slot.WorkSlotWeightCalculator;
 import fk.prof.backend.util.BitOperationUtil;
 import fk.prof.backend.util.proto.BackendProtoUtil;
+import fk.prof.backend.util.proto.ProfileProtoUtil;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
 import fk.prof.idl.Backend;
 import fk.prof.idl.Entities;
+import fk.prof.idl.Profile;
 import fk.prof.idl.WorkEntities;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
@@ -51,7 +53,7 @@ public class AggregationWindowPlanner {
   private final Future<Long> aggregationWindowScheduleTimer;
 
   private AggregationWindow currentAggregationWindow = null;
-  private Backend.RecordingPolicy latestRecordingPolicy = null;
+  private Profile.RecordingPolicy latestRecordingPolicy = null;
 
   private int currentAggregationWindowIndex = 0;
   private int relevantAggregationWindowIndexForRecordingPolicy = 0;
@@ -172,7 +174,7 @@ public class AggregationWindowPlanner {
       if(logger.isDebugEnabled()) {
         logger.debug("Initializing aggregation window with index=" + currentAggregationWindowIndex +
             ", process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup) +
-            ", recording_policy=" + BackendProtoUtil.recordingPolicyCompactRepr(latestRecordingPolicy));
+            ", recording_policy=" + ProfileProtoUtil.recordingPolicyCompactRepr(latestRecordingPolicy));
       }
 
       try {
@@ -204,7 +206,7 @@ public class AggregationWindowPlanner {
               ctrActiveWindows.inc();
               logger.info("Initialized aggregation window with index=" + currentAggregationWindowIndex +
                   ", process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup) +
-                  ", recording_policy=" + BackendProtoUtil.recordingPolicyCompactRepr(latestRecordingPolicy) +
+                  ", recording_policy=" + ProfileProtoUtil.recordingPolicyCompactRepr(latestRecordingPolicy) +
                   ", work_count=" + targetRecordersCount);
             }
           }

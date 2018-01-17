@@ -2,6 +2,7 @@ package fk.prof.backend.util.proto;
 
 import fk.prof.idl.Backend;
 import fk.prof.idl.PolicyEntities;
+import fk.prof.idl.Profile;
 import fk.prof.idl.WorkEntities;
 
 import java.util.List;
@@ -51,9 +52,9 @@ public class PolicyEntitiesProtoUtil {
     return String.format("version=%d,policyDetails={%s}", versionedPolicyDetails.getVersion(), policyDetailsCompactRepr(versionedPolicyDetails.getPolicyDetails()));
   }
 
-  public static Backend.RecordingPolicy translateToBackendRecordingPolicy(PolicyEntities.VersionedPolicyDetails versionedPolicy) {
+  public static Profile.RecordingPolicy translateToRecordingPolicy(PolicyEntities.VersionedPolicyDetails versionedPolicy) {
     PolicyEntities.Policy policyDTOPolicy = versionedPolicy.getPolicyDetails().getPolicy();
-    Backend.RecordingPolicy.Builder recordingPolicyBuilder = Backend.RecordingPolicy.newBuilder()
+    Profile.RecordingPolicy.Builder recordingPolicyBuilder = Profile.RecordingPolicy.newBuilder()
         .setCoveragePct(policyDTOPolicy.getSchedule().getPgCovPct())
         .setDuration(policyDTOPolicy.getSchedule().getDuration())
         .setDescription(policyDTOPolicy.getDescription())

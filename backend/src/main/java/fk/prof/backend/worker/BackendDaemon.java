@@ -20,6 +20,7 @@ import fk.prof.backend.util.URLUtil;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
 import fk.prof.idl.Backend;
 import fk.prof.idl.Entities;
+import fk.prof.idl.Profile;
 import fk.prof.metrics.MetricName;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
@@ -173,8 +174,8 @@ public class BackendDaemon extends AbstractVerticle {
     vertx.setTimer(config.getLoadReportItvlSecs() * 1000, timerId -> postLoadToLeader());
   }
 
-  private Future<Backend.RecordingPolicy> getWorkFromLeader(Entities.ProcessGroup processGroup, Meter mtrSuccess, Meter mtrFailure) {
-    Future<Backend.RecordingPolicy> result = Future.future();
+  private Future<Profile.RecordingPolicy> getWorkFromLeader(Entities.ProcessGroup processGroup, Meter mtrSuccess, Meter mtrFailure) {
+    Future<Profile.RecordingPolicy> result = Future.future();
     Backend.LeaderDetail leaderDetail;
     if((leaderDetail = leaderReadContext.getLeader()) != null) {
       try {
@@ -207,7 +208,7 @@ public class BackendDaemon extends AbstractVerticle {
                 return;
               }
               try {
-                Backend.RecordingPolicy recordingPolicy = ProtoUtil.buildProtoFromBuffer(Backend.RecordingPolicy.parser(), ar.result().getResponse());
+                Profile.RecordingPolicy recordingPolicy = ProtoUtil.buildProtoFromBuffer(Profile.RecordingPolicy.parser(), ar.result().getResponse());
                 result.complete(recordingPolicy);
                 mtrSuccess.mark();
               } catch (Exception ex) {

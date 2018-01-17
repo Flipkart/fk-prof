@@ -19,6 +19,14 @@ message TraceCtxDetailList {
     repeated TraceCtxDetail traceCtx = 1;
 }
 
+message RecordingPolicy {
+    required uint32 duration = 1;
+    required uint32 coverage_pct = 2;
+    repeated Work work = 3;
+    required string description = 4;
+    optional uint32 min_healthy = 5;
+}
+
 message RecorderDetails {
     optional string ip = 1;
     optional string hostname = 2;

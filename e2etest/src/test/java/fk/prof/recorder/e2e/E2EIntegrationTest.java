@@ -8,6 +8,7 @@ import fk.prof.backend.ConfigManager;
 import fk.prof.backend.Configuration;
 import fk.prof.idl.Backend;
 import fk.prof.idl.Entities;
+import fk.prof.idl.Profile;
 import fk.prof.idl.WorkEntities;
 import fk.prof.recorder.main.Burn20And80PctCpu;
 import fk.prof.recorder.main.Burn50And50PctCpu;
@@ -426,7 +427,7 @@ public class E2EIntegrationTest {
         }
 
         // add policy data
-        Backend.RecordingPolicy policy = Backend.RecordingPolicy.newBuilder()
+        Profile.RecordingPolicy policy = Profile.RecordingPolicy.newBuilder()
             .setDuration(30)
             .setCoveragePct(100)
             .setDescription("Test work profile")

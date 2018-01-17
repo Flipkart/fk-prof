@@ -1,6 +1,7 @@
 package fk.prof.backend.model.slot;
 
 import fk.prof.idl.Backend;
+import fk.prof.idl.Profile;
 import fk.prof.idl.WorkEntities;
 
 import java.util.HashMap;
@@ -15,7 +16,7 @@ public class WorkSlotWeightCalculator {
     weights.put(WorkEntities.WorkType.cpu_sample_work, 1);
   }
 
-  public static int weight(Backend.RecordingPolicy recordingPolicy) {
+  public static int weight(Profile.RecordingPolicy recordingPolicy) {
     int baseSlots = 0;
     if (recordingPolicy.getWorkCount() > 0) {
       for(WorkEntities.Work work: recordingPolicy.getWorkList()) {

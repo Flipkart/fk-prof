@@ -13,10 +13,7 @@ import fk.prof.backend.model.policy.PolicyStore;
 import fk.prof.backend.util.ProtoUtil;
 import fk.prof.backend.util.proto.PolicyEntitiesProtoUtil;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
-import fk.prof.idl.Backend;
-import fk.prof.idl.Entities;
-import fk.prof.idl.PolicyEntities;
-import fk.prof.idl.Recorder;
+import fk.prof.idl.*;
 import fk.prof.metrics.BackendTag;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
@@ -212,7 +209,7 @@ public class LeaderHttpVerticle extends AbstractVerticle {
         context.response().setStatusCode(400);
         context.response().end("Calling backend=" + RecorderProtoUtil.assignedBackendCompactRepr(callingBackend) + " not assigned to process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup));
       } else {
-        Backend.RecordingPolicy recordingPolicy = PolicyEntitiesProtoUtil.translateToBackendRecordingPolicy(policyStore.getVersionedPolicy(processGroup));
+        Profile.RecordingPolicy recordingPolicy = PolicyEntitiesProtoUtil.translateToRecordingPolicy(policyStore.getVersionedPolicy(processGroup));
         if (recordingPolicy == null) {
           mtrPolicyMiss.mark();
           context.response().setStatusCode(400);
