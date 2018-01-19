@@ -3,10 +3,10 @@ package fk.prof.aggregation.model;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.idl.Profile;
 import fk.prof.idl.Profile.*;
+import fk.prof.idl.WorkEntities;
 import fk.prof.idl.WorkEntities.WorkType;
 import fk.prof.aggregation.state.AggregationState;
 import org.hamcrest.core.IsCollectionContaining;
-import org.joda.time.LocalDate;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
@@ -56,6 +56,7 @@ public class ModelToProtoTest {
                         101l, new FinalizedProfileWorkInfo(1, null, AggregationState.COMPLETED, now.plusSeconds(10), now.plusSeconds(90), 80, buildMap("trace1", 5, "trace2", 10), buildMap(WorkType.cpu_sample_work, 100)),
                         102l, new FinalizedProfileWorkInfo(1, null, AggregationState.ABORTED, now.plusSeconds(100), now.plusSeconds(200), 100, buildMap("trace1", 10, "trace2", 10), buildMap(WorkType.cpu_sample_work, 1000))
                         ),
+                buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkType.cpu_sample_work))),
                 null
                 );
 
@@ -203,7 +204,14 @@ public class ModelToProtoTest {
         return recorders;
     }
 
-
+    private RecordingPolicy buildRecordingPolicy(Set<WorkType> workTypes) {
+        List<WorkEntities.Work> workList = new ArrayList<>();
+        for(WorkType workType: workTypes) {
+            workList.add(WorkEntities.Work.newBuilder().setWType(workType).build());
+        }
+        return RecordingPolicy.newBuilder().setDuration(60).setMinHealthy(10)
+            .setDescription("Test policy").setCoveragePct(100).addAllWork(workList).build();
+    }
 
     private TraceCtxDetail buildTraceCtxDetails(int idx, int count) {
         return TraceCtxDetail.newBuilder().setTraceIdx(idx).setSampleCount(count).build();

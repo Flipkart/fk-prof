@@ -264,7 +264,7 @@ public class AggregationWindowPlanner {
         windowStart,
         aggregationWindowDurationInSecs,
         workIds,
-        latestRecordingPolicy.getDuration());
+        latestRecordingPolicy);
     processGroupContextForScheduling.updateWorkAssignmentSchedule(workAssignmentSchedule);
     activeAggregationWindows.associateAggregationWindow(workIds, currentAggregationWindow);
   }

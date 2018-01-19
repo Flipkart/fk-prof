@@ -17,6 +17,7 @@ public class FinalizedAggregationWindow {
   protected final LocalDateTime endedAt;
   protected final int durationInSecs;
   protected final Map<Long, FinalizedProfileWorkInfo> workInfoLookup;
+  protected final RecordingPolicy policy;
   protected final FinalizedCpuSamplingAggregationBucket cpuSamplingAggregationBucket;
 
   private final ProcessGroupTag processGroupTag;
@@ -28,6 +29,7 @@ public class FinalizedAggregationWindow {
                                     LocalDateTime endedAt,
                                     int durationInSecs,
                                     Map<Long, FinalizedProfileWorkInfo> workInfoLookup,
+                                    RecordingPolicy policy,
                                     FinalizedCpuSamplingAggregationBucket cpuSamplingAggregationBucket) {
     this.appId = appId;
     this.clusterId = clusterId;
@@ -36,6 +38,7 @@ public class FinalizedAggregationWindow {
     this.endedAt = endedAt;
     this.durationInSecs = durationInSecs;
     this.workInfoLookup = workInfoLookup;
+    this.policy = policy;
     this.cpuSamplingAggregationBucket = cpuSamplingAggregationBucket;
 
     this.processGroupTag = new ProcessGroupTag(appId, clusterId, procId);
@@ -81,6 +84,7 @@ public class FinalizedAggregationWindow {
         && this.durationInSecs == other.durationInSecs
         && this.endedAt == null ? other.endedAt == null : this.endedAt.equals(other.endedAt)
         && this.workInfoLookup.equals(other.workInfoLookup)
+        && this.policy.equals(other.policy)
         && this.cpuSamplingAggregationBucket.equals(other.cpuSamplingAggregationBucket);
   }
 
@@ -92,7 +96,8 @@ public class FinalizedAggregationWindow {
         .setWindowDuration(durationInSecs)
         .setAppId(appId)
         .setClusterId(clusterId)
-        .setProcId(procId);
+        .setProcId(procId)
+        .setPolicy(policy);
 
     if(workType != null) {
       builder.setWorkType(workType);

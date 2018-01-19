@@ -116,4 +116,5 @@ message Header {
     optional string aggregationEndTime = 6;					// iso8601 string
     optional WorkType workType = 7;
     optional uint32 windowDuration = 8;
+    optional RecordingPolicy policy = 9;
 }

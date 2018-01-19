@@ -15,10 +15,7 @@ import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.function.Supplier;
 
 /**
@@ -37,7 +34,9 @@ public class MockAggregationWindow {
         int sampleCount1 = sampleCount.getValue() / 2;
         int sampleCount2 = sampleCount.getValue() - sampleCount1;
 
-        FinalizedAggregationWindow window = new FinalizedAggregationWindow("app1", "cluster1", "proc1", lt, lt.plusMinutes(30), durationInSeconds, buildProfilesWorkInfo(lt ,sampleCount1, sampleCount2), cpuSampleBucket);
+        FinalizedAggregationWindow window = new FinalizedAggregationWindow("app1", "cluster1", "proc1", lt, lt.plusMinutes(30), durationInSeconds,
+            buildProfilesWorkInfo(lt ,sampleCount1, sampleCount2),
+            buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work))), cpuSampleBucket);
 
         return window;
     }
@@ -162,6 +161,16 @@ public class MockAggregationWindow {
                 .setWorkType(WorkEntities.WorkType.cpu_sample_work)
                 .build();
     }
+
+    private static Profile.RecordingPolicy buildRecordingPolicy(Set<WorkEntities.WorkType> workTypes) {
+        List<WorkEntities.Work> workList = new ArrayList<>();
+        for(WorkEntities.WorkType workType: workTypes) {
+            workList.add(WorkEntities.Work.newBuilder().setWType(workType).build());
+        }
+        return Profile.RecordingPolicy.newBuilder().setDuration(60).setMinHealthy(10)
+            .setDescription("Test policy").setCoveragePct(100).addAllWork(workList).build();
+    }
+
 
     // TODO: Remove after perf test. Below 2 methods show different ways to serialize proto objects.
     // A temp byteBuffer is reused everytime to write a abstractMessage. This avoids the creation of temp buffer everytime

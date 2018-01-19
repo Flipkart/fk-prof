@@ -13,6 +13,7 @@ import fk.prof.backend.model.assignment.impl.AssociatedProcessGroupsImpl;
 import fk.prof.backend.model.election.LeaderReadContext;
 import fk.prof.backend.model.election.impl.InMemoryLeaderStore;
 import fk.prof.backend.model.aggregation.impl.ActiveAggregationWindowsImpl;
+import fk.prof.idl.Profile;
 import fk.prof.idl.Recording;
 import fk.prof.idl.WorkEntities;
 import io.vertx.core.CompositeFuture;
@@ -78,9 +79,10 @@ public class ProfileApiTest {
   @Test(timeout = 5000)
   public void testWithValidSingleProfile(TestContext context) {
     long workId = workIdCounter.incrementAndGet();
+    Profile.RecordingPolicy policy = buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work)), 60);
     LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
     activeAggregationWindows.associateAggregationWindow(new long[] {workId},
-        new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId}, 60));
+        new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId}, policy));
 
     final Async async = context.async();
     Future<ResponsePayload> future = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId), getMockWseEntriesForSingleProfile());
@@ -101,7 +103,7 @@ public class ProfileApiTest {
         expectedWorkLookup.put(workId, expectedWorkInfo);
         FinalizedAggregationWindow expected = new FinalizedAggregationWindow("a", "c", "p",
             awStart, null, 30 * 60,
-            expectedWorkLookup, expectedAggregationBucket);
+            expectedWorkLookup, policy, expectedAggregationBucket);
         context.assertTrue(expected.equals(actual));
         async.complete();
       }
@@ -113,8 +115,9 @@ public class ProfileApiTest {
     long workId1 = workIdCounter.incrementAndGet();
     long workId2 = workIdCounter.incrementAndGet();
     long workId3 = workIdCounter.incrementAndGet();
+    Profile.RecordingPolicy policy = buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work)), 60);
     LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
-    AggregationWindow aw = new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId1, workId2, workId3}, 60);
+    AggregationWindow aw = new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId1, workId2, workId3}, policy);
     activeAggregationWindows.associateAggregationWindow(new long[] {workId1, workId2, workId3}, aw);
     List<Recording.RecordingChunk> recList = getMockChunksForMultipleProfiles();
 
@@ -157,7 +160,7 @@ public class ProfileApiTest {
 
         FinalizedAggregationWindow expected = new FinalizedAggregationWindow("a", "c", "p",
             awStart, null, 30 * 60,
-            expectedWorkLookup, expectedAggregationBucket);
+            expectedWorkLookup, policy, expectedAggregationBucket);
 
         context.assertTrue(expected.equals(actual));
         async.complete();
@@ -171,7 +174,8 @@ public class ProfileApiTest {
     long workId = workIdCounter.incrementAndGet();
     LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
     activeAggregationWindows.associateAggregationWindow(new long[] {workId},
-        new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId}, 60));
+        new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId},
+            buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work)), 60)));
 
     final Async async = context.async();
     Future<ResponsePayload> f1 = makeProfileRequest(vertx, port, MockProfileObjects.getRecordingHeader(workId), getMockWseEntriesForSingleProfile(),
@@ -196,7 +200,8 @@ public class ProfileApiTest {
     long workId = workIdCounter.incrementAndGet();
     LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
     activeAggregationWindows.associateAggregationWindow(new long[] {workId},
-        new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId}, 60));
+        new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId},
+            buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work)), 60)));
 
     final Async async = context.async();
     Future<ResponsePayload> f1 = makeProfileRequest(vertx, port, MockProfileObjects.getRecordingHeader(workId), getMockWseEntriesForSingleProfile(),
@@ -220,7 +225,8 @@ public class ProfileApiTest {
     long workId = workIdCounter.incrementAndGet();
     LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
     activeAggregationWindows.associateAggregationWindow(new long[] {workId},
-        new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId}, 60));
+        new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId},
+            buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work)), 60)));
 
     final Async async = context.async();
     Future<ResponsePayload> f1 = makeProfileRequest(vertx, port, MockProfileObjects.getRecordingHeader(workId), getMockWseEntriesForSingleProfile(),
@@ -254,7 +260,8 @@ public class ProfileApiTest {
     long workId1 = workIdCounter.incrementAndGet();
     long workId2 = workId1;
     LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
-    AggregationWindow aw = new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId1, workId2}, 60);
+    AggregationWindow aw = new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId1, workId2},
+        buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work)), 60));
     activeAggregationWindows.associateAggregationWindow(new long[] {workId1}, aw);
     List<Recording.RecordingChunk> recList = getMockChunksForMultipleProfiles();
 
@@ -280,7 +287,8 @@ public class ProfileApiTest {
     long workId = workIdCounter.incrementAndGet();
     LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
     activeAggregationWindows.associateAggregationWindow(new long[] {workId},
-        new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId}, 60));
+        new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId},
+            buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work)), 60)));
 
     final Async async = context.async();
     Future<ResponsePayload> f1 = makeValidProfileRequest(MockProfileObjects.getRecordingHeader(workId), getMockWseEntriesForSingleProfile());
@@ -362,7 +370,8 @@ public class ProfileApiTest {
     long workId2 = workIdCounter.incrementAndGet();
     long workId3 = workIdCounter.incrementAndGet();
     LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
-    AggregationWindow aw = new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId1, workId2, workId3}, 60);
+    AggregationWindow aw = new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId1, workId2, workId3},
+        buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work)), 60));
     activeAggregationWindows.associateAggregationWindow(new long[] {workId1, workId2, workId3}, aw);
     List<Recording.RecordingChunk> recList = getMockChunksForMultipleProfiles();
 
@@ -411,7 +420,8 @@ public class ProfileApiTest {
     long workId = workIdCounter.incrementAndGet();
     if (!payloadStrategy.equals(HeaderPayloadStrategy.INVALID_WORK_ID)) {
       activeAggregationWindows.associateAggregationWindow(new long[] {workId},
-          new AggregationWindow("a", "c", "p", LocalDateTime.now(), 30 * 60, new long[]{workId}, 60));
+          new AggregationWindow("a", "c", "p", LocalDateTime.now(), 30 * 60, new long[]{workId},
+              buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work)), 60)));
     }
     final Async async = context.async();
 
@@ -433,7 +443,8 @@ public class ProfileApiTest {
   private void makeInvalidChunkProfileRequest(TestContext context, ChunkPayloadStrategy payloadStrategy, String errorToGrep, boolean skipEndMarker) {
     long workId = workIdCounter.incrementAndGet();
     activeAggregationWindows.associateAggregationWindow(new long[] {workId},
-        new AggregationWindow("a", "c", "p", LocalDateTime.now(), 30 * 60, new long[]{workId}, 60));
+        new AggregationWindow("a", "c", "p", LocalDateTime.now(), 30 * 60, new long[]{workId},
+            buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work)), 60)));
     final Async async = context.async();
 
     makeProfileRequest(vertx, port, MockProfileObjects.getRecordingHeader(workId), getMockWseEntriesForSingleProfile(), HeaderPayloadStrategy.VALID, payloadStrategy, skipEndMarker, 0)
@@ -524,6 +535,16 @@ public class ProfileApiTest {
         startedAt, endedAt, 60, expectedTraceCoverages, samplesMap);
     return expectedProfileWorkInfo;
   }
+
+  private Profile.RecordingPolicy buildRecordingPolicy(Set<WorkEntities.WorkType> workTypes, int recDuration) {
+    List<WorkEntities.Work> workList = new ArrayList<>();
+    for(WorkEntities.WorkType workType: workTypes) {
+      workList.add(WorkEntities.Work.newBuilder().setWType(workType).build());
+    }
+    return Profile.RecordingPolicy.newBuilder().setDuration(recDuration).setMinHealthy(10)
+        .setDescription("Test policy").setCoveragePct(100).addAllWork(workList).build();
+  }
+
 
   public static Future<ResponsePayload> makeProfileRequest(Vertx vertx, int port, Recording.RecordingHeader recordingHeader, List<Recording.RecordingChunk> recList, HeaderPayloadStrategy headerPayloadStrategy, ChunkPayloadStrategy chunkPayloadStrategy, boolean skipEndMarker, int additionalDelayInMs) {
     Future<ResponsePayload> future = Future.future();
