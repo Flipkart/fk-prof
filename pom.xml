@@ -19,8 +19,7 @@
         <module>storage</module>
         <module>aggregation</module>
         <module>metrics</module>
-      <module>bciagent</module>
-      <module>bciagenttest</module>
+        <module>bciagent</module>
     </modules>
 
     <properties>

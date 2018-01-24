@@ -14,8 +14,8 @@ public class TestBciAgent {
         Class[] classes = inst.getAllLoadedClasses();
 
         // trigger loading for test event classes
-        new Event(Util.getInstumentedCallerName(), 0, 0, 0, Event.Socket.accept(""));
-        new Event(Util.getInstumentedCallerName(), 0, 0, 0, Event.File.open(""));
+        new Event(Util.getCallerName(), 0, 0, 0, Event.Socket.accept(""));
+        new Event(Util.getCallerName(), 0, 0, 0, Event.File.open(""));
 
         // mocked tracer
         GlobalCtx.setIOTracer(new IOTracer(new MockSocketTracer(tracerEvents), new MockFileTracer(tracerEvents)));

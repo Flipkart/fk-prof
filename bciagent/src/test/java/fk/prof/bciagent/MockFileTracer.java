@@ -15,16 +15,16 @@ public class MockFileTracer extends IOTracer.FileOpTracer {
 
     @Override
     public void open(FileDescriptor fd, String path, long elapsed) {
-        events.add(new Event(Util.getInstumentedCallerName(), System.currentTimeMillis(), elapsed, fd.valid() ? FdAccessor.getFd(fd) : -1, Event.File.open(path)));
+        events.add(new Event(Util.getCallerName(), System.currentTimeMillis(), elapsed, fd.valid() ? FdAccessor.getFd(fd) : -1, Event.File.open(path)));
     }
 
     @Override
     public void read(FileDescriptor fd, long count, long elapsed) {
-        events.add(new Event(Util.getInstumentedCallerName(), System.currentTimeMillis(), elapsed, fd.valid() ? FdAccessor.getFd(fd) : -1, Event.File.read(count)));
+        events.add(new Event(Util.getCallerName(), System.currentTimeMillis(), elapsed, fd.valid() ? FdAccessor.getFd(fd) : -1, Event.File.read(count)));
     }
 
     @Override
     public void write(FileDescriptor fd, long count, long elapsed) {
-        events.add(new Event(Util.getInstumentedCallerName(), System.currentTimeMillis(), elapsed, fd.valid() ? FdAccessor.getFd(fd) : -1, Event.File.write(count)));
+        events.add(new Event(Util.getCallerName(), System.currentTimeMillis(), elapsed, fd.valid() ? FdAccessor.getFd(fd) : -1, Event.File.write(count)));
     }
 }

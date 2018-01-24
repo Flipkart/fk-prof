@@ -15,7 +15,8 @@ public class BciAgent {
     public static void premain(String agentArgs, Instrumentation inst) {
         System.out.println("Starting the agent");
 
-        // getting all loaded classes after creating lambdas creates issues. Retransformation does not play nice with lambdas.
+        // Saw some issues when this was below some lambda creating calls.
+        // Retransformation does not play nice with lambdas.
         Class[] classes = inst.getAllLoadedClasses();
 
         if (!verifyPrerequisites()) {

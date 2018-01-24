@@ -1,10 +1,8 @@
 package fk.prof.bciagent;
 
 public class Event {
-
-    public final static long elapsed_max_error = 10_000_000;   // 10 micros
-
     public final String caller;
+    public final long evt_created;
     public final long ts_ms;
     public final long elapsed_ns;
     public final int fd;
@@ -14,6 +12,7 @@ public class Event {
     public String toString() {
         return "{ \"method\" : \"" + caller + "\"," +
                 " \"ts\" : " + ts_ms + "," +
+                " \"evt_created\" : " + evt_created + "," +
                 " \"elapsed\" : " + elapsed_ns + "," +
                 " \"fd\" : " + fd + "," +
                 " \"" + (data instanceof Socket ? "socket" : "file") + "\" : " + data.toString() +
@@ -26,6 +25,7 @@ public class Event {
         this.elapsed_ns = elapsed_ns;
         this.fd = fd;
         this.data = socket;
+        this.evt_created = System.nanoTime();
     }
 
     public Event(String caller, long ts_ms, long elapsed_ns, int fd, File file) {
@@ -34,10 +34,11 @@ public class Event {
         this.elapsed_ns = elapsed_ns;
         this.fd = fd;
         this.data = file;
+        this.evt_created = System.nanoTime();
     }
 
     public static boolean equals(Event e1, Event e2) {
-        return e1.equals(e2) && Math.abs(e1.elapsed_ns - e2.elapsed_ns) < elapsed_max_error;
+        return e1.equals(e2);
     }
 
     @Override

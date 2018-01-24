@@ -83,7 +83,7 @@
                     <Premain-Class>fk.prof.bciagent.TestBciAgent</Premain-Class>
                     <Can-Retransform-Classes>true</Can-Retransform-Classes>
                     <Can-Redefine-Classes>true</Can-Redefine-Classes>
-                    <Boot-Class-Path>./bciagent-${project.version}-fat-test.jar</Boot-Class-Path>
+                    <Boot-Class-Path>./bciagent-${project.version}-test-fat.jar</Boot-Class-Path>
                   </manifestEntries>
                 </transformer>
               </transformers>
@@ -115,16 +115,11 @@
               <goal>integration-test</goal>
             </goals>
           </execution>
-          <execution>
-            <id>verify-it-tests</id>
-            <phase>verify</phase>
-            <goals>
-              <goal>verify</goal>
-            </goals>
-          </execution>
         </executions>
         <configuration>
           <argLine>-javaagent:${project.build.directory}/bciagent-${project.version}-test-fat.jar</argLine>
+          <parallel>classes</parallel>
+          <threadCountClasses>1</threadCountClasses>
         </configuration>
       </plugin>
     </plugins>

@@ -5,9 +5,11 @@ import javassist.CtConstructor;
 import javassist.CtMethod;
 
 public class Instrumenter {
-  private static final String elapsedLocalVar = "$$$_elpsed";
+  private static final String elapsedLocalVar = "$$$_evt_start_ts";
   private static final String fdLocalVar = "$$$_fd";
-  private static final String timedoutLocalVar = "$$$_timedout";
+
+  private static final String fileTracer = GlobalCtx.class.getCanonicalName() + ".getIOTracer().forFile()";
+  private static final String socketTracer = GlobalCtx.class.getCanonicalName() + ".getIOTracer().forSocket()";
 
   static class MethodEntry {
 
@@ -21,12 +23,9 @@ public class Instrumenter {
     static void ss_read(CtMethod m) throws Exception {
       String jStr = "";
       m.addLocalVariable(elapsedLocalVar, CtClass.longType);
-      m.addLocalVariable(timedoutLocalVar, CtClass.booleanType);
       jStr += elapsedLocalVar + " = System.nanoTime();";
-      jStr += timedoutLocalVar + " = false;";
       m.insertBefore(jStr);
     }
-
   }
 
   static class MethodExit {
@@ -62,15 +61,12 @@ public class Instrumenter {
     }
 
     static void ss_read(CtMethod m, CtClass socketTimeoutExceptionClass) throws Exception {
-      // not so nice way to check whether our catch block executed.
-      m.addCatch("{ $4 = -$4; throw $e; }", socketTimeoutExceptionClass);
+      String elapsedLocalVar = "$$$_elapsed_ns";
       String jStr = "";
       jStr += code_sockStream_saveFDToLocalVar();
-      // do our work and set things the way as they were.
-      jStr += "{ " +
-                socketTracer + ".read(" + fdLocalVar + ", (long)($_), " + expr_elapsedNanos() + ", (" + timeoutLocalVar + " != $4)); " +
-                "$4 = -$4; " +
-              "}";
+      jStr += "long " + elapsedLocalVar + " = " + expr_elapsedNanos() + ";";
+      jStr += socketTracer + ".read(" + fdLocalVar + ", (long)($_), " + elapsedLocalVar + ", " + elapsedLocalVar + " > ((long)$4) * 1000000);";
+
       m.insertAfter(jStr, true);
     }
 
