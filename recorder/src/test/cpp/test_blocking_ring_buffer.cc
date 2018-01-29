@@ -500,17 +500,17 @@ TEST(BlockingRingBuffer_should_not_block_reads____or_allow_writes____when_readon
 
     auto start = std::chrono::steady_clock::now();
     CHECK_EQUAL(0, ring.read(buff, 0, 20));
-    CHECK_CLOSE(100, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), 5);
+    CHECK_CLOSE(100, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), 10);
 
     t.join();
 
     start = std::chrono::steady_clock::now();
     CHECK_EQUAL(0, ring.read(buff, 0, 20));
-    CHECK_CLOSE(1, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count(), 1);
+    CHECK_CLOSE(1, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count(), 100);
 
     start = std::chrono::steady_clock::now();
     CHECK_EQUAL(0, ring.write(buff, 0, 20));
-    CHECK_CLOSE(1, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count(), 1);
+    CHECK_CLOSE(1, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count(), 100);
 }
 
 TEST(BlockingRingBuffer_should_not_block_writes____when_readonly____but_should_allow_completion_of_read) {

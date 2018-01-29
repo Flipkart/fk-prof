@@ -1,7 +1,7 @@
 package fk.prof.aggregation.model;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.stacktrace.StacktraceFrameNode;
+import fk.prof.idl.Profile;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -80,12 +80,12 @@ public class CpuSamplingFrameNode extends StacktraceFrameNode<CpuSamplingFrameNo
     return result;
   }
 
-  protected AggregatedProfileModel.FrameNode buildFrameNodeProto() {
-    return AggregatedProfileModel.FrameNode.newBuilder()
+  protected Profile.FrameNode buildFrameNodeProto() {
+    return Profile.FrameNode.newBuilder()
       .setMethodId(methodId)
       .setChildCount(children.size())
       .setLineNo(lineNumber)
-      .setCpuSamplingProps(AggregatedProfileModel.CPUSamplingNodeProps.newBuilder()
+      .setCpuSamplingProps(Profile.CPUSamplingNodeProps.newBuilder()
           .setOnCpuSamples(onCpuSamples.get()).setOnStackSamples(onStackSamples.get()))
       .build();
   }

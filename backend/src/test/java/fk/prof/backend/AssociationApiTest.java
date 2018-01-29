@@ -15,8 +15,10 @@ import fk.prof.backend.model.association.ProcessGroupCountBasedBackendComparator
 import fk.prof.backend.model.association.impl.ZookeeperBasedBackendAssociationStore;
 import fk.prof.backend.model.election.impl.InMemoryLeaderStore;
 import fk.prof.backend.model.policy.PolicyStore;
-import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.ProtoUtil;
+import fk.prof.idl.Backend;
+import fk.prof.idl.Entities;
+import fk.prof.idl.Recorder;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -33,7 +35,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import recording.Recorder;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -103,7 +104,7 @@ public class AssociationApiTest {
   public void getAssociationWhenLeaderNotElected(TestContext context)
       throws IOException {
     final Async async = context.async();
-    Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build();
+    Entities.ProcessGroup processGroup = Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build();
     makeRequestPostAssociation(buildRecorderInfoFromProcessGroup(processGroup)).setHandler(ar -> {
       if(ar.succeeded()) {
         context.assertEquals(503, ar.result().getStatusCode());
@@ -136,7 +137,7 @@ public class AssociationApiTest {
           Thread.sleep(1500);
 
           //Leader has been elected, it will be same as backend, since backend verticles were not undeployed
-          Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build();
+          Entities.ProcessGroup processGroup = Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build();
           makeRequestPostAssociation(buildRecorderInfoFromProcessGroup(processGroup)).setHandler(ar -> {
             if (ar.succeeded()) {
               context.assertEquals(400, ar.result().getStatusCode());
@@ -182,12 +183,12 @@ public class AssociationApiTest {
           when(inMemoryLeaderStore.isLeader()).thenReturn(false);
 
           //Leader has been elected, it will be same as backend, since backend verticles were not undeployed
-          Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build();
+          Entities.ProcessGroup processGroup = Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build();
           makeRequestPostAssociation(buildRecorderInfoFromProcessGroup(processGroup)).setHandler(ar -> {
             if(ar.succeeded()) {
               context.assertEquals(400, ar.result().getStatusCode());
               try {
-                makeRequestReportLoad(BackendDTO.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f).setCurrTick(1).build())
+                makeRequestReportLoad(Backend.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f).setCurrTick(1).build())
                     .setHandler(ar1 -> {
                       context.assertTrue(ar1.succeeded());
                       try {
@@ -241,17 +242,17 @@ public class AssociationApiTest {
         Thread.sleep(5000);
         when(inMemoryLeaderStore.isLeader()).thenReturn(false);
 
-        Future<ProfHttpClient.ResponseWithStatusTuple> r1 = makeRequestReportLoad(BackendDTO.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f).setCurrTick(2).build());
-        Future<ProfHttpClient.ResponseWithStatusTuple> r2 = makeRequestReportLoad(BackendDTO.LoadReportRequest.newBuilder().setIp("2").setPort(1).setLoad(0.5f).setCurrTick(2).build());
+        Future<ProfHttpClient.ResponseWithStatusTuple> r1 = makeRequestReportLoad(Backend.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f).setCurrTick(2).build());
+        Future<ProfHttpClient.ResponseWithStatusTuple> r2 = makeRequestReportLoad(Backend.LoadReportRequest.newBuilder().setIp("2").setPort(1).setLoad(0.5f).setCurrTick(2).build());
         CompositeFuture.all(r1, r2).setHandler(ar -> {
           if(ar.failed()) {
             context.fail(ar.cause());
           }
           try {
-            Recorder.ProcessGroup.Builder pgBuilder = Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c");
-            Recorder.ProcessGroup pg1 = pgBuilder.clone().setProcName("p1").build();
-            Recorder.ProcessGroup pg2 = pgBuilder.clone().setProcName("p2").build();
-            Recorder.ProcessGroup pg3 = pgBuilder.clone().setProcName("p3").build();
+            Entities.ProcessGroup.Builder pgBuilder = Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c");
+            Entities.ProcessGroup pg1 = pgBuilder.clone().setProcName("p1").build();
+            Entities.ProcessGroup pg2 = pgBuilder.clone().setProcName("p2").build();
+            Entities.ProcessGroup pg3 = pgBuilder.clone().setProcName("p3").build();
             Future<ProfHttpClient.ResponseWithStatusTuple> r3 = makeRequestPostAssociation(buildRecorderInfoFromProcessGroup(pg1));
             Future<ProfHttpClient.ResponseWithStatusTuple> r4 = makeRequestPostAssociation(buildRecorderInfoFromProcessGroup(pg2));
             Future<ProfHttpClient.ResponseWithStatusTuple> r5 = makeRequestPostAssociation(buildRecorderInfoFromProcessGroup(pg3));
@@ -323,7 +324,7 @@ public class AssociationApiTest {
     return future;
   }
 
-  private static Recorder.RecorderInfo buildRecorderInfoFromProcessGroup(Recorder.ProcessGroup processGroup) {
+  private static Recorder.RecorderInfo buildRecorderInfoFromProcessGroup(Entities.ProcessGroup processGroup) {
     return Recorder.RecorderInfo.newBuilder()
         .setAppId(processGroup.getAppId())
         .setCluster(processGroup.getCluster())
@@ -343,7 +344,7 @@ public class AssociationApiTest {
         .build();
   }
 
-  private Future<ProfHttpClient.ResponseWithStatusTuple> makeRequestReportLoad(BackendDTO.LoadReportRequest payload)
+  private Future<ProfHttpClient.ResponseWithStatusTuple> makeRequestReportLoad(Backend.LoadReportRequest payload)
       throws IOException {
     Future<ProfHttpClient.ResponseWithStatusTuple> future = Future.future();
     HttpClientRequest request = vertx.createHttpClient()

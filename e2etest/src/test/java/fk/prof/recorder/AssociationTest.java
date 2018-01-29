@@ -1,5 +1,7 @@
 package fk.prof.recorder;
 
+import fk.prof.idl.Recorder;
+import fk.prof.idl.WorkEntities;
 import fk.prof.recorder.main.SleepForever;
 import fk.prof.recorder.utils.AgentRunner;
 import fk.prof.recorder.utils.Matchers;
@@ -13,7 +15,6 @@ import org.joda.time.format.ISODateTimeFormat;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import recording.Recorder;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -109,7 +110,7 @@ public class AssociationTest {
 
         Recorder.PollReq pollRequest = pollReq.getValue();
         assertRecorderInfoAllGood_AndGetTick(pollRequest.getRecorderInfo(), is(0l), rc(false));
-        Recorder.WorkResponse workLastIssued = pollReq.getValue().getWorkLastIssued();
+        WorkEntities.WorkResponse workLastIssued = pollReq.getValue().getWorkLastIssued();
         assertReportedBootstrapWorkCompletion(workLastIssued);
 
         assertThat(pollCalledMoreThanOnce.getValue(), is(false));
@@ -165,7 +166,7 @@ public class AssociationTest {
         Recorder.PollReq pollRequest = pollReq.getValue();
         assertThat(pollRequest, is(notNullValue()));
         assertRecorderInfoAllGood_AndGetTick(pollRequest.getRecorderInfo(), is(0l), rc(true));
-        Recorder.WorkResponse workLastIssued = pollReq.getValue().getWorkLastIssued();
+        WorkEntities.WorkResponse workLastIssued = pollReq.getValue().getWorkLastIssued();
         assertReportedBootstrapWorkCompletion(workLastIssued);
 
         assertThat(pollCalledAt[1] - pollCalledAt[0], is(Matchers.approximately(2000l)));
@@ -217,7 +218,7 @@ public class AssociationTest {
         Recorder.PollReq pollRequest = pollReq.getValue();
         assertThat(pollRequest, is(notNullValue()));
         assertRecorderInfoAllGood_AndGetTick(pollRequest.getRecorderInfo(), is(0l), rc(true));
-        Recorder.WorkResponse workLastIssued = pollReq.getValue().getWorkLastIssued();
+        WorkEntities.WorkResponse workLastIssued = pollReq.getValue().getWorkLastIssued();
         assertReportedBootstrapWorkCompletion(workLastIssued);
 
         assertThat(pollCalledAt[1] - pollCalledAt[0], is(Matchers.approximately(2000l)));
@@ -257,7 +258,7 @@ public class AssociationTest {
         Recorder.PollReq pollRequest = pollReq.getValue();
         assertThat(pollRequest, is(notNullValue()));
         assertRecorderInfoAllGood_AndGetTick(pollRequest.getRecorderInfo(), is(0l), rc(true));
-        Recorder.WorkResponse workLastIssued = pollReq.getValue().getWorkLastIssued();
+        WorkEntities.WorkResponse workLastIssued = pollReq.getValue().getWorkLastIssued();
         assertReportedBootstrapWorkCompletion(workLastIssued);
 
         assertThat(associate2PolledAt.getValue() - startTime, is(greaterThan(14l)));
@@ -324,16 +325,16 @@ public class AssociationTest {
         Recorder.PollReq pollRequest = pollReq.getValue();
         assertThat(pollRequest, is(notNullValue()));
         assertRecorderInfoAllGood_AndGetTick(pollRequest.getRecorderInfo(), is(0l), rc(true));
-        Recorder.WorkResponse workLastIssued = pollReq.getValue().getWorkLastIssued();
+        WorkEntities.WorkResponse workLastIssued = pollReq.getValue().getWorkLastIssued();
         assertReportedBootstrapWorkCompletion(workLastIssued);
 
         assertThat(assocCalledMoreThanThrice.getValue(), is(false));
     }
 
-    private void assertReportedBootstrapWorkCompletion(Recorder.WorkResponse workLastIssued) {
+    private void assertReportedBootstrapWorkCompletion(WorkEntities.WorkResponse workLastIssued) {
         assertThat(workLastIssued.getWorkId(), is(0l));
-        assertThat(workLastIssued.getWorkState(), is(Recorder.WorkResponse.WorkState.complete));
-        assertThat(workLastIssued.getWorkResult(), is(Recorder.WorkResponse.WorkResult.success));
+        assertThat(workLastIssued.getWorkState(), is(WorkEntities.WorkResponse.WorkState.complete));
+        assertThat(workLastIssued.getWorkResult(), is(WorkEntities.WorkResponse.WorkResult.success));
         assertThat(workLastIssued.getElapsedTime(), is(0));
     }
 

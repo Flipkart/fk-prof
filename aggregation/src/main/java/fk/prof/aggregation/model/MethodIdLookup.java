@@ -1,6 +1,7 @@
 package fk.prof.aggregation.model;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.idl.Profile;
+import fk.prof.idl.Profile.*;
 
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,7 +57,7 @@ public class MethodIdLookup {
         && this.lookup.equals(other.lookup);
   }
 
-  protected AggregatedProfileModel.MethodLookUp buildMethodIdLookupProto() {
-    return AggregatedProfileModel.MethodLookUp.newBuilder().addAllFqdn(Arrays.asList(generateReverseLookup())).build();
+  protected Profile.MethodLookUp buildMethodIdLookupProto() {
+    return Profile.MethodLookUp.newBuilder().addAllFqdn(Arrays.asList(generateReverseLookup())).build();
   }
 }

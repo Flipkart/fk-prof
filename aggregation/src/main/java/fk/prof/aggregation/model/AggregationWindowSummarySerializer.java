@@ -1,7 +1,7 @@
 package fk.prof.aggregation.model;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.serialize.Serializer;
+import fk.prof.idl.Profile;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -35,13 +35,13 @@ public class AggregationWindowSummarySerializer implements Serializer {
         Serializer.writeCheckedDelimited(aggregation.buildHeaderProto(VERSION), cout);
 
         // all traces
-        AggregatedProfileModel.TraceCtxNames traceNames = aggregation.buildTraceCtxNamesProto();
+        Profile.TraceCtxNames traceNames = aggregation.buildTraceCtxNamesProto();
 
         Serializer.writeCheckedDelimited(traceNames, cout);
 
         // all profile work summary
         checksum.reset();
-        for(AggregatedProfileModel.ProfileWorkInfo workInfo: aggregation.buildProfileWorkInfoProto(traceNames)) {
+        for(Profile.ProfileWorkInfo workInfo: aggregation.buildProfileWorkInfoProto(traceNames)) {
             if(workInfo != null) {
                 workInfo.writeDelimitedTo(cout);
             }

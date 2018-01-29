@@ -1,9 +1,10 @@
 package fk.prof.backend.model.assignment;
 
-import recording.Recorder;
+
+import fk.prof.idl.Entities;
 
 public interface ProcessGroupContextForScheduling {
-  Recorder.ProcessGroup getProcessGroup();
+  Entities.ProcessGroup getProcessGroup();
   void updateWorkAssignmentSchedule(WorkAssignmentSchedule workAssignmentSchedule);
   int getHealthyRecordersCount();
 

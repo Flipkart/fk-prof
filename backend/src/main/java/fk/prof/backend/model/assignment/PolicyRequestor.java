@@ -1,11 +1,12 @@
 package fk.prof.backend.model.assignment;
 
 import com.codahale.metrics.Meter;
-import fk.prof.backend.proto.BackendDTO;
+import fk.prof.idl.Backend;
+import fk.prof.idl.Entities;
+import fk.prof.idl.Profile;
 import io.vertx.core.Future;
-import recording.Recorder;
 
 @FunctionalInterface
 public interface PolicyRequestor {
-  Future<BackendDTO.RecordingPolicy> get(Recorder.ProcessGroup processGroup, Meter mtrSuccess, Meter mtrFailure);
+  Future<Profile.RecordingPolicy> get(Entities.ProcessGroup processGroup, Meter mtrSuccess, Meter mtrFailure);
 }

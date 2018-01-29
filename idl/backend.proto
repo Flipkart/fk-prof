@@ -1,0 +1,26 @@
+syntax = "proto2";
+package fk.prof.idl;
+
+import "recorder.proto";
+import "entities.proto";
+
+message BackendAssociation {
+    required AssignedBackend backend = 1;
+    repeated ProcessGroup processGroups = 2;
+}
+
+message BackendAssociations {
+    repeated BackendAssociation associations = 1;
+}
+
+message LeaderDetail {
+    required string host = 1;
+    required uint32 port = 2;
+}
+
+message LoadReportRequest {
+    required string ip = 1;
+    required uint32 port = 2;
+    required float load = 3;
+    required int64 curr_tick = 4;
+}

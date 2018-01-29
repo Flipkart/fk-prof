@@ -11,9 +11,11 @@ import fk.prof.backend.ConfigManager;
 import fk.prof.backend.exception.AggregationFailure;
 import fk.prof.backend.model.aggregation.ActiveAggregationWindows;
 import fk.prof.backend.model.profile.RecordedProfileIndexes;
+import fk.prof.idl.Profile;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.Recording;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
-import recording.Recorder;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -26,6 +28,7 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
   private final String procId;
   private LocalDateTime start = null, endedAt = null;
   private final int durationInSecs;
+  private final Profile.RecordingPolicy policy;
 
   private final Map<Long, ProfileWorkInfo> workInfoLookup;
   private final CpuSamplingAggregationBucket cpuSamplingAggregationBucket = new CpuSamplingAggregationBucket();
@@ -35,16 +38,17 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
   private final Meter mtrStateTransitionFailures, mtrCSAggrFailures;
 
   public AggregationWindow(String appId, String clusterId, String procId,
-                           LocalDateTime start, int durationInSecs, long[] workIds, int workDurationInSec) {
+                           LocalDateTime start, int durationInSecs, long[] workIds, Profile.RecordingPolicy policy) {
     this.appId = appId;
     this.clusterId = clusterId;
     this.procId = procId;
     this.start = start;
     this.durationInSecs = durationInSecs;
+    this.policy = policy;
 
     Map<Long, ProfileWorkInfo> workInfoModifiableLookup = new HashMap<>();
     for (int i = 0; i < workIds.length; i++) {
-      workInfoModifiableLookup.put(workIds[i], new ProfileWorkInfo(workDurationInSec));
+      workInfoModifiableLookup.put(workIds[i], new ProfileWorkInfo(policy.getDuration()));
     }
     this.workInfoLookup = Collections.unmodifiableMap(workInfoModifiableLookup);
 
@@ -137,12 +141,12 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
     }
   }
 
-  public void aggregate(Recorder.Wse wse, RecordedProfileIndexes indexes) throws AggregationFailure {
+  public void aggregate(Recording.Wse wse, RecordedProfileIndexes indexes) throws AggregationFailure {
     ensureEntityIsWriteable();
 
     switch (wse.getWType()) {
       case cpu_sample_work:
-        Recorder.StackSampleWse stackSampleWse = wse.getCpuSampleEntry();
+        Recording.StackSampleWse stackSampleWse = wse.getCpuSampleEntry();
         if (stackSampleWse == null) {
           throw new AggregationFailure(String.format("work type=%s did not have associated samples", wse.getWType()));
         }
@@ -153,7 +157,7 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
     }
   }
 
-  public void updateWorkInfo(long workId, Recorder.RecordingChunk recording) {
+  public void updateWorkInfo(long workId, Recording.RecordingChunk recordingChunk) {
     ensureEntityIsWriteable();
 
     ProfileWorkInfo workInfo = workInfoLookup.get(workId);
@@ -161,7 +165,7 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
       throw new AggregationFailure(String.format("Cannot find work id=%d association in the aggregation window", workId), true);
     }
 
-    workInfo.updateWSEDetails(recording);
+    workInfo.updateWSEDetails(recordingChunk);
   }
 
   public void updateRecorderInfo(long workId, Recorder.RecorderInfo recorderInfo) {
@@ -198,6 +202,7 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
     return new FinalizedAggregationWindow(
         appId, clusterId, procId, start, endedAt, durationInSecs,
         finalizedWorkInfoLookup,
+        policy,
         cpuSamplingAggregationBucket.finalizeEntity()
     );
   }

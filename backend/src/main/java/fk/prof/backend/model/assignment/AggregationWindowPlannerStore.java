@@ -4,11 +4,10 @@ import com.google.common.base.Preconditions;
 import fk.prof.aggregation.model.FinalizedAggregationWindow;
 import fk.prof.backend.model.aggregation.ActiveAggregationWindows;
 import fk.prof.backend.model.slot.WorkSlotPool;
-import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
+import fk.prof.idl.Entities;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
-import recording.Recorder;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -16,7 +15,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class AggregationWindowPlannerStore {
-  private final Map<Recorder.ProcessGroup, AggregationWindowPlanner> lookup = new HashMap<>();
+  private final Map<Entities.ProcessGroup, AggregationWindowPlanner> lookup = new HashMap<>();
 
   private final Vertx vertx;
   private final int backendId;
@@ -80,7 +79,7 @@ public class AggregationWindowPlannerStore {
     return false;
   }
 
-  public void deAssociateAggregationWindowPlanner(Recorder.ProcessGroup processGroup)
+  public void deAssociateAggregationWindowPlanner(Entities.ProcessGroup processGroup)
     throws IllegalStateException {
     AggregationWindowPlanner aggregationWindowPlanner = this.lookup.remove(processGroup);
     if(aggregationWindowPlanner == null) {

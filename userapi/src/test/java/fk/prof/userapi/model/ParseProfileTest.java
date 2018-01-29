@@ -2,8 +2,9 @@ package fk.prof.userapi.model;
 
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.model.AggregationWindowSerializer;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.serialize.Serializer;
+import fk.prof.idl.Profile;
+import fk.prof.idl.WorkEntities;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.ObjectNotFoundException;
 import fk.prof.storage.S3AsyncStorage;
@@ -149,8 +150,8 @@ public class ParseProfileTest {
     }
 
     private void testEquality(TestContext context, AggregatedCpuSamplesData expected, AggregatedCpuSamplesData actual) {
-        Iterator<AggregatedProfileModel.FrameNode> expectedFN = expected.getFrameNodes().iterator();
-        Iterator<AggregatedProfileModel.FrameNode> actualFN = actual.getFrameNodes().iterator();
+        Iterator<Profile.FrameNode> expectedFN = expected.getFrameNodes().iterator();
+        Iterator<Profile.FrameNode> actualFN = actual.getFrameNodes().iterator();
 
         while(expectedFN.hasNext() && actualFN.hasNext()) {
             context.assertEquals(expectedFN.next(), actualFN.next());
@@ -182,7 +183,7 @@ public class ParseProfileTest {
     }
 
     private AggregatedProfileInfo buildDefaultProfileInfo() {
-        List<AggregatedProfileModel.FrameNodeList> frameNodes = buildFrameNodes();
+        List<Profile.FrameNodeList> frameNodes = buildFrameNodes();
         Map<String, AggregatedSamplesPerTraceCtx> samples = new HashMap<>();
         // first 2 elements belong to trace1
         samples.put(traceName1, new AggregatedSamplesPerTraceCtx(buildMethodLookup(), new AggregatedCpuSamplesData(new StacktraceTreeIterable(frameNodes.subList(0,2)))));
@@ -216,7 +217,7 @@ public class ParseProfileTest {
 
         // profile info
         adler32.reset();
-        for(AggregatedProfileModel.ProfileWorkInfo workInfo: buildProfilesSummary()) {
+        for(Profile.ProfileWorkInfo workInfo: buildProfilesSummary()) {
             workInfo.writeDelimitedTo(cout);
         }
         Serializer.writeVariantInt32(0, cout);
@@ -228,7 +229,7 @@ public class ParseProfileTest {
         Serializer.writeVariantInt32((int)adler32.getValue(), cout);
 
         adler32.reset();
-        for (AggregatedProfileModel.FrameNodeList frameNodes : buildFrameNodes()) {
+        for (Profile.FrameNodeList frameNodes : buildFrameNodes()) {
             frameNodes.writeDelimitedTo(cout);
         }
         Serializer.writeVariantInt32((int)adler32.getValue(), cout);
@@ -241,8 +242,8 @@ public class ParseProfileTest {
         return new ByteArrayInputStream(bytes);
     }
 
-    private AggregatedProfileModel.MethodLookUp buildMethodLookup() {
-        return AggregatedProfileModel.MethodLookUp.newBuilder()
+    private Profile.MethodLookUp buildMethodLookup() {
+        return Profile.MethodLookUp.newBuilder()
                 .addFqdn("~ ROOT ~.()")
                 .addFqdn("~ UNCLASSIFIABLE ~.()")
                 .addFqdn("com.example.App.main(String[])")
@@ -259,67 +260,67 @@ public class ParseProfileTest {
      *            |_ dosomething
      *            |_ print
      */
-    private List<AggregatedProfileModel.FrameNodeList> buildFrameNodes() {
-        List<AggregatedProfileModel.FrameNodeList> list = new ArrayList<>();
+    private List<Profile.FrameNodeList> buildFrameNodes() {
+        List<Profile.FrameNodeList> list = new ArrayList<>();
 
-        list.add(AggregatedProfileModel.FrameNodeList.newBuilder()
-                .addFrameNodes(AggregatedProfileModel.FrameNode.newBuilder().setMethodId(0).setLineNo(0).setChildCount(2).setCpuSamplingProps(AggregatedProfileModel.CPUSamplingNodeProps.newBuilder().setOnStackSamples(600).setOnCpuSamples(0)))
-                .addFrameNodes(AggregatedProfileModel.FrameNode.newBuilder().setMethodId(1).setLineNo(0).setChildCount(0).setCpuSamplingProps(AggregatedProfileModel.CPUSamplingNodeProps.newBuilder().setOnStackSamples(0).setOnCpuSamples(0)))
-                .addFrameNodes(AggregatedProfileModel.FrameNode.newBuilder().setMethodId(2).setLineNo(10).setChildCount(1).setCpuSamplingProps(AggregatedProfileModel.CPUSamplingNodeProps.newBuilder().setOnStackSamples(600).setOnCpuSamples(0)))
+        list.add(Profile.FrameNodeList.newBuilder()
+                .addFrameNodes(Profile.FrameNode.newBuilder().setMethodId(0).setLineNo(0).setChildCount(2).setCpuSamplingProps(Profile.CPUSamplingNodeProps.newBuilder().setOnStackSamples(600).setOnCpuSamples(0)))
+                .addFrameNodes(Profile.FrameNode.newBuilder().setMethodId(1).setLineNo(0).setChildCount(0).setCpuSamplingProps(Profile.CPUSamplingNodeProps.newBuilder().setOnStackSamples(0).setOnCpuSamples(0)))
+                .addFrameNodes(Profile.FrameNode.newBuilder().setMethodId(2).setLineNo(10).setChildCount(1).setCpuSamplingProps(Profile.CPUSamplingNodeProps.newBuilder().setOnStackSamples(600).setOnCpuSamples(0)))
                 .setTraceCtxIdx(0)
                 .build());
 
-        list.add(AggregatedProfileModel.FrameNodeList.newBuilder()
-                .addFrameNodes(AggregatedProfileModel.FrameNode.newBuilder().setMethodId(4).setLineNo(20).setChildCount(1).setCpuSamplingProps(AggregatedProfileModel.CPUSamplingNodeProps.newBuilder().setOnStackSamples(600).setOnCpuSamples(0)))
-                .addFrameNodes(AggregatedProfileModel.FrameNode.newBuilder().setMethodId(3).setLineNo(40).setChildCount(0).setCpuSamplingProps(AggregatedProfileModel.CPUSamplingNodeProps.newBuilder().setOnStackSamples(600).setOnCpuSamples(600)))
+        list.add(Profile.FrameNodeList.newBuilder()
+                .addFrameNodes(Profile.FrameNode.newBuilder().setMethodId(4).setLineNo(20).setChildCount(1).setCpuSamplingProps(Profile.CPUSamplingNodeProps.newBuilder().setOnStackSamples(600).setOnCpuSamples(0)))
+                .addFrameNodes(Profile.FrameNode.newBuilder().setMethodId(3).setLineNo(40).setChildCount(0).setCpuSamplingProps(Profile.CPUSamplingNodeProps.newBuilder().setOnStackSamples(600).setOnCpuSamples(600)))
                 .setTraceCtxIdx(0)
                 .build());
 
-        list.add(AggregatedProfileModel.FrameNodeList.newBuilder()
-                .addFrameNodes(AggregatedProfileModel.FrameNode.newBuilder().setMethodId(0).setLineNo(0).setChildCount(2).setCpuSamplingProps(AggregatedProfileModel.CPUSamplingNodeProps.newBuilder().setOnStackSamples(1280).setOnCpuSamples(0)))
-                .addFrameNodes(AggregatedProfileModel.FrameNode.newBuilder().setMethodId(1).setLineNo(0).setChildCount(0).setCpuSamplingProps(AggregatedProfileModel.CPUSamplingNodeProps.newBuilder().setOnStackSamples(0).setOnCpuSamples(0)))
-                .addFrameNodes(AggregatedProfileModel.FrameNode.newBuilder().setMethodId(2).setLineNo(10).setChildCount(1).setCpuSamplingProps(AggregatedProfileModel.CPUSamplingNodeProps.newBuilder().setOnStackSamples(1280).setOnCpuSamples(0)))
+        list.add(Profile.FrameNodeList.newBuilder()
+                .addFrameNodes(Profile.FrameNode.newBuilder().setMethodId(0).setLineNo(0).setChildCount(2).setCpuSamplingProps(Profile.CPUSamplingNodeProps.newBuilder().setOnStackSamples(1280).setOnCpuSamples(0)))
+                .addFrameNodes(Profile.FrameNode.newBuilder().setMethodId(1).setLineNo(0).setChildCount(0).setCpuSamplingProps(Profile.CPUSamplingNodeProps.newBuilder().setOnStackSamples(0).setOnCpuSamples(0)))
+                .addFrameNodes(Profile.FrameNode.newBuilder().setMethodId(2).setLineNo(10).setChildCount(1).setCpuSamplingProps(Profile.CPUSamplingNodeProps.newBuilder().setOnStackSamples(1280).setOnCpuSamples(0)))
                 .setTraceCtxIdx(1)
                 .build());
 
-        list.add(AggregatedProfileModel.FrameNodeList.newBuilder()
-                .addFrameNodes(AggregatedProfileModel.FrameNode.newBuilder().setMethodId(4).setLineNo(21).setChildCount(0).setCpuSamplingProps(AggregatedProfileModel.CPUSamplingNodeProps.newBuilder().setOnStackSamples(1280).setOnCpuSamples(1280)))
+        list.add(Profile.FrameNodeList.newBuilder()
+                .addFrameNodes(Profile.FrameNode.newBuilder().setMethodId(4).setLineNo(21).setChildCount(0).setCpuSamplingProps(Profile.CPUSamplingNodeProps.newBuilder().setOnStackSamples(1280).setOnCpuSamples(1280)))
                 .setTraceCtxIdx(1)
                 .build());
 
         return list;
     }
 
-    public static AggregatedProfileModel.Header buildHeader() {
+    public static Profile.Header buildHeader() {
         ZonedDateTime start = ZonedDateTime.parse("2017-01-30T09:54:53.852Z", DateTimeFormatter.ISO_ZONED_DATE_TIME);
-        return AggregatedProfileModel.Header.newBuilder()
+        return Profile.Header.newBuilder()
                 .setAppId("app1")
                 .setProcId("svc1")
                 .setClusterId("cluster1")
-                .setWorkType(AggregatedProfileModel.WorkType.cpu_sample_work)
+                .setWorkType(WorkEntities.WorkType.cpu_sample_work)
                 .setAggregationStartTime(start.format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
                 .setAggregationEndTime(start.plusMinutes(30).format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
                 .setFormatVersion(1)
                 .build();
     }
 
-    public static AggregatedProfileModel.TraceCtxNames buildTraceName(String... traces) {
-        return AggregatedProfileModel.TraceCtxNames.newBuilder().addAllName(Arrays.asList(traces)).build();
+    public static Profile.TraceCtxNames buildTraceName(String... traces) {
+        return Profile.TraceCtxNames.newBuilder().addAllName(Arrays.asList(traces)).build();
     }
 
-    public static AggregatedProfileModel.TraceCtxDetailList buildTraceCtxList() {
-        return AggregatedProfileModel.TraceCtxDetailList.newBuilder()
-                .addTraceCtx(AggregatedProfileModel.TraceCtxDetail.newBuilder()
+    public static Profile.TraceCtxDetailList buildTraceCtxList() {
+        return Profile.TraceCtxDetailList.newBuilder()
+                .addTraceCtx(Profile.TraceCtxDetail.newBuilder()
                         .setTraceIdx(0)
                         .setSampleCount(600))
-                .addTraceCtx(AggregatedProfileModel.TraceCtxDetail.newBuilder()
+                .addTraceCtx(Profile.TraceCtxDetail.newBuilder()
                         .setTraceIdx(1)
                         .setSampleCount(1280)).build();
     }
 
-    public static AggregatedProfileModel.RecorderInfo[] buildRecordersList() {
-        return new AggregatedProfileModel.RecorderInfo[] {
-            AggregatedProfileModel.RecorderInfo.newBuilder()
+    public static Profile.RecorderDetails[] buildRecordersList() {
+        return new Profile.RecorderDetails[] {
+            Profile.RecorderDetails.newBuilder()
                 .setIp("192.168.1.1")
                 .setHostname("some-box-1")
                 .setAppId("app1")
@@ -330,7 +331,7 @@ public class ParseProfileTest {
                 .setVmId("vm1")
                 .setZone("chennai-1")
                 .setInstanceType("c1.xlarge").build(),
-            AggregatedProfileModel.RecorderInfo.newBuilder()
+            Profile.RecorderDetails.newBuilder()
                 .setIp("192.168.1.2")
                 .setHostname("some-box-2")
                 .setAppId("app1")
@@ -343,35 +344,35 @@ public class ParseProfileTest {
                 .setInstanceType("c1.xlarge").build()};
     }
 
-    public static List<AggregatedProfileModel.ProfileWorkInfo> buildProfilesSummary() {
-        List<AggregatedProfileModel.ProfileWorkInfo> workInfos = new ArrayList<>();
-        AggregatedProfileModel.RecorderInfo[] recorders = buildRecordersList();
+    public static List<Profile.ProfileWorkInfo> buildProfilesSummary() {
+        List<Profile.ProfileWorkInfo> workInfos = new ArrayList<>();
+        Profile.RecorderDetails[] recorders = buildRecordersList();
 
-        workInfos.add(AggregatedProfileModel.ProfileWorkInfo.newBuilder()
+        workInfos.add(Profile.ProfileWorkInfo.newBuilder()
                 .setStartOffset(10)
                 .setDuration(60)
                 .setRecorderVersion(1)
-                .setRecorderInfo(recorders[0])
-                .addSampleCount(AggregatedProfileModel.ProfileWorkInfo.SampleCount.newBuilder().setWorkType(AggregatedProfileModel.WorkType.cpu_sample_work).setSampleCount(900))
-                .setStatus(AggregatedProfileModel.AggregationStatus.Completed)
-                .addTraceCoverageMap(AggregatedProfileModel.ProfileWorkInfo.TraceCtxToCoveragePctMap.newBuilder()
+                .setRecorderDetails(recorders[0])
+                .addSampleCount(Profile.ProfileWorkInfo.SampleCount.newBuilder().setWorkType(WorkEntities.WorkType.cpu_sample_work).setSampleCount(900))
+                .setStatus(Profile.AggregationStatus.Completed)
+                .addTraceCoverageMap(Profile.ProfileWorkInfo.TraceCtxToCoveragePctMap.newBuilder()
                         .setTraceCtxIdx(0)
                         .setCoveragePct(5))
-                .addTraceCoverageMap(AggregatedProfileModel.ProfileWorkInfo.TraceCtxToCoveragePctMap.newBuilder()
+                .addTraceCoverageMap(Profile.ProfileWorkInfo.TraceCtxToCoveragePctMap.newBuilder()
                         .setTraceCtxIdx(1)
                         .setCoveragePct(10)).build());
 
-        workInfos.add(AggregatedProfileModel.ProfileWorkInfo.newBuilder()
+        workInfos.add(Profile.ProfileWorkInfo.newBuilder()
                 .setStartOffset(24)
                 .setDuration(60)
                 .setRecorderVersion(1)
-                .setRecorderInfo(recorders[1])
-                .addSampleCount(AggregatedProfileModel.ProfileWorkInfo.SampleCount.newBuilder().setWorkType(AggregatedProfileModel.WorkType.cpu_sample_work).setSampleCount(980))
-                .setStatus(AggregatedProfileModel.AggregationStatus.Retried)
-                .addTraceCoverageMap(AggregatedProfileModel.ProfileWorkInfo.TraceCtxToCoveragePctMap.newBuilder()
+                .setRecorderDetails(recorders[1])
+                .addSampleCount(Profile.ProfileWorkInfo.SampleCount.newBuilder().setWorkType(WorkEntities.WorkType.cpu_sample_work).setSampleCount(980))
+                .setStatus(Profile.AggregationStatus.Retried)
+                .addTraceCoverageMap(Profile.ProfileWorkInfo.TraceCtxToCoveragePctMap.newBuilder()
                         .setTraceCtxIdx(0)
                         .setCoveragePct(5))
-                .addTraceCoverageMap(AggregatedProfileModel.ProfileWorkInfo.TraceCtxToCoveragePctMap.newBuilder()
+                .addTraceCoverageMap(Profile.ProfileWorkInfo.TraceCtxToCoveragePctMap.newBuilder()
                         .setTraceCtxIdx(1)
                         .setCoveragePct(10)).build());
 

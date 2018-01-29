@@ -2,10 +2,11 @@ package fk.prof.backend;
 
 import fk.prof.backend.model.association.BackendDetail;
 import fk.prof.backend.model.association.ProcessGroupCountBasedBackendComparator;
+import fk.prof.idl.Entities;
+import fk.prof.idl.Recorder;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import recording.Recorder;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,19 +16,19 @@ import java.util.PriorityQueue;
 public class ProcessGroupCountBasedBackendPriorityTest {
 
   PriorityQueue<BackendDetail> backendDetailPriorityQueue;
-  List<Recorder.ProcessGroup> mockProcessGroups;
+  List<Entities.ProcessGroup> mockProcessGroups;
   List<Recorder.AssignedBackend> mockBackends;
 
   @Before
   public void setBefore() {
     backendDetailPriorityQueue = new PriorityQueue<>(new ProcessGroupCountBasedBackendComparator());
     mockProcessGroups = Arrays.asList(
-        Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build(),
-        Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p2").build(),
-        Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p3").build(),
-        Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p4").build(),
-        Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p5").build(),
-        Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p6").build()
+        Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build(),
+        Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p2").build(),
+        Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p3").build(),
+        Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p4").build(),
+        Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p5").build(),
+        Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p6").build()
     );
     mockBackends = Arrays.asList(
         Recorder.AssignedBackend.newBuilder().setHost("1").setPort(0).build(),

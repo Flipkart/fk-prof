@@ -1,12 +1,12 @@
 package fk.prof.backend.model.association.impl;
 
-import recording.Recorder;
+import fk.prof.idl.Entities;
 
 public class ProcessGroupZNodeDetail {
   private final String zNodePath;
-  private final Recorder.ProcessGroup processGroup;
+  private final Entities.ProcessGroup processGroup;
 
-  public ProcessGroupZNodeDetail(String zNodePath, Recorder.ProcessGroup processGroup) {
+  public ProcessGroupZNodeDetail(String zNodePath, Entities.ProcessGroup processGroup) {
     this.zNodePath = zNodePath;
     this.processGroup = processGroup;
   }
@@ -15,7 +15,7 @@ public class ProcessGroupZNodeDetail {
     return zNodePath;
   }
 
-  public Recorder.ProcessGroup getProcessGroup() {
+  public Entities.ProcessGroup getProcessGroup() {
     return processGroup;
   }
 }

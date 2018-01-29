@@ -5,7 +5,8 @@ import com.google.common.io.ByteStreams;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.model.AggregationWindowSerializer;
 import fk.prof.aggregation.model.AggregationWindowSummarySerializer;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.idl.Profile;
+import fk.prof.idl.WorkEntities;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.buffer.StorageBackedInputStream;
 import fk.prof.userapi.Deserializer;
@@ -104,23 +105,23 @@ public class AggregatedProfileLoader {
             }
 
             // read header
-            AggregatedProfileModel.Header parsedHeader = Deserializer.readCheckedDelimited(AggregatedProfileModel.Header.parser(), cin, "header");
+            Profile.Header parsedHeader = Deserializer.readCheckedDelimited(Profile.Header.parser(), cin, "header");
 
             // read traceCtx list
-            AggregatedProfileModel.TraceCtxNames traceNames = Deserializer.readCheckedDelimited(AggregatedProfileModel.TraceCtxNames.parser(), cin, "traceNames");
-            AggregatedProfileModel.TraceCtxDetailList traceDetails = Deserializer.readCheckedDelimited(AggregatedProfileModel.TraceCtxDetailList.parser(), cin, "traceDetails");
+            Profile.TraceCtxNames traceNames = Deserializer.readCheckedDelimited(Profile.TraceCtxNames.parser(), cin, "traceNames");
+            Profile.TraceCtxDetailList traceDetails = Deserializer.readCheckedDelimited(Profile.TraceCtxDetailList.parser(), cin, "traceDetails");
 
             // read profiles summary
             checksumReset(checksum);
-            List<AggregatedProfileModel.ProfileWorkInfo> profiles = new ArrayList<>();
+            List<Profile.ProfileWorkInfo> profiles = new ArrayList<>();
             int size = 0;
             while ((size = Deserializer.readVariantInt32(cin)) != 0) {
-                profiles.add(AggregatedProfileModel.ProfileWorkInfo.parseFrom(ByteStreams.limit(cin, size)));
+                profiles.add(Profile.ProfileWorkInfo.parseFrom(ByteStreams.limit(cin, size)));
             }
             checksumVerify((int) checksum.getValue(), Deserializer.readVariantInt32(in), "checksum error profileWorkInfo");
 
             // read method lookup table
-            AggregatedProfileModel.MethodLookUp methodLookUp = Deserializer.readCheckedDelimited(AggregatedProfileModel.MethodLookUp.parser(), cin, "methodLookup");
+            Profile.MethodLookUp methodLookUp = Deserializer.readCheckedDelimited(Profile.MethodLookUp.parser(), cin, "methodLookup");
 
             // read work specific samples
             Map<String, AggregatedSamplesPerTraceCtx> samplesPerTrace = new HashMap<>();
@@ -162,26 +163,26 @@ public class AggregatedProfileLoader {
             }
 
             // read header
-            AggregatedProfileModel.Header parsedHeader = Deserializer.readCheckedDelimited(AggregatedProfileModel.Header.parser(), cin, "header");
+            Profile.Header parsedHeader = Deserializer.readCheckedDelimited(Profile.Header.parser(), cin, "header");
 
             // read traceCtx list
-            AggregatedProfileModel.TraceCtxNames traceNames = Deserializer.readCheckedDelimited(AggregatedProfileModel.TraceCtxNames.parser(), cin, "traceNames");
+            Profile.TraceCtxNames traceNames = Deserializer.readCheckedDelimited(Profile.TraceCtxNames.parser(), cin, "traceNames");
 
             // read profiles summary
             checksumReset(checksum);
-            List<AggregatedProfileModel.ProfileWorkInfo> profiles = new ArrayList<>();
+            List<Profile.ProfileWorkInfo> profiles = new ArrayList<>();
             int size = 0;
             while((size = Deserializer.readVariantInt32(cin)) != 0) {
-                profiles.add(AggregatedProfileModel.ProfileWorkInfo.parseFrom(ByteStreams.limit(cin, size)));
+                profiles.add(Profile.ProfileWorkInfo.parseFrom(ByteStreams.limit(cin, size)));
             }
             checksumVerify((int)checksum.getValue(), Deserializer.readVariantInt32(in), "checksum error profileWorkInfo");
 
             // read work specific samples
-            Map<AggregatedProfileModel.WorkType, AggregationWindowSummary.WorkSpecificSummary> summaryPerTrace = new HashMap<>();
+            Map<WorkEntities.WorkType, AggregationWindowSummary.WorkSpecificSummary> summaryPerTrace = new HashMap<>();
 
             // cpu_sampling
-            AggregatedProfileModel.TraceCtxDetailList traceDetails = Deserializer.readCheckedDelimited(AggregatedProfileModel.TraceCtxDetailList.parser(), cin, "cpu_sample traceDetails");
-            summaryPerTrace.put(AggregatedProfileModel.WorkType.cpu_sample_work, new AggregationWindowSummary.CpuSampleSummary(traceDetails));
+            Profile.TraceCtxDetailList traceDetails = Deserializer.readCheckedDelimited(Profile.TraceCtxDetailList.parser(), cin, "cpu_sample traceDetails");
+            summaryPerTrace.put(WorkEntities.WorkType.cpu_sample_work, new AggregationWindowSummary.CpuSampleSummary(traceDetails));
 
             AggregationWindowSummary summary = new AggregationWindowSummary(parsedHeader, traceNames, profiles, summaryPerTrace);
 
@@ -204,10 +205,10 @@ public class AggregatedProfileLoader {
         // tree is serialized in DFS manner. First node being the root.
         int nodeCount = 1; // for root node
         int parsedNodeCount = 0;
-        List<AggregatedProfileModel.FrameNodeList> parsedFrameNodes = new ArrayList<>();
+        List<Profile.FrameNodeList> parsedFrameNodes = new ArrayList<>();
         do {
-            AggregatedProfileModel.FrameNodeList frameNodeList = AggregatedProfileModel.FrameNodeList.parseDelimitedFrom(in);
-            for(AggregatedProfileModel.FrameNode node: frameNodeList.getFrameNodesList()) {
+            Profile.FrameNodeList frameNodeList = Profile.FrameNodeList.parseDelimitedFrom(in);
+            for(Profile.FrameNode node: frameNodeList.getFrameNodesList()) {
                 nodeCount += node.getChildCount();
             }
             parsedNodeCount += frameNodeList.getFrameNodesCount();

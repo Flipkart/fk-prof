@@ -1,7 +1,7 @@
 package fk.prof.userapi.verticles;
 
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.idl.Profile;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
@@ -61,7 +61,7 @@ public class RouterVerticleTest {
     private static final ZonedDateTime P_TIME_STAMP = ZonedDateTime.parse("2017-01-20T12:37:00.376+05:30", DateTimeFormatter.ISO_ZONED_DATE_TIME);
     private static final ZonedDateTime NP_TIME_STAMP = ZonedDateTime.parse("2017-01-21T12:37:00.376+05:30", DateTimeFormatter.ISO_ZONED_DATE_TIME);
 
-    private static final String P_WORKTYPE = "thread_sample_work";
+    private static final String P_WORKTYPE = "io_trace_work";
     private static final String NP_WORKTYPE = "cpu_sample_work";
 
 
@@ -364,8 +364,8 @@ public class RouterVerticleTest {
 
         AggregatedProfileNamingStrategy pProfile = new AggregatedProfileNamingStrategy("profiles", 1, P_APP_ID, P_CLUSTER_ID, P_PROC, P_TIME_STAMP, 1800);
         AggregationWindowSummary dummySummary = new AggregationWindowSummary(
-                AggregatedProfileModel.Header.newBuilder().setFormatVersion(1).setAggregationStartTime(P_TIME_STAMP.format(DateTimeFormatter.ISO_ZONED_DATE_TIME)).setAggregationEndTime(P_TIME_STAMP.plusSeconds(1800).format(DateTimeFormatter.ISO_ZONED_DATE_TIME)).build(),
-                AggregatedProfileModel.TraceCtxNames.newBuilder().addAllName(Arrays.asList("trace1", "trace2")).build(), null, null);
+                Profile.Header.newBuilder().setFormatVersion(1).setAggregationStartTime(P_TIME_STAMP.format(DateTimeFormatter.ISO_ZONED_DATE_TIME)).setAggregationEndTime(P_TIME_STAMP.plusSeconds(1800).format(DateTimeFormatter.ISO_ZONED_DATE_TIME)).build(),
+                Profile.TraceCtxNames.newBuilder().addAllName(Arrays.asList("trace1", "trace2")).build(), null, null);
 
         String encodedSummary = Json.encode(dummySummary);
 

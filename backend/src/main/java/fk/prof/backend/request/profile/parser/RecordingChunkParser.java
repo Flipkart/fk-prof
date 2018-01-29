@@ -3,13 +3,13 @@ package fk.prof.backend.request.profile.parser;
 import com.codahale.metrics.Histogram;
 import fk.prof.backend.exception.AggregationFailure;
 import fk.prof.backend.request.CompositeByteBufInputStream;
-import recording.Recorder;
+import fk.prof.idl.Recording;
 
 import java.io.IOException;
 import java.util.zip.Adler32;
 
 public class RecordingChunkParser {
-  private Recorder.RecordingChunk recording = null;
+  private Recording.RecordingChunk chunk = null;
 
   private Adler32 checksum = new Adler32();
   private boolean parsed = false;
@@ -18,15 +18,15 @@ public class RecordingChunkParser {
 
   private MessageParser msgParser;
 
-  public RecordingChunkParser(int maxMessageSizeInBytes, Histogram histWseSize) {
+  public RecordingChunkParser(int maxMessageSizeInBytes, Histogram histChunkSize) {
     this.maxMessageSizeInBytes = maxMessageSizeInBytes;
-    this.msgParser = new MessageParser(histWseSize);
+    this.msgParser = new MessageParser(histChunkSize);
   }
 
   /**
-   * Returns true if recording has been read and checksum validated, false otherwise
+   * Returns true if recording chunk has been read and checksum validated, false otherwise
    *
-   * @return returns if recording has been parsed or not
+   * @return returns if recording chunk has been parsed or not
    */
   public boolean isParsed() {
     return this.parsed;
@@ -37,12 +37,12 @@ public class RecordingChunkParser {
   }
 
   /**
-   * Returns {@link Recorder.Wse} if {@link #isParsed()} is true, null otherwise
+   * Returns {@link Recording.RecordingChunk} if {@link #isParsed()} is true, null otherwise
    *
    * @return
    */
-  public Recorder.RecordingChunk get() {
-    return this.recording;
+  public Recording.RecordingChunk get() {
+    return this.chunk;
   }
 
   /**
@@ -50,7 +50,7 @@ public class RecordingChunkParser {
    * Note: If {@link #get()} is not performed before reset, previous parsed entry will be lost
    */
   public void reset() {
-    this.recording = null;
+    this.chunk = null;
     this.parsed = false;
     this.checksum.reset();
   }
@@ -61,19 +61,19 @@ public class RecordingChunkParser {
    */
   public void parse(CompositeByteBufInputStream in) throws AggregationFailure {
     try {
-      if (recording == null) {
+      if (chunk == null) {
         in.markAndDiscardRead();
-        recording = msgParser.readDelimited(Recorder.RecordingChunk.parser(), in, maxMessageSizeInBytes, "RecordingChunk");
-        if(recording == null) {
+        chunk = msgParser.readDelimited(Recording.RecordingChunk.parser(), in, maxMessageSizeInBytes, "RecordingChunk");
+        if(chunk == null) {
           endMarkerReceived = true;
           return;
         }
         in.updateChecksumSinceMarked(checksum);
       }
       in.markAndDiscardRead();
-      int checksumValue = msgParser.readRawVariantInt(in, "wseChecksumValue");
+      int checksumValue = msgParser.readRawVariantInt(in, "recordingChunkChecksumValue");
       if (checksumValue != ((int) checksum.getValue())) {
-        throw new AggregationFailure("Checksum of recording does not match");
+        throw new AggregationFailure("Checksum of recording chunk does not match");
       }
       parsed = true;
     }
