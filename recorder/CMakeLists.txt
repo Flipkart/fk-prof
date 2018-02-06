@@ -109,56 +109,28 @@ include_directories("/usr/include/i386-linux-gnu/c++/4.8/")
 
 set(SOURCE_FILES
     ${SRC}/checksum.cc
-    ${SRC}/checksum.hh
     ${SRC}/circular_queue.cc
-    ${SRC}/circular_queue.hh
     ${SRC}/common.cc
-    ${SRC}/common.hh
     ${SRC}/controller.cc
-    ${SRC}/controller.hh
-    ${SRC}/metrics.hh
-    ${SRC}/globals.hh
     ${SRC}/globals.cc
-    ${SRC}/ti_thd.hh
     ${SRC}/ti_thd.cc
     ${SRC}/signal_handler.cc
-    ${SRC}/signal_handler.hh
     ${SRC}/processor.cc
-    ${SRC}/processor.hh
-    ${SRC}/mapping_parser.hh
     ${SRC}/mapping_parser.cc
     ${SRC}/site_resolver.cc
-    ${SRC}/site_resolver.hh
     ${SRC}/profiler.cc
-    ${SRC}/profiler.hh
     ${SRC}/io_tracer.cc
-    ${SRC}/io_tracer.hh
-    ${SRC}/stacktraces.hh
     ${SRC}/stacktraces.cc
-    ${SRC}/trace.hh
-    ${SRC}/thread_map.hh
     ${SRC}/thread_map.cc
-    ${SRC}/fd_map.hh
     ${SRC}/fd_map.cc
-    ${SRC}/concurrent_map.hh
     ${SRC}/concurrent_map.cc
     ${SRC}/profile_writer.cc
-    ${SRC}/profile_writer.hh
     ${SRC}/blocking_ring_buffer.cc
-    ${SRC}/blocking_ring_buffer.hh
-    ${SRC}/config.hh
     ${SRC}/config.cc
-    ${SRC}/scheduler.hh
     ${SRC}/scheduler.cc
-    ${SRC}/util.hh
-    ${SRC}/perf_ctx_jni.hh
-    ${SRC}/perf_ctx.hh
     ${SRC}/perf_ctx.cc
-    ${SRC}/prob_pct.hh
     ${SRC}/prob_pct.cc
-    ${SRC}/metric_formatter.hh
-    ${SRC}/metric_formatter.cc
-    ${SRC}/unique_readsafe_ptr.hh)
+    ${SRC}/metric_formatter.cc)
 
 set(PRELOAD_SOURCE_FILES
     ${SRC_PRELOAD}/preload.c)
@@ -170,11 +142,9 @@ set(TEST_BASE_FILES
     ${SRC_TEST}/test.cc)
     
 set(TEST_FILES
-    ${SRC_TEST}/fixtures.hh
     ${SRC_TEST}/test_circular_queue.cc
     ${SRC_TEST}/test_cpu_sampling_profile_serialization.cc
     ${SRC_TEST}/test_config.cc
-    ${SRC_TEST}/test.hh
     ${SRC_TEST}/test_checksum.cc
     ${SRC_TEST}/test_maps.cc
     ${SRC_TEST}/test_scheduler.cc
@@ -188,14 +158,12 @@ set(TEST_FILES
     ${SRC_TEST}/test.cc)
 
 set(TEST_UTIL_FILES
-    ${SRC_TEST}/test_helpers.hh
     ${SRC_TEST}/test_helpers.cc)
 
 set(SYMINFO_TEST_EXT_FILES
     ${SRC_TEST}/syminfo_test_ext.cc)
 
 set(TEST_JNI_FILES
-    ${SRC_TEST}/test_jni.hh
     ${SRC_TEST}/test_jni.cc)
 
 ##########################################################
@@ -233,8 +201,8 @@ endif()
 
 set(CMAKE_CXX_FLAGS_RELWITHDEBUGINFO  "-O2 -g3 -ggdb")
 set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g3 -ggdb") # -fsanitize=address when needed
-SET(VERBOSE_LOGS "n" CACHE STRING "'Enable Verbose Logging' flag, turns on compile-time controlled debug and trace logs, defaults to 'n'")
-if (${VERBOSE_LOGS} MATCHES "y")
+SET(VERBOSE_LOGS "y" CACHE STRING "'Enable Verbose Logging' flag, turns on compile-time controlled debug and trace logs, defaults to 'n'")
+if (${VERBOSE_LOGS} MATCHES "n")
   set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} -DSPDLOG_TRACE_ON -DSPDLOG_DEBUG_ON")
 endif()
 # to enable tracing add: -DENABLE_TRACING
@@ -278,3 +246,10 @@ install(TARGETS  ${AGENT_LIB}
 LIBRARY DESTINATION lib)
 install(TARGETS  ${PRELOAD_LIB}
 LIBRARY DESTINATION lib)
+
+if (${_FK_PROF_BENCHMARK} MATCHES "y")
+  find_package(benchmark REQUIRED)
+  set(BENCH_FILES ${SRC_TEST}/benchmarks.cc)
+  add_executable(fkp_benchmarks ${BENCH_FILES})
+  target_link_libraries(fkp_benchmarks benchmark ${BASE_OUTPUT} testbase)
+endif()

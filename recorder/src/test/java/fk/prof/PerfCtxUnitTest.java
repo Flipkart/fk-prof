@@ -19,7 +19,7 @@ public class PerfCtxUnitTest {
     private TestJni testJni;
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
         TestJni.loadJniLib();
         testJni = new TestJni();
         testJni.setupPerfCtx();

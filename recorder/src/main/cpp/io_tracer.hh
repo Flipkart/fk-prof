@@ -56,13 +56,13 @@ public:
 
     void stop() override;
     
-    void recordSocketRead(JNIEnv* jni_env, fd_type_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count, bool timeout);
+    void recordSocketRead(JNIEnv* jni_env, fd_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count, bool timeout);
     
-    void recordSocketWrite(JNIEnv* jni_env, fd_type_t fd,std::uint64_t ts, std::uint64_t latency_ns, int count);
+    void recordSocketWrite(JNIEnv* jni_env, fd_t fd,std::uint64_t ts, std::uint64_t latency_ns, int count);
     
-    void recordFileRead(JNIEnv* jni_env, fd_type_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count);
+    void recordFileRead(JNIEnv* jni_env, fd_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count);
     
-    void recordFileWrite(JNIEnv* jni_env, fd_type_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count);
+    void recordFileWrite(JNIEnv* jni_env, fd_t fd, std::uint64_t ts, std::uint64_t latency_ns, int count);
     
     ~IOTracer();
 
