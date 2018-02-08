@@ -39,8 +39,6 @@ public:
     explicit CircularQueue(Listener &listener, std::uint32_t maxFrameSize);
 
     virtual ~CircularQueue();
-
-    //TODO: see if instead of push/pop semantic, acquire/release slot sematic helps in avoiding stacktrace copy.
     
     bool push(const InMsg& in_msg);
 

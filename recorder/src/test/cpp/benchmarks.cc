@@ -3,6 +3,8 @@
 #include "globals.hh"
 #include "concurrentqueue.h"
 #include "circular_queue.hh"
+#include "lstack.hh"
+#include <atomic>
 
 // noop listener
 
@@ -28,21 +30,28 @@ static bool push_to_queue(cpu::Queue& q) {
     return q.push(cpu::InMsg(ct, nullptr, BacktraceError::Fkp_no_error, true));
 }
 
-static void BM_Queue_Event_Push(benchmark::State& state) {
-    std::size_t push_skipped = 0, pop_skipped = 0;
+std::string to_str(const char* name, int idx) {
+    return std::string(name) + std::to_string(idx);
+}
 
+#include <iostream>
+
+static void BM_Queue_Event_Push(benchmark::State& state) {
     for (auto _ : state) {
-        for (int i = 0; i < 128; ++i) {
-            push_skipped += (push_to_queue(q) ? 0 : 1);
-        }
-        for (int i = 0; i < 128; ++i) {
-            pop_skipped += (q.pop() ? 0 : 1);
+        if (state.thread_index == 0) {
+            int c = state.threads - 1;
+            while (c > 0) {
+                c--;
+                while (!q.pop()) {
+                };
+            }
+        } else {
+            while (!push_to_queue(q));
         }
     }
-    state.counters["push_skipped"] = push_skipped;
-    state.counters["pop_skipped"] = pop_skipped;
 }
 // Register the function as a benchmark
-BENCHMARK(BM_Queue_Event_Push)->Iterations(10000)->Repetitions(10)->ThreadRange(1, 4);
+BENCHMARK(BM_Queue_Event_Push)->Iterations(10000)->Repetitions(10)->ReportAggregatesOnly()->ThreadRange(2, 8);
+
 
 BENCHMARK_MAIN();

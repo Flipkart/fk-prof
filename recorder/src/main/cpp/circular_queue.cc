@@ -26,7 +26,7 @@ bool CircularQueue<TraceType, InMsg>::acquire_write_slot(size_t& slot) {
             return false;
         }
         // TODO: have someone review the memory ordering constraints
-    } while (!input.compare_exchange_strong(currentInput, nextInput, std::memory_order_relaxed));
+    } while (!input.compare_exchange_weak(currentInput, nextInput, std::memory_order_relaxed));
 
     slot = currentInput;
     return true;
