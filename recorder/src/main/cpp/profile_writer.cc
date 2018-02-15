@@ -435,12 +435,12 @@ ProfileSerializingWriter::ProfileSerializingWriter(jvmtiEnv* _jvmti, ProfileWrit
 
     s_c_frame_snipped.clear();
 
+    clear_proto();
+    
     report_new_ctx(DEFAULT_CTX_ID, DEFAULT_CTX_NAME, false, _noctx_cov_pct, PerfCtx::MergeSemantic::to_parent);
     report_new_ctx(UNKNOWN_CTX_ID, UNKNOWN_CTX_NAME, true, 0, PerfCtx::MergeSemantic::to_parent);
 
     report_new_mthd_info("?", "?", "?", "?", BacktraceType::Java);
-    
-    clear_proto();
 }
 
 void ProfileSerializingWriter::clear_proto() {

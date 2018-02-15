@@ -43,6 +43,8 @@ public:
     bool push(const InMsg& in_msg);
 
     bool pop();
+    
+    size_t size();
 
 private:
     Listener& listener_;

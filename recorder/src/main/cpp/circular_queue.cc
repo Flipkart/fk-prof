@@ -76,6 +76,14 @@ template <typename TraceType, typename InMsg> size_t CircularQueue<TraceType, In
     return (index + 1) % Capacity;
 }
 
+template<typename TraceType, typename InMsg>
+size_t CircularQueue<TraceType, InMsg>::size() {
+    auto current_input = input.load(std::memory_order_relaxed);
+    auto current_output = output.load(std::memory_order_relaxed);
+    return current_input < current_output ?
+            (current_input + Capacity - current_output) : current_input - current_output;
+}
+
 // cpu sampling
 
 cpu::Queue::Queue(QueueListener<cpu::Sample> &listener, std::uint32_t maxFrameSize) : CircularQueue<cpu::Sample, cpu::InMsg>(listener, maxFrameSize) {

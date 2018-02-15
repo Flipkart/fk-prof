@@ -212,7 +212,7 @@ void JNICALL OnNativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread th
 volatile bool main_started = false;
 
 void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread) {
-    SPDLOG_TRACE(logger, "Some thraed started");
+    SPDLOG_TRACE(logger, "Some thread started");
     jvmtiThreadInfo thread_info;
     int error = jvmti_env->GetThreadInfo(thread, &thread_info);
     if (error == JNI_OK) {

@@ -6,7 +6,7 @@
 #include "metrics.hh"
 #include "util.hh"
 #include <unistd.h>
-#include <limits.h>
+#include <limits>
 
 namespace MetricFormatter {
     std::string hostname();

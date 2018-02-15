@@ -24,7 +24,6 @@
 #include "blocking_ring_buffer.hh"
 #include "ti_thd.hh"
 
-#define MAX_DATA_SIZE 100
 #define PROCESSOR_ITVL_FACTOR 2
 
 class Controller {

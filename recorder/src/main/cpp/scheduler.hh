@@ -11,10 +11,21 @@
 
 class Scheduler {
 public:
-    typedef std::function<void()> Cb;
-    typedef std::pair<Time::Pt, Cb> Ent;
+    /**
+    * A POD struct to wrap a callback with a meaningful description.
+    */
+    struct Task {
+        typedef std::function<void()> Cb;
+        Cb callback;
+        std::string description;
+        void operator()() {
+            callback();
+        }
+    };
+
+    typedef std::pair<Time::Pt, Task> Ent;
     struct Cmp {
-        bool operator() (const Ent& left, const Ent& right) {
+        bool operator()(const Ent &left, const Ent &right) {
             return left.first > right.first;
         }
     };
@@ -24,7 +35,8 @@ public:
 
     ~Scheduler();
 
-    void schedule(Time::Pt time, Cb task);
+    void schedule(Time::Pt time, Task task);
+    void schedule(Time::Pt time, Task::Cb cb, std::string desc = "Not Described");
 
     bool poll();
 

@@ -201,12 +201,12 @@ endif()
 
 set(CMAKE_CXX_FLAGS_RELWITHDEBUGINFO  "-O2 -g3 -ggdb")
 set(CMAKE_CXX_FLAGS_DEBUG  "-O0 -g3 -ggdb") # -fsanitize=address when needed
-SET(VERBOSE_LOGS "y" CACHE STRING "'Enable Verbose Logging' flag, turns on compile-time controlled debug and trace logs, defaults to 'n'")
-if (${VERBOSE_LOGS} MATCHES "n")
+SET(VERBOSE_LOGS "n" CACHE STRING "'Enable Verbose Logging' flag, turns on compile-time controlled debug and trace logs, defaults to 'n'")
+if (${VERBOSE_LOGS} MATCHES "y")
   set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} -DSPDLOG_TRACE_ON -DSPDLOG_DEBUG_ON")
 endif()
 # to enable tracing add: -DENABLE_TRACING
-set(CMAKE_CXX_FLAGS "-I${INCLUDE_VENDOR_SPDLOG} -I${INCLUDE_VENDOR_CONCQUEUE} -I${PROTOBUF_INCLUDE_DIR} ${CMAKE_CXX_FLAGS} ${GLOBAL_WARNINGS} ${GLOBAL_COPTS} -pthread -std=c++0x -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS "-I${INCLUDE_VENDOR_SPDLOG} -I${INCLUDE_VENDOR_CONCQUEUE} -I${PROTOBUF_INCLUDE_DIR} ${CMAKE_CXX_FLAGS} ${GLOBAL_WARNINGS} ${GLOBAL_COPTS} -pthread -std=c++11 -fno-omit-frame-pointer")
 
 ##########################################################
 # Build
@@ -215,9 +215,9 @@ add_library(${BASE_OUTPUT} STATIC ${SOURCE_FILES})
 add_library(${AGENT_LIB} SHARED ${TI_SRC_FILES})
 
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD") 
-    target_link_libraries(${BASE_OUTPUT} proto ${PROTOBUF_LIBRARY} ${ZLIB_LDFLAGS} ${CURL_LDFLAGS} ${MEDIDA_LDFLAGS} ${ELF_LDFLAGS} ${UNWIND_LDFLAGS})
+    target_link_libraries(${BASE_OUTPUT} proto ${PROTOBUF_LIBRARY} ${ZLIB_LDFLAGS} ${CURL_LDFLAGS} ${MEDIDA_LDFLAGS} ${ELF_LDFLAGS} ${UNWIND_LDFLAGS} atomic)
 else()
-    target_link_libraries(${BASE_OUTPUT} proto ${PROTOBUF_LIBRARY} ${ZLIB_LDFLAGS} ${CURL_LDFLAGS} ${MEDIDA_LDFLAGS} ${ELF_LDFLAGS} ${UNWIND_LDFLAGS} dl)
+    target_link_libraries(${BASE_OUTPUT} proto ${PROTOBUF_LIBRARY} ${ZLIB_LDFLAGS} ${CURL_LDFLAGS} ${MEDIDA_LDFLAGS} ${ELF_LDFLAGS} ${UNWIND_LDFLAGS} dl atomic)
 endif()
 target_link_libraries(${AGENT_LIB} ${BASE_OUTPUT})
 add_library(${PRELOAD_LIB} SHARED ${PRELOAD_SOURCE_FILES})

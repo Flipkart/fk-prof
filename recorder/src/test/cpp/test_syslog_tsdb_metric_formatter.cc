@@ -5,7 +5,7 @@
 #include <regex>
 #include <string>
 #include <unistd.h>
-#include <limits.h>
+#include <limits>
 
 std::string time_now() {
     std::time_t t = std::time(nullptr);

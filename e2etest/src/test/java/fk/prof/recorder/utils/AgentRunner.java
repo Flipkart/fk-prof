@@ -31,10 +31,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -43,6 +40,7 @@ public class AgentRunner {
     public static final String DEFAULT_AGENT_INTERVAL = "interval=100";
     private static final String PERFCTX_JAR_BASE_NAME_PATTERN = "^perfctx-.+\\.jar$";
     private static final String RECORDER_BUILD_DIR = "../recorder/build";
+    private static final String BCIAGENT_JAR_BASE_NAME_PATTERN = "^bciagent-.+\\.jar$";
     private static final String EXT = Platforms.getDynamicLibraryExtension();
 
     private final String fqdn;
@@ -79,30 +77,50 @@ public class AgentRunner {
     }
 
     public void start() throws IOException {
-        startProcess();
+        startProcess(false);
+    }
+
+    public void start(boolean withBciAgent) throws IOException {
+        startProcess(withBciAgent);
         //readProcessId();
     }
     
-    private void startProcess() throws IOException {
+    private void startProcess(boolean withBciAgent) throws IOException {
         String finalArgs = (args == null) ? perfCtxArgFrag() : args + "," + perfCtxArgFrag(); 
         String agentArg = "-agentpath:" + RECORDER_BUILD_DIR + "/libfkpagent" + EXT + "=" + finalArgs;
 
+        String bciAgentArg = "";
+        if(withBciAgent) {
+            bciAgentArg = "-javaagent:" + bciAgentArgFrag();
+        };
+
         List<String> classpath = Util.discoverClasspath(getClass());
-        //System.out.println("AGENT ARG: " + agentArg);
-        //System.out.println("classpath = " + classpath);
+
         ProcessBuilder pb = new ProcessBuilder();
         populateEnvVars(pb);
         process = pb
-                .command("java", "-XX:+PreserveFramePointer", agentArg, "-verbose:gc", "-XX:+PrintGCDateStamps", "-XX:+PrintGCTimeStamps", "-XX:+PrintGCDetails", "-Xloggc:/tmp/fkprof_gc.log", "-cp", String.join(":", classpath), fqdn)
+                .command(asArgsList("java", "-XX:+PreserveFramePointer", agentArg, bciAgentArg, "-verbose:gc",
+                        "-XX:+PrintGCDateStamps", "-XX:+PrintGCTimeStamps", "-XX:+PrintGCDetails",
+                        "-Xloggc:/tmp/fkprof_gc.log", "-cp", String.join(":", classpath), fqdn))
                 .redirectError(new File("/tmp/fkprof_stderr.log"))
                 .redirectOutput(new File("/tmp/fkprof_stdout.log"))
                 .start();
+    }
+
+    private String[] asArgsList(String... args) {
+        return Arrays.stream(args).filter(a -> a != null && a.length() > 0).toArray(String[]::new);
     }
 
     private String perfCtxArgFrag() {
         Collection<Path> files = FileResolver.findFile("../perfctx/target", PERFCTX_JAR_BASE_NAME_PATTERN);
         if (files.size() != 1) throw new IllegalStateException(String.format("Confused about the correct perf-ctx labeling jar. Expected 1 but found %s files matching the pattern '%s'", files.size(), PERFCTX_JAR_BASE_NAME_PATTERN));
         return "pctx_jar_path=" + files.iterator().next().toAbsolutePath();
+    }
+
+    private String bciAgentArgFrag() {
+        Collection<Path> files = FileResolver.findFile("../bciagent/target", BCIAGENT_JAR_BASE_NAME_PATTERN);
+        if (files.size() != 1) throw new IllegalStateException(String.format("Confused about the correct bci agent jar. Expected 1 but found %s files matching the pattern '%s'", files.size(), BCIAGENT_JAR_BASE_NAME_PATTERN));
+        return files.iterator().next().toAbsolutePath().toString();
     }
 
     private void populateEnvVars(ProcessBuilder pb) throws IOException {
