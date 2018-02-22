@@ -1,17 +1,20 @@
 package fk.prof.aggregation.model;
 
-import fk.prof.idl.Profile.*;
 import fk.prof.aggregation.stacktrace.StacktraceFrameNode;
+import fk.prof.idl.Profile.FrameNodeList;
+import fk.prof.idl.Profile.TraceCtxDetail;
+import fk.prof.idl.Profile.TraceCtxDetailList;
+import fk.prof.idl.Profile.TraceCtxNames;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
 
-public class FinalizedCpuSamplingAggregationBucket implements FinalizedWorkSpecificAggregationBucket {
+public class FinalizedIOTracingAggregationBucket implements FinalizedWorkSpecificAggregationBucket {
   protected final MethodIdLookup methodIdLookup;
-  protected final Map<String, CpuSamplingTraceDetail> traceDetailLookup;
+  protected final Map<String, IOTracingTraceDetail> traceDetailLookup;
 
-  public FinalizedCpuSamplingAggregationBucket(MethodIdLookup methodIdLookup, Map<String, CpuSamplingTraceDetail> traceDetailLookup) {
+  public FinalizedIOTracingAggregationBucket(MethodIdLookup methodIdLookup, Map<String, IOTracingTraceDetail> traceDetailLookup) {
     this.methodIdLookup = methodIdLookup;
     this.traceDetailLookup = traceDetailLookup;
   }
@@ -21,11 +24,11 @@ public class FinalizedCpuSamplingAggregationBucket implements FinalizedWorkSpeci
     if (o == this) {
       return true;
     }
-    if (!(o instanceof FinalizedCpuSamplingAggregationBucket)) {
+    if (!(o instanceof FinalizedIOTracingAggregationBucket)) {
       return false;
     }
 
-    FinalizedCpuSamplingAggregationBucket other = (FinalizedCpuSamplingAggregationBucket) o;
+    FinalizedIOTracingAggregationBucket other = (FinalizedIOTracingAggregationBucket) o;
     return this.methodIdLookup.equals(other.methodIdLookup)
         && this.traceDetailLookup.equals(other.traceDetailLookup);
   }
@@ -41,7 +44,7 @@ public class FinalizedCpuSamplingAggregationBucket implements FinalizedWorkSpeci
 
     int index = 0;
     for(String trace: traces.getNameList()) {
-      CpuSamplingTraceDetail traceDetail = traceDetailLookup.getOrDefault(trace, null);
+      IOTracingTraceDetail traceDetail = traceDetailLookup.getOrDefault(trace, null);
       if(traceDetail != null) {
         builder.addTraceCtx(TraceCtxDetail.newBuilder().setTraceIdx(index).setSampleCount(traceDetail.getSampleCount()));
       }
@@ -56,7 +59,7 @@ public class FinalizedCpuSamplingAggregationBucket implements FinalizedWorkSpeci
    * Serializes the stacktrace tree in a dfs order. It serializes the tree in batches of fixed size, reusing the memory
    * allocated for temporary data structures in subsequent batches.
    */
-  protected static class NodeVisitor implements StacktraceFrameNode.NodeVisitor<CpuSamplingFrameNode> {
+  protected static class NodeVisitor implements StacktraceFrameNode.NodeVisitor<IOTracingFrameNode> {
     private OutputStream out;
     private int batchSize;
     private FrameNodeList.Builder builder = FrameNodeList.newBuilder();
@@ -68,7 +71,7 @@ public class FinalizedCpuSamplingAggregationBucket implements FinalizedWorkSpeci
     }
 
     @Override
-    public void visit(CpuSamplingFrameNode node) throws IOException {
+    public void visit(IOTracingFrameNode node) throws IOException {
       if(builder.getFrameNodesCount() >= batchSize) {
         builder.build().writeDelimitedTo(out);
 

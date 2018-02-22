@@ -45,6 +45,7 @@ public class AggregationWindowStorage {
 
         // cpu_sample
         store(aggregationWindow, WorkEntities.WorkType.cpu_sample_work);
+        store(aggregationWindow, WorkEntities.WorkType.io_trace_work);
 
         // summary file
         storeSummary(aggregationWindow);

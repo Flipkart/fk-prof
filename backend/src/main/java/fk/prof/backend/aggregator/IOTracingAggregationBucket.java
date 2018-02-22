@@ -10,40 +10,37 @@ import fk.prof.idl.Recording;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class CpuSamplingAggregationBucket extends WorkSpecificAggregationBucket<FinalizedCpuSamplingAggregationBucket> {
+public class IOTracingAggregationBucket extends WorkSpecificAggregationBucket<FinalizedIOTracingAggregationBucket> {
   private final MethodIdLookup methodIdLookup = new MethodIdLookup();
-  private final ConcurrentHashMap<String, CpuSamplingTraceDetail> traceDetailLookup = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, IOTracingTraceDetail> traceDetailLookup = new ConcurrentHashMap<>();
 
   /**
-   * Aggregates stack samples in the bucket. Throws {@link AggregationFailure} if aggregation fails
+   * Aggregates io traces in the bucket. Throws {@link AggregationFailure} if aggregation fails
    *
-   * @param stackSampleWse
+   * @param ioTraceWse
    */
-  public void aggregate(Recording.StackSampleWse stackSampleWse, RecordedProfileIndexes indexes, Meter mtrAggrFailures)
+  public void aggregate(Recording.IOTraceWse ioTraceWse, RecordedProfileIndexes indexes, Meter mtrAggrFailures)
       throws AggregationFailure {
     try {
-      for (Recording.StackSample stackSample : stackSampleWse.getStackSampleList()) {
+      for (Recording.IOTrace ioTrace : ioTraceWse.getTracesList()) {
+        Recording.StackSample stackSample = ioTrace.getStack();
+        if(stackSample == null) {
+          throw new AggregationFailure("IO trace aggregation for samples with missing stacktrace is not supported");
+        }
         for (Integer traceId : stackSample.getTraceIdList()) {//TODO: this is not necessarily the best way of doing this from temporal locality PoV (may be we want a de-duped DS), think thru this -jj
           String trace = indexes.getTrace(traceId);
           if (trace == null) {
             throw new AggregationFailure("Unknown trace id encountered in stack sample, aborting aggregation of this profile");
           }
-          CpuSamplingTraceDetail traceDetail = traceDetailLookup.computeIfAbsent(trace,
-              key -> new CpuSamplingTraceDetail()
+          IOTracingTraceDetail traceDetail = traceDetailLookup.computeIfAbsent(trace,
+              key -> new IOTracingTraceDetail()
           );
 
           List<Recording.Frame> frames = stackSample.getFrameList();
           if (frames.size() > 0) {
-
             // global sample count increment
-            CpuSamplingFrameNode currentNode = traceDetail.getGlobalRoot();
-            currentNode.incrementOnStackSamples();
+            IOTracingFrameNode currentNode = stackSample.getSnipped() ? traceDetail.getUnclassifiableRoot() : traceDetail.getGlobalRoot();
             traceDetail.incrementSamples();
-
-            if(stackSample.getSnipped()) {
-              currentNode = traceDetail.getUnclassifiableRoot();
-              currentNode.incrementOnStackSamples();
-            }
 
             //callee -> caller ordering in frames, so iterating bottom up in the list to merge in existing tree in root->leaf fashion
             for (int i = frames.size() - 1; i >= 0; i--) {
@@ -54,10 +51,12 @@ public class CpuSamplingAggregationBucket extends WorkSpecificAggregationBucket<
               }
               int methodId = methodIdLookup.getOrAdd(method);
               currentNode = currentNode.getOrAddChild(methodId, frame.getLineNo());
-              currentNode.incrementOnStackSamples();
               //The first frame is the on-cpu frame so incrementing on-cpu samples count
               if (i == 0) {
-                currentNode.incrementOnCpuSamples();
+                int bytes = ioTrace.getRead() != null ? ioTrace.getRead().getCount() : 0;
+                bytes = ioTrace.getWrite() != null ? ioTrace.getWrite().getCount() : bytes;
+                boolean timeout = ioTrace.getRead() != null && ioTrace.getRead().getTimeout();
+                currentNode.addTrace(ioTrace.getFdId(), ioTrace.getType(), ioTrace.getLatencyNs(), bytes, timeout);
               }
             }
           }
@@ -70,8 +69,8 @@ public class CpuSamplingAggregationBucket extends WorkSpecificAggregationBucket<
   }
 
   @Override
-  protected FinalizedCpuSamplingAggregationBucket buildFinalizedEntity() {
-    return new FinalizedCpuSamplingAggregationBucket(
+  protected FinalizedIOTracingAggregationBucket buildFinalizedEntity() {
+    return new FinalizedIOTracingAggregationBucket(
         methodIdLookup,
         traceDetailLookup
     );

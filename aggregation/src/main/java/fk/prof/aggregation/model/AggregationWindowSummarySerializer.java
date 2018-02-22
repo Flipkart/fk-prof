@@ -2,6 +2,7 @@ package fk.prof.aggregation.model;
 
 import fk.prof.aggregation.serialize.Serializer;
 import fk.prof.idl.Profile;
+import fk.prof.idl.WorkEntities;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -51,7 +52,7 @@ public class AggregationWindowSummarySerializer implements Serializer {
         Serializer.writeVariantInt32((int)checksum.getValue(), cout);
 
         // work specific trace summary
-        // cpu_sample_work
-        Serializer.writeCheckedDelimited(aggregation.cpuSamplingAggregationBucket.buildTraceCtxListProto(traceNames), cout);
+        Serializer.writeCheckedDelimited(aggregation.buildTraceCtxDetailListProto(WorkEntities.WorkType.cpu_sample_work, traceNames), cout);
+        Serializer.writeCheckedDelimited(aggregation.buildTraceCtxDetailListProto(WorkEntities.WorkType.io_trace_work, traceNames), cout);
     }
 }

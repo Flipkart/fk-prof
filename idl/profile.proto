@@ -100,11 +100,14 @@ message CPUSamplingNodeProps {
 }
 
 message IOTracingNodeProps {
-    optional float fdIdx = 1;
-    optional uint32 samples = 2;
-    optional float latency99 = 3;
-    optional float latency95 = 4;
-    optional float mean = 5;
+    optional uint32 fdIdx = 1;
+    optional IOTraceType traceType = 2;
+    optional uint32 samples = 3;
+    optional float latency99 = 4;
+    optional float latency95 = 5;
+    optional float mean = 6;
+    optional uint64 bytes = 7;
+    optional bool dropped = 8;
 }
 
 message Header {

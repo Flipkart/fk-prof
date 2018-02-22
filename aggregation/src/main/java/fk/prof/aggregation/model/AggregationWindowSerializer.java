@@ -60,47 +60,14 @@ public class AggregationWindowSerializer implements Serializer {
         // work specific aggregated samples
         switch (workType) {
             case cpu_sample_work:
-                new CpuSamplingAggregatedSamplesSerializer(aggregation.cpuSamplingAggregationBucket, traceNames).serialize(out);
-        }
-    }
-
-    private static class CpuSamplingAggregatedSamplesSerializer implements Serializer {
-
-        private FinalizedCpuSamplingAggregationBucket cpuSamplingAggregation;
-        private Profile.TraceCtxNames traces;
-
-        public CpuSamplingAggregatedSamplesSerializer(FinalizedCpuSamplingAggregationBucket cpuSamplingAggregation, Profile.TraceCtxNames traces) {
-            this.cpuSamplingAggregation = cpuSamplingAggregation;
-            this.traces = traces;
-        }
-
-        @Override
-        public void serialize(OutputStream out) throws IOException {
-
-            Checksum checksum = new Adler32();
-            CheckedOutputStream cout = new CheckedOutputStream(out, checksum);
-
-            // method lookup
-            Serializer.writeCheckedDelimited(cpuSamplingAggregation.methodIdLookup.buildMethodIdLookupProto(), cout);
-
-            // stacktrace tree
-            checksum.reset();
-            int index = 0;
-            for(String traceName: traces.getNameList()) {
-                FinalizedCpuSamplingAggregationBucket.NodeVisitor visitor =
-                        new FinalizedCpuSamplingAggregationBucket.NodeVisitor(cout, STACKTRACETREE_SERIAL_BATCHSIZE, index);
-
-                try {
-                    cpuSamplingAggregation.traceDetailLookup.get(traceName).getGlobalRoot().traverse(visitor);
-                } catch (IOException e) {
-                    throw e;
-                } catch (Exception e) {
-                    throw new SerializationException("Unexpected error while traversing stacktrace tree", e);
-                }
-                visitor.end();
-                ++index;
-            }
-            Serializer.writeVariantInt32((int) checksum.getValue(), cout);
+                new CpuSamplingAggregatedSamplesSerializer(STACKTRACETREE_SERIAL_BATCHSIZE,
+                    (FinalizedCpuSamplingAggregationBucket)aggregation.workSpecificBuckets.get(WorkEntities.WorkType.cpu_sample_work), traceNames)
+                    .serialize(out);
+                break;
+            case io_trace_work:
+                new IOTracingAggregatedSamplesSerializer(STACKTRACETREE_SERIAL_BATCHSIZE,
+                    (FinalizedIOTracingAggregationBucket) aggregation.workSpecificBuckets.get(WorkEntities.WorkType.io_trace_work), traceNames)
+                    .serialize(out);
         }
     }
 }

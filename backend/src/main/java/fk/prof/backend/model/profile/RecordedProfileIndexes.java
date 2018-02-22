@@ -11,6 +11,7 @@ import java.util.List;
 public class RecordedProfileIndexes {
   private final HashLongObjMap<String> methodLookup = HashLongObjMaps.newUpdatableMap();
   private final HashIntObjMap<String> traceLookup = HashIntObjMaps.newUpdatableMap();
+  private final HashIntObjMap<Recording.FDInfo> fdLookup = HashIntObjMaps.newUpdatableMap();
 
   public String getMethod(long methodId) {
     return methodLookup.get(methodId);
@@ -23,6 +24,7 @@ public class RecordedProfileIndexes {
   public void update(Recording.IndexedData indexedData) {
     updateMethodIndex(indexedData.getMethodInfoList());
     updateTraceIndex(indexedData.getTraceCtxList());
+    updateFDIndex(indexedData.getFdInfoList());
   }
 
   private void updateMethodIndex(List<Recording.MethodInfo> methods) {
@@ -38,6 +40,14 @@ public class RecordedProfileIndexes {
     if (traces != null) {
       for (Recording.TraceContext traceContext : traces) {
         traceLookup.put(traceContext.getTraceId(), traceContext.getTraceName());
+      }
+    }
+  }
+
+  private void updateFDIndex(List<Recording.FDInfo> fds) {
+    if(fds != null) {
+      for (Recording.FDInfo fdInfo: fds) {
+        fdLookup.put(fdInfo.getId(), fdInfo);
       }
     }
   }

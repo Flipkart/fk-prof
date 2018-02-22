@@ -18,7 +18,7 @@ public class FinalizedAggregationWindow {
   protected final int durationInSecs;
   protected final Map<Long, FinalizedProfileWorkInfo> workInfoLookup;
   protected final RecordingPolicy policy;
-  protected final FinalizedCpuSamplingAggregationBucket cpuSamplingAggregationBucket;
+  protected final Map<WorkEntities.WorkType, FinalizedWorkSpecificAggregationBucket> workSpecificBuckets;
 
   private final ProcessGroupTag processGroupTag;
 
@@ -30,7 +30,7 @@ public class FinalizedAggregationWindow {
                                     int durationInSecs,
                                     Map<Long, FinalizedProfileWorkInfo> workInfoLookup,
                                     RecordingPolicy policy,
-                                    FinalizedCpuSamplingAggregationBucket cpuSamplingAggregationBucket) {
+                                    Map<WorkEntities.WorkType, FinalizedWorkSpecificAggregationBucket> workSpecificBuckets) {
     this.appId = appId;
     this.clusterId = clusterId;
     this.procId = procId;
@@ -39,7 +39,7 @@ public class FinalizedAggregationWindow {
     this.durationInSecs = durationInSecs;
     this.workInfoLookup = workInfoLookup;
     this.policy = policy;
-    this.cpuSamplingAggregationBucket = cpuSamplingAggregationBucket;
+    this.workSpecificBuckets = workSpecificBuckets;
 
     this.processGroupTag = new ProcessGroupTag(appId, clusterId, procId);
   }
@@ -85,7 +85,7 @@ public class FinalizedAggregationWindow {
         && this.endedAt == null ? other.endedAt == null : this.endedAt.equals(other.endedAt)
         && this.workInfoLookup.equals(other.workInfoLookup)
         && this.policy.equals(other.policy)
-        && this.cpuSamplingAggregationBucket.equals(other.cpuSamplingAggregationBucket);
+        && this.workSpecificBuckets.equals(other.workSpecificBuckets);
   }
 
   protected Header buildHeaderProto(int version, WorkEntities.WorkType workType) {
@@ -155,18 +155,34 @@ public class FinalizedAggregationWindow {
    * @return
    */
   protected TraceCtxNames buildTraceCtxNamesProto(WorkEntities.WorkType workType) {
+    if(workSpecificBuckets.get(workType) == null) {
+      throw new IllegalArgumentException(String.format("Recording policy does not specify work type=%s", workType));
+    }
+
     switch (workType) {
       case cpu_sample_work:
+        FinalizedCpuSamplingAggregationBucket cpuSamplingAggregationBucket = (FinalizedCpuSamplingAggregationBucket)workSpecificBuckets.get(WorkEntities.WorkType.cpu_sample_work);
         return cpuSamplingAggregationBucket.buildTraceNamesProto();
+      case io_trace_work:
+        FinalizedIOTracingAggregationBucket ioTracingAggregationBucket = (FinalizedIOTracingAggregationBucket) workSpecificBuckets.get(WorkEntities.WorkType.io_trace_work);
+        return ioTracingAggregationBucket.buildTraceNamesProto();
       default:
         throw new IllegalArgumentException(workType.name() + " not supported");
     }
   }
 
   protected TraceCtxDetailList buildTraceCtxDetailListProto(WorkEntities.WorkType workType, TraceCtxNames traces) {
+    if(workSpecificBuckets.get(workType) == null) {
+      throw new IllegalArgumentException(String.format("Recording policy does not specify work type=%s", workType));
+    }
+
     switch (workType) {
       case cpu_sample_work:
+        FinalizedCpuSamplingAggregationBucket cpuSamplingAggregationBucket = (FinalizedCpuSamplingAggregationBucket)workSpecificBuckets.get(WorkEntities.WorkType.cpu_sample_work);
         return cpuSamplingAggregationBucket.buildTraceCtxListProto(traces);
+      case io_trace_work:
+        FinalizedIOTracingAggregationBucket ioTracingAggregationBucket = (FinalizedIOTracingAggregationBucket) workSpecificBuckets.get(WorkEntities.WorkType.io_trace_work);
+        return ioTracingAggregationBucket.buildTraceCtxListProto(traces);
       default:
         throw new IllegalArgumentException(workType.name() + " not supported");
     }

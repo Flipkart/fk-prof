@@ -8,6 +8,7 @@ public enum MetricName {
 
   AW_State_Transition_Failure("aw.state.transition.failure"),
   AW_CpuSampling_Aggregation_Failure("aw.cpusampling.agg.failure"),
+  AW_IOTracing_Aggregation_Failure("aw.iotracing.agg.failure"),
   AW_Active_Count("aw.active.count"),
   AW_Work_Success("aw.work.success"),
   AW_Work_Failure("aw.work.failure"),

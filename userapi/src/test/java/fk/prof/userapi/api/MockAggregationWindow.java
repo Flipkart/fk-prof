@@ -34,9 +34,12 @@ public class MockAggregationWindow {
         int sampleCount1 = sampleCount.getValue() / 2;
         int sampleCount2 = sampleCount.getValue() - sampleCount1;
 
+        Map<WorkEntities.WorkType, FinalizedWorkSpecificAggregationBucket> workSpecificBuckets = new HashMap<>();
+        workSpecificBuckets.put(WorkEntities.WorkType.cpu_sample_work, cpuSampleBucket);
         FinalizedAggregationWindow window = new FinalizedAggregationWindow("app1", "cluster1", "proc1", lt, lt.plusMinutes(30), durationInSeconds,
             buildProfilesWorkInfo(lt ,sampleCount1, sampleCount2),
-            buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work))), cpuSampleBucket);
+            buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work))),
+            workSpecificBuckets);
 
         return window;
     }

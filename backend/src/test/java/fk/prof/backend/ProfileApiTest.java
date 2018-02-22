@@ -101,9 +101,11 @@ public class ProfileApiTest {
             actual.getDetailsForWorkId(workId).getEndedAt(), expectedSamplesMap);
         Map<Long, FinalizedProfileWorkInfo> expectedWorkLookup = new HashMap<>();
         expectedWorkLookup.put(workId, expectedWorkInfo);
+        Map<WorkEntities.WorkType, FinalizedWorkSpecificAggregationBucket> expectedWorkSpecificBuckets = new HashMap<>();
+        expectedWorkSpecificBuckets.put(WorkEntities.WorkType.cpu_sample_work, expectedAggregationBucket);
         FinalizedAggregationWindow expected = new FinalizedAggregationWindow("a", "c", "p",
             awStart, null, 30 * 60,
-            expectedWorkLookup, policy, expectedAggregationBucket);
+            expectedWorkLookup, policy, expectedWorkSpecificBuckets);
         context.assertTrue(expected.equals(actual));
         async.complete();
       }
@@ -158,9 +160,11 @@ public class ProfileApiTest {
         expectedWorkLookup.put(workId2, expectedWorkInfo2);
         expectedWorkLookup.put(workId3, expectedWorkInfo3);
 
+        Map<WorkEntities.WorkType, FinalizedWorkSpecificAggregationBucket> expectedWorkSpecificBuckets = new HashMap<>();
+        expectedWorkSpecificBuckets.put(WorkEntities.WorkType.cpu_sample_work, expectedAggregationBucket);
         FinalizedAggregationWindow expected = new FinalizedAggregationWindow("a", "c", "p",
             awStart, null, 30 * 60,
-            expectedWorkLookup, policy, expectedAggregationBucket);
+            expectedWorkLookup, policy, expectedWorkSpecificBuckets);
 
         context.assertTrue(expected.equals(actual));
         async.complete();
