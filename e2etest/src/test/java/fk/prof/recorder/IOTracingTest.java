@@ -107,7 +107,7 @@ public class IOTracingTest {
         // not matching capabilities. the work giver is making sure that we see correct capabilities.
         // work is only given if the capabilities match
         CpuSamplingTest.assertPollIntervalIsGood(pollReqs, prevTime, 1500l ,3000l,
-                AssociationTest.rc(true, false), false);
+                AssociationTest.rc(true, true), false);
 
         assertRecordingHeaderIsGood(workIssueTime, hdr, MAX_FRAMES);
 
