@@ -1,6 +1,6 @@
-#include "controller.hh"
 #include <chrono>
 #include <curl/curl.h>
+#include "controller.hh"
 #include "buff.hh"
 #include "blocking_ring_buffer.hh"
 #include "io_tracer.hh"
@@ -26,6 +26,11 @@ std::string load_vm_id(jvmtiEnv* env) {
     write_system_prop(env, "java.vm.info", ss);
     write_system_prop(env, "java.vm.vendor", ss);
     return ss.str();
+}
+
+bool bci_agent_loaded_without_fail() {
+    IOTracerJavaState& state = getIOTracerJavaState();
+    return state.isBciAgentLoaded() && (state.getBciFailedCount() == 0);
 }
 
 Controller::Controller(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap& _thread_map, ConfigurationOptions& _cfg) :
@@ -111,6 +116,8 @@ static void populate_recorder_info(recording::RecorderInfo& ri, const Configurat
 
     auto c = ri.mutable_capabilities();
     c->set_can_cpu_sample(cfg.allow_sigprof);
+    c->set_can_instrument_java(true);
+    c->set_can_trace_io(bci_agent_loaded_without_fail());
 }
 
 static void populate_issued_work_status(recording::WorkResponse& w_res, std::uint64_t work_id, recording::WorkResponse::WorkState state, recording::WorkResponse::WorkResult result, Time::Pt& start_tm, Time::Pt& end_tm) {
@@ -658,7 +665,7 @@ bool Controller::capable(const recording::CpuSampleWork& csw) {
 }
 
 void Controller::prep(const recording::CpuSampleWork& csw) {
-    sft.cpu_samples = csw.serialization_flush_threshold();
+    update_flush_ctr(csw.serialization_flush_threshold());
     tts.cpu_samples_max_stack_sz = Profiler::calculate_max_stack_depth(csw.max_frames());
 }
 
@@ -707,20 +714,19 @@ void Controller::retire(const recording::CpuSampleWork& csw) {
     GlobalCtx::recording.cpu_profiler.reset();
 }
 
-bool Controller::capable(const recording::IOTraceWork& csw) {
-    IOTracerJavaState& state = getIOTracerJavaState();
-    return state.isBciAgentLoaded() && (state.getBciFailedCount() == 0);
+bool Controller::capable(const recording::IOTraceWork& w) {
+    return bci_agent_loaded_without_fail();
 }
 
-void Controller::prep(const recording::IOTraceWork& csw) {
-    sft.io_trace_evts = csw.serialization_flush_threshold();
-    tts.io_trace_max_stack_sz = Profiler::calculate_max_stack_depth(csw.max_frames());
+void Controller::prep(const recording::IOTraceWork& w) {
+    update_flush_ctr(w.serialization_flush_threshold());
+    tts.io_trace_max_stack_sz = Profiler::calculate_max_stack_depth(w.max_frames());
 }
 
-void Controller::issue(const recording::IOTraceWork& csw, Processes& processes, JNIEnv* env) {
-    std::uint64_t latency_threshold = csw.latency_threshold_ms() * NANOS_IN_MILLIS;
+void Controller::issue(const recording::IOTraceWork& w, Processes& processes, JNIEnv* env) {
+    std::uint64_t latency_threshold = w.latency_threshold_ms() * NANOS_IN_MILLIS;
     
-    logger->info("Starting io-tracing with threashold {} ms and for upto {} frames", csw.latency_threshold_ms(), tts.io_trace_max_stack_sz);
+    logger->info("Starting io-tracing with threashold {} ms and for upto {} frames", w.latency_threshold_ms(), tts.io_trace_max_stack_sz);
     
     // process instance
     GlobalCtx::recording.io_tracer.reset(new IOTracer(jvm, jvmti, thread_map, getFdMap(), processor, *serializer, latency_threshold, tts.io_trace_max_stack_sz));

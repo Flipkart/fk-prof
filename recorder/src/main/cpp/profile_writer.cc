@@ -146,11 +146,15 @@ ProfileSerializingWriter::FdId ProfileSerializingWriter::report_fd_info(const Fd
         
         auto idx_dat = recording.mutable_indexed_data();
         auto fi = idx_dat->add_fd_info();
+        fi->set_id(fd_id);
+        
         if(fd_bucket->data.type == FdType::File) {
+            fi->set_fd_type(fk::prof::idl::FDType::file);
             auto file = fi->mutable_file_info();
             file->set_filename(fd_bucket->data.targe_path);
         }
         else if(fd_bucket->data.type == FdType::Socket){
+            fi->set_fd_type(fk::prof::idl::FDType::socket);
             auto socket = fi->mutable_socket_info();
             socket->set_address(fd_bucket->data.targe_path);
             socket->set_connect(fd_bucket->data.connect);
@@ -160,6 +164,7 @@ ProfileSerializingWriter::FdId ProfileSerializingWriter::report_fd_info(const Fd
         else {
             assert(false);
         }
+        
         return fd_id;
     }
     return it->second;
@@ -217,8 +222,8 @@ void ProfileSerializingWriter::record(const cpu::Sample& entry) {
     auto& ctx = entry.ctx;
     auto default_ctx = entry.default_ctx;
     
-    if (cpu_samples_flush_ctr >= sft.cpu_samples) flush();
-    cpu_samples_flush_ctr++;
+    if (ser_flush_ctr >= sft) flush();
+    ++ser_flush_ctr;
     
     auto cse = cpu_samples_accumulator->mutable_cpu_sample_entry();
     auto ss = cse->add_stack_sample();
@@ -257,8 +262,8 @@ void ProfileSerializingWriter::populate_fdwrite(recording::IOTrace* const evt, c
 }
 
 void ProfileSerializingWriter::record(const iotrace::Sample& entry) {
-    if (io_evts_flush_ctr >= sft.io_trace_evts) flush();
-    ++io_evts_flush_ctr;
+    if (ser_flush_ctr >= sft) flush();
+    ++ser_flush_ctr;
     
     auto ioe = io_trace_accumulator->mutable_io_trace_entry();
     auto evt = ioe->add_traces();
@@ -393,23 +398,23 @@ ProfileSerializingWriter::MthId ProfileSerializingWriter::recordNewMethod(const 
 }
 
 void ProfileSerializingWriter::flush() {
+    SPDLOG_DEBUG(logger, "flushing proto objects to bytebuffer");
     w.write_recording(recording);
     clear_proto();
-    cpu_samples_flush_ctr = 0;
-    io_evts_flush_ctr = 0;
+    ser_flush_ctr = 0;
     w.flush();
 }
 
 #define METRIC_TYPE "profile_serializer"
 
 ProfileSerializingWriter::ProfileSerializingWriter(jvmtiEnv* _jvmti, ProfileWriter& _w, SiteResolver::MethodInfoResolver _fir, SiteResolver::LineNoResolver _lnr,
-                                                   PerfCtx::Registry& _reg, const SerializationFlushThresholds& _sft, const TruncationThresholds& _trunc_thresholds,
+                                                   PerfCtx::Registry& _reg, const FlushCtr _sft, const TruncationThresholds& _trunc_thresholds,
                                                    std::uint8_t _noctx_cov_pct) :
     jvmti(_jvmti), w(_w), fir(_fir), lnr(_lnr), reg(_reg), 
     cpu_samples_accumulator(recording.add_wse()),
     io_trace_accumulator(recording.add_wse()),
-    next_mthd_id(0), next_thd_id(3), next_ctx_id(5), next_fd_id(0), sft(_sft), cpu_samples_flush_ctr(0), io_evts_flush_ctr(0),
-    trunc_thresholds(_trunc_thresholds),
+    next_mthd_id(0), next_thd_id(3), next_ctx_id(5), next_fd_id(0), sft(_sft), 
+    ser_flush_ctr(0), trunc_thresholds(_trunc_thresholds),
 
     s_c_new_thd_info(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "thd_rpt", "new"})),
     s_c_new_ctx_info(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "ctx_rpt", "new"})),
@@ -458,8 +463,7 @@ ProfileSerializingWriter::~ProfileSerializingWriter() {
     auto next_ctx_to_be_reported = next_ctx_id;
     for (auto pt : user_ctxs) report_ctx(pt);
 
-    if ((cpu_samples_flush_ctr != 0) ||
+    if ((ser_flush_ctr != 0) ||
         (next_ctx_to_be_reported != next_ctx_id)) flush();
-    assert(cpu_samples_flush_ctr == 0);
+    assert(ser_flush_ctr == 0);
 }
-

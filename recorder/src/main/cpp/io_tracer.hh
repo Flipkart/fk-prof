@@ -2,6 +2,7 @@
 #define IO_TRACER_HH
 
 #include "defs.hh"
+#include "circular_queue.hh"
 #include "processor.hh"
 #include "profile_writer.hh"
 
@@ -65,7 +66,7 @@ private:
 class IOTracer : public Process {
 public:
     IOTracer(JavaVM *_jvm, jvmtiEnv *_jvmti_env, ThreadMap &_thread_map, FdMap &_fd_map,
-             std::shared_ptr<Notifier> _processor_notifier, iotrace::Queue::Listener &_serializer,
+             std::shared_ptr<Notifier> _processor_notifier, typename iotrace::Queue::Listener &_serializer,
              std::int64_t _latency_threshold, std::uint32_t _max_stack_depth);
 
     bool start(JNIEnv *env);

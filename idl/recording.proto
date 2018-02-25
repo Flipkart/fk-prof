@@ -70,10 +70,9 @@ message ThreadInfo {
 
 message FDInfo {
     required uint32 id = 1;
-    required int64 fd = 2;
-    required FDType fd_type = 3;
-    optional FileInfo file_info = 4;
-    optional SocketInfo socket_info = 5;
+    required FDType fd_type = 2;
+    optional FileInfo file_info = 3;
+    optional SocketInfo socket_info = 4;
 }
 
 enum FDType {

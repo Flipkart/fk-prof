@@ -386,7 +386,8 @@ public class AssociationTest {
         };
     }
 
-    public static long assertRecorderInfoAllGood_AndGetTick(Recorder.RecorderInfo recorderInfo, final Matcher<Long> recorderTickMatcher, final Recorder.RecorderCapabilities rc) {
+    public static long assertRecorderInfoAllGood_AndGetTick(Recorder.RecorderInfo recorderInfo, final Matcher<Long> recorderTickMatcher, final Recorder.RecorderCapabilities rc,
+                                                            boolean matchCapabilities) {
         assertThat(recorderInfo.getIp(), is("10.20.30.40"));
         assertThat(recorderInfo.getHostname(), is("foo-host"));
         assertThat(recorderInfo.getAppId(), is("bar-app"));
@@ -403,10 +404,16 @@ public class AssociationTest {
         assertThat(recorderInfo.getRecorderVersion(), is(1));
         assertThat(recorderInfo.getRecorderUptime(), allOf(greaterThanOrEqualTo(0), lessThanOrEqualTo(60)));
         Recorder.RecorderCapabilities capabilities = recorderInfo.getCapabilities();
-        assertEquals(capabilities, rc);
+        if(matchCapabilities) {
+            assertEquals(capabilities, rc);
+        }
         long recorderTick = recorderInfo.getRecorderTick();
         assertThat(recorderTick, recorderTickMatcher);
         return recorderTick;
+    }
+
+    public static long assertRecorderInfoAllGood_AndGetTick(Recorder.RecorderInfo recorderInfo, final Matcher<Long> recorderTickMatcher, final Recorder.RecorderCapabilities rc) {
+        return assertRecorderInfoAllGood_AndGetTick(recorderInfo, recorderTickMatcher, rc, true);
     }
 
     private static String getVmInfo() {
@@ -422,9 +429,17 @@ public class AssociationTest {
         return value + "; ";
     }
 
-    public static Recorder.RecorderCapabilities rc(boolean cpuSamp) {
+    public static Recorder.RecorderCapabilities rc(boolean cpuSample, boolean io) {
         Recorder.RecorderCapabilities.Builder b = Recorder.RecorderCapabilities.newBuilder();
-        b.setCanCpuSample(cpuSamp);
+        b.setCanCpuSample(cpuSample);
+        if(io) {
+            b.setCanInstrumentJava(true);
+            b.setCanTraceIo(true);
+        }
         return b.build();
+    }
+
+    public static Recorder.RecorderCapabilities rc(boolean cpuSample) {
+        return rc(true, false);
     }
 }

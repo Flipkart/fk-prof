@@ -40,7 +40,7 @@ public class AgentRunner {
     public static final String DEFAULT_AGENT_INTERVAL = "interval=100";
     private static final String PERFCTX_JAR_BASE_NAME_PATTERN = "^perfctx-.+\\.jar$";
     private static final String RECORDER_BUILD_DIR = "../recorder/build";
-    private static final String BCIAGENT_JAR_BASE_NAME_PATTERN = "^bciagent-.+\\.jar$";
+    private static final String BCIAGENT_JAR_BASE_NAME_PATTERN = "^bciagent-\\d+\\.\\d+-(SNAPSHOT-)?fat.jar$";
     private static final String EXT = Platforms.getDynamicLibraryExtension();
 
     private final String fqdn;

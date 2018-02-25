@@ -57,7 +57,7 @@ void Processor::run() {
     });
 
     auto sleep_itvl = (*it)->run_itvl();
-    SPDLOG_TRACE(logger, "chosen itvl_time: {}", sleep_itvl.count());
+    logger->info("chosen run itvl_time: {}", sleep_itvl.count());
 
     while (true) {
         auto before = Time::now();
@@ -68,7 +68,7 @@ void Processor::run() {
         auto after = Time::now();
         auto run_duration = std::chrono::duration_cast<Time::msec>(after - before);
         
-        SPDLOG_TRACE(logger, "run_duration: {}ms", run_duration.count());
+        SPDLOG_DEBUG(logger, "run_duration: {}ms", run_duration.count());
         
         if (!running.load(std::memory_order_relaxed)) {
             break;
@@ -86,9 +86,12 @@ void Processor::run() {
                                 [this]() { return processing_pending.load(); });
                 }
             }
+            
+            SPDLOG_TRACE(logger, "processing thd woke up");
         }
     }
 
+    SPDLOG_TRACE(logger, "stopping all process");
     for (auto &p : processes) {
         p->stop();
     }

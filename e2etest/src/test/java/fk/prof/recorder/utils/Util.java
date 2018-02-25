@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.request.HttpRequest;
+import fk.prof.idl.Recording;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import org.junit.Assert;
@@ -19,6 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Created by gaurav.ashok on 25/03/17.
@@ -56,6 +58,12 @@ public class Util {
         }
 
         return aggregationWindows.get(maxIdx(dateTimes));
+    }
+
+    public static String frameStr(Recording.Frame frame, Function<Long, Recording.MethodInfo> methods) {
+        long id = frame.getMethodId();
+        Recording.MethodInfo m = methods.apply(id);
+        return m.getClassFqdn() + "::" + m.getMethodName();
     }
 
     /**

@@ -6,9 +6,9 @@ void IOTracerJavaState::onVMInit(jvmtiEnv *jvmti, JNIEnv *jni_env) {
     if (initialised)
         return;
 
-    jclass local_ref = jni_env->FindClass("fk/prof/trace/IOTrace");
+    jclass local_ref = jni_env->FindClass("fk/prof/bciagent/tracer/IOTracer");
     JNI_EXCEPTION_CHECK(jni_env,
-                        "fk.prof.trace.iotrace class not found. io tracing will be disabled");
+                        "fk.prof.bciagent.tracer.IOTracer class not found. io tracing will be disabled");
 
     io_trace_class = reinterpret_cast<jclass>(jni_env->NewGlobalRef(local_ref));
     jni_env->DeleteLocalRef(local_ref);
@@ -40,7 +40,7 @@ void IOTracerJavaState::failBciFor(const char *class_name) {
 }
 
 const std::int64_t IOTracerJavaState::default_latency_threshold =
-    std::numeric_limits<std::int64_t>::max();
+    fk_prof_bciagent_tracer_IOTracer_DEFAULT_THRESHOLD;
 
 // global IOtrace java state
 IOTracerJavaState io_tracer_js;
@@ -56,6 +56,9 @@ IOTracer::IOTracer(JavaVM *_jvm, jvmtiEnv *_jvmti_env, ThreadMap &_thread_map, F
     : jvm(_jvm), jvmti_env(_jvmti_env), thread_map(_thread_map), fd_map(_fd_map),
       processor_notifier(_processor_notifier), latency_threshold_ns(_latency_threshold_ns),
       max_stack_depth(_max_stack_depth), evt_queue(_serializer, _max_stack_depth) {
+    fd_map.putFileInfo(0, "stdin");
+    fd_map.putFileInfo(1, "stdout");
+    fd_map.putFileInfo(2, "stderr");
 }
 
 IOTracer::~IOTracer() {
@@ -143,7 +146,8 @@ void IOTracer::record(JNIEnv *jni_env, blocking::BlockingEvt &evt) {
     ThreadBucket *thd_info = thread_map.get(jni_env);
     bool default_context = !thd_info->data.ctx_tracker.in_ctx();
 
-    auto err = jvmti_env->GetStackTrace(nullptr, 0, max_stack_depth, frames, &frame_count);
+    // get stacktrace from depth 2. Top 2 frames are from IOTracer class.
+    auto err = jvmti_env->GetStackTrace(nullptr, 2, max_stack_depth, frames, &frame_count);
     if (err != JVMTI_ERROR_NONE) {
         logger->debug("error while getting stacktrace: {}", err);
 
@@ -160,15 +164,15 @@ void IOTracer::record(JNIEnv *jni_env, blocking::BlockingEvt &evt) {
 /* JNI implementation */
 
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024FileOpTracer__1open(
-    JNIEnv *jni_env, jclass, jint fd, jstring path, jlong ts, jlong latency) {
-
+    JNIEnv *jni_env, jobject, jint fd, jstring path, jlong ts, jlong latency) {
+    
     const char *path_str = jni_env->GetStringUTFChars(path, nullptr);
     getFdMap().putFileInfo(fd, path_str);
     jni_env->ReleaseStringUTFChars(path, path_str);
 }
 
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024SocketOpTracer__1accept(
-    JNIEnv *jni_env, jclass, jint fd, jstring remote_path, jlong ts, jlong latency) {
+    JNIEnv *jni_env, jobject, jint fd, jstring remote_path, jlong ts, jlong latency) {
 
     const char *path_str = jni_env->GetStringUTFChars(remote_path, nullptr);
     getFdMap().putSocketInfo(fd, path_str, false);
@@ -176,7 +180,7 @@ JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024SocketOpTracer
 }
 
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024SocketOpTracer__1connect(
-    JNIEnv *jni_env, jclass, jint fd, jstring remote_path, jlong ts, jlong latency) {
+    JNIEnv *jni_env, jobject, jint fd, jstring remote_path, jlong ts, jlong latency) {
 
     const char *path_str = jni_env->GetStringUTFChars(remote_path, nullptr);
     getFdMap().putSocketInfo(fd, path_str, true);
@@ -184,8 +188,8 @@ JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024SocketOpTracer
 }
 
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024FileOpTracer__1read(
-    JNIEnv *jni_env, jclass, jint fd, jint count, jlong ts, jlong latency) {
-
+    JNIEnv *jni_env, jobject, jint fd, jlong count, jlong ts, jlong latency) {
+    
     ReadsafePtr<IOTracer> tracer(GlobalCtx::recording.io_tracer);
     if (tracer.available()) {
         tracer->recordFileRead(jni_env, fd, ts, latency, count);
@@ -193,8 +197,8 @@ JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024FileOpTracer__
 }
 
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024FileOpTracer__1write(
-    JNIEnv *jni_env, jclass, jint fd, jint count, jlong ts, jlong latency) {
-
+    JNIEnv *jni_env, jobject, jint fd, jlong count, jlong ts, jlong latency) {
+    
     ReadsafePtr<IOTracer> tracer(GlobalCtx::recording.io_tracer);
     if (tracer.available()) {
         tracer->recordFileWrite(jni_env, fd, ts, latency, count);
@@ -202,7 +206,7 @@ JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024FileOpTracer__
 }
 
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024SocketOpTracer__1read(
-    JNIEnv *jni_env, jclass, jint fd, jint count, jlong ts, jlong latency, jboolean timeout) {
+    JNIEnv *jni_env, jobject, jint fd, jlong count, jlong ts, jlong latency, jboolean timeout) {
 
     ReadsafePtr<IOTracer> tracer(GlobalCtx::recording.io_tracer);
     if (tracer.available()) {
@@ -211,7 +215,7 @@ JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024SocketOpTracer
 }
 
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024SocketOpTracer__1write(
-    JNIEnv *jni_env, jclass, jint fd, jint count, jlong ts, jlong latency) {
+    JNIEnv *jni_env, jobject, jint fd, jlong count, jlong ts, jlong latency) {
 
     ReadsafePtr<IOTracer> tracer(GlobalCtx::recording.io_tracer);
     if (tracer.available()) {

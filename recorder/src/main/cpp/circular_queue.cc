@@ -174,3 +174,5 @@ void iotrace::Queue::write(iotrace::Sample& entry, StackFrame* fb, const iotrace
     entry.trace.type = BacktraceType::Java;
     entry.trace.error = in_msg.frame_count < 0 ? BacktraceError::Fkp_getstacktrace_error : BacktraceError::Fkp_no_error;  
 }
+
+template class CircularQueue<iotrace::Sample, iotrace::InMsg>;

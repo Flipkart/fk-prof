@@ -151,4 +151,6 @@ namespace iotrace {
     };
 }
 
+extern template class ::CircularQueue<iotrace::Sample, iotrace::InMsg>;
+
 #endif /* CIRCULAR_QUEUE_H */

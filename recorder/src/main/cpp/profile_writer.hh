@@ -1,16 +1,16 @@
 #ifndef PROFILE_WRITER_H
 #define PROFILE_WRITER_H
 
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
 #include <google/protobuf/io/coded_stream.h>
 #include "checksum.hh"
 #include "recorder.pb.h"
 #include "recording.pb.h"
-#include "buff.hh"
-#include <memory>
-#include "site_resolver.hh"
 #include "circular_queue.hh"
-#include <unordered_map>
-#include <unordered_set>
+#include "buff.hh"
+#include "site_resolver.hh"
 
 namespace recording = fk::prof::idl;
 
@@ -56,17 +56,7 @@ public:
     void flush();
 };
 
-struct SerializationFlushThresholds {
-
-    typedef std::uint32_t FlushCtr;
-
-    FlushCtr cpu_samples;
-    FlushCtr io_trace_evts;
-
-    SerializationFlushThresholds() : cpu_samples(DEFAULT_FLUSH_BATCH_SIZE), io_trace_evts(DEFAULT_FLUSH_BATCH_SIZE) {
-    }
-    ~SerializationFlushThresholds() {}
-};
+typedef std::uint32_t FlushCtr;
 
 struct TruncationThresholds {
 
@@ -84,7 +74,9 @@ struct TruncationThresholds {
 };
 
 // Serializes profiling data by listening to events.
-class ProfileSerializingWriter : public cpu::Queue::Listener, public iotrace::Queue::Listener, public SiteResolver::MethodListener {
+class ProfileSerializingWriter : public cpu::Queue::Listener,
+                                 public iotrace::Queue::Listener,
+                                 public SiteResolver::MethodListener {
 private:
     jvmtiEnv* jvmti;
     
@@ -114,9 +106,8 @@ private:
     std::unordered_map<uintptr_t, FdId> known_fds;
     FdId next_fd_id;
 
-    const SerializationFlushThresholds& sft;
-    SerializationFlushThresholds::FlushCtr cpu_samples_flush_ctr;
-    SerializationFlushThresholds::FlushCtr io_evts_flush_ctr;
+    const FlushCtr sft;
+    FlushCtr ser_flush_ctr;
 
     const TruncationThresholds& trunc_thresholds;
 
@@ -164,7 +155,7 @@ private:
 
 public:
     ProfileSerializingWriter(jvmtiEnv* _jvmti, ProfileWriter& _w, SiteResolver::MethodInfoResolver _fir, SiteResolver::LineNoResolver _lnr,
-                             PerfCtx::Registry& _reg, const SerializationFlushThresholds& _sft, const TruncationThresholds& _trunc_thresholds,
+                             PerfCtx::Registry& _reg, const FlushCtr _sft, const TruncationThresholds& _trunc_thresholds,
                              std::uint8_t _noctx_cov_pct);
 
     ~ProfileSerializingWriter();
