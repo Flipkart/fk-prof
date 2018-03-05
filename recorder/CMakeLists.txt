@@ -110,6 +110,7 @@ include_directories("/usr/include/i386-linux-gnu/c++/4.8/")
 set(SOURCE_FILES
     ${SRC}/checksum.cc
     ${SRC}/circular_queue.cc
+    ${SRC}/circular_queue_1.cc
     ${SRC}/common.cc
     ${SRC}/controller.cc
     ${SRC}/globals.cc
