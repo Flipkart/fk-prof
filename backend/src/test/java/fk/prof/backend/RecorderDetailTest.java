@@ -10,7 +10,7 @@ import org.junit.Test;
 import java.time.Clock;
 import java.time.LocalDateTime;
 
-import static fk.prof.backend.PollAndLoadApiTest.enableCpuSampling;
+import static fk.prof.backend.PollAndLoadApiTest.enableCpuSamplingAndIOTracing;
 
 public class RecorderDetailTest {
 
@@ -105,7 +105,7 @@ public class RecorderDetailTest {
         .setRecorderVersion(1)
         .setVmId("1")
         .setZone("1")
-        .setCapabilities(enableCpuSampling())
+        .setCapabilities(enableCpuSamplingAndIOTracing())
         .setIp(ip);
   }
 }

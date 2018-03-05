@@ -328,7 +328,7 @@ public class PollAndLoadApiTest {
                             .setWorkLastIssued(buildWorkResponse(0, WorkEntities.WorkResponse.WorkState.complete))
                             .build();
                         //wait for recorder defunct threshold time post which backend would have fetched work from leader and setup aggregation window
-                        vertx.setTimer(thresholdForDefunctRecorderInSecs * 1000, timerId2 -> {
+                        vertx.setTimer((thresholdForDefunctRecorderInSecs + 2) * 1000, timerId2 -> {
                           try {
                             makePollRequest(assignedBackend, pollReq2).setHandler(ar4 -> {
                               if(ar4.failed()) {
@@ -420,11 +420,11 @@ public class PollAndLoadApiTest {
         .setVmId("1")
         .setZone("1")
         .setIp("1")
-        .setCapabilities(enableCpuSampling())
+        .setCapabilities(enableCpuSamplingAndIOTracing())
         .build();
   }
 
-  public static Recorder.RecorderCapabilities enableCpuSampling() {
+  public static Recorder.RecorderCapabilities enableCpuSamplingAndIOTracing() {
     return Recorder.RecorderCapabilities.newBuilder().setCanCpuSample(true).build();
   }
 
@@ -453,7 +453,7 @@ public class PollAndLoadApiTest {
         .setVmId("1")
         .setZone("1")
         .setIp("1")
-        .setCapabilities(enableCpuSampling())
+        .setCapabilities(enableCpuSamplingAndIOTracing())
         .build();
   }
 }

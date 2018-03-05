@@ -6,7 +6,9 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class IOTracingFrameNodeTest {
   @Test
@@ -29,7 +31,7 @@ public class IOTracingFrameNodeTest {
     Assert.assertFalse(fn.hasCpuSamplingProps());
     Assert.assertEquals(3, fn.getIoTracingPropsCount());
 
-    List<Profile.IOTracingNodeProps> props = new ArrayList<>();
+    Set<Profile.IOTracingNodeProps> props = new HashSet<>();
     props.add(Profile.IOTracingNodeProps.newBuilder()
         .setFdIdx(1).setTraceType(Recording.IOTraceType.file_read)
         .setSamples(3).setLatency95(30).setLatency99(30)
@@ -42,6 +44,6 @@ public class IOTracingFrameNodeTest {
         .setFdIdx(2).setTraceType(Recording.IOTraceType.file_write)
         .setSamples(1).setLatency95(20).setLatency99(20)
         .setMean(20).setBytes(200).setDropped(false).build());
-    Assert.assertEquals(props, fn.getIoTracingPropsList());
+    Assert.assertEquals(props, new HashSet<Profile.IOTracingNodeProps>(fn.getIoTracingPropsList()));
   }
 }

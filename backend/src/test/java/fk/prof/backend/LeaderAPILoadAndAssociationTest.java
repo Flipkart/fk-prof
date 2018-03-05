@@ -402,7 +402,7 @@ public class LeaderAPILoadAndAssociationTest {
         .setVmId("1")
         .setZone("1")
         .setIp("1")
-        .setCapabilities(Recorder.RecorderCapabilities.newBuilder().setCanCpuSample(true))
+        .setCapabilities(Recorder.RecorderCapabilities.newBuilder().setCanCpuSample(true).setCanTraceIo(true))
         .build();
   }
 }

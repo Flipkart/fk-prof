@@ -14,6 +14,7 @@ public class WorkSlotWeightCalculator {
   // In that case slotweightcalculator becomes a dependency to be injected everywhere
   static {
     weights.put(WorkEntities.WorkType.cpu_sample_work, 1);
+    weights.put(WorkEntities.WorkType.io_trace_work, 1);
   }
 
   public static int weight(Profile.RecordingPolicy recordingPolicy) {

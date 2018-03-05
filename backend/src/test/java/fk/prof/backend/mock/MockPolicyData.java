@@ -13,8 +13,11 @@ import java.util.List;
  * Created by rohit.patiyal on 10/05/17.
  */
 public class MockPolicyData {
-    private static WorkEntities.CpuSampleWork mockCpuSampleWork = WorkEntities.CpuSampleWork.newBuilder().setFrequency(50).setMaxFrames(64).build();
-    private static WorkEntities.Work mockWork = WorkEntities.Work.newBuilder().setWType(WorkEntities.WorkType.cpu_sample_work).setCpuSample(mockCpuSampleWork).build();
+    private static WorkEntities.CpuSampleWork mockCpuSampleSubWork = WorkEntities.CpuSampleWork.newBuilder().setFrequency(50).setMaxFrames(64).build();
+    private static WorkEntities.IOTraceWork mockIOTraceSubWork = WorkEntities.IOTraceWork.newBuilder().setLatencyThresholdMs(100).setMaxFrames(64).build();
+    private static WorkEntities.Work mockCpuSampleWork = WorkEntities.Work.newBuilder().setWType(WorkEntities.WorkType.cpu_sample_work).setCpuSample(mockCpuSampleSubWork).build();
+    private static WorkEntities.Work mockIOTraceWork = WorkEntities.Work.newBuilder().setWType(WorkEntities.WorkType.io_trace_work).setIoTrace(mockIOTraceSubWork).build();
+
 
     private static List<PolicyEntities.Schedule> mockSchedules = Arrays.asList(
         PolicyEntities.Schedule.newBuilder().setAfter("0").setDuration(120).setPgCovPct(100).build(),
@@ -23,9 +26,9 @@ public class MockPolicyData {
     );
 
     private static List<PolicyEntities.Policy> mockPolicies = Arrays.asList(
-        PolicyEntities.Policy.newBuilder().addWork(mockWork).setSchedule(mockSchedules.get(0)).setDescription("Test policy").build(),
-        PolicyEntities.Policy.newBuilder().addWork(mockWork).setSchedule(mockSchedules.get(1)).setDescription("Test policy").build(),
-        PolicyEntities.Policy.newBuilder().addWork(mockWork).setSchedule(mockSchedules.get(2)).setDescription("Test policy").build()
+        PolicyEntities.Policy.newBuilder().addWork(mockCpuSampleWork).addWork(mockIOTraceWork).setSchedule(mockSchedules.get(0)).setDescription("Test policy").build(),
+        PolicyEntities.Policy.newBuilder().addWork(mockCpuSampleWork).setSchedule(mockSchedules.get(1)).setDescription("Test policy").build(),
+        PolicyEntities.Policy.newBuilder().addWork(mockIOTraceWork).setSchedule(mockSchedules.get(2)).setDescription("Test policy").build()
 
     );
 

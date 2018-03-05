@@ -31,10 +31,21 @@ public class PolicyEntitiesProtoUtil {
 
   private static String policyWorkCompactRepr(WorkEntities.Work work) {
     StringBuilder sb = new StringBuilder();
-    if(work.hasCpuSample()){
-      sb.append("cpuSample:");
-      WorkEntities.CpuSampleWork cpuSample = work.getCpuSample();
-      sb.append(String.format("{freq=%d,maxFram=%d}",cpuSample.getFrequency(), cpuSample.getMaxFrames()));
+    switch (work.getWType()) {
+      case cpu_sample_work:
+        if (work.hasCpuSample()) {
+          sb.append("cpuSample:");
+          WorkEntities.CpuSampleWork cpuSample = work.getCpuSample();
+          sb.append(String.format("{freq=%d,maxFrames=%d}", cpuSample.getFrequency(), cpuSample.getMaxFrames()));
+        }
+        break;
+      case io_trace_work:
+        if (work.hasIoTrace()) {
+          sb.append("ioTrace:");
+          WorkEntities.IOTraceWork ioTrace = work.getIoTrace();
+          sb.append(String.format("{latThresh=%d,maxFrames=%d}", ioTrace.getLatencyThresholdMs(), ioTrace.getMaxFrames()));
+        }
+        break;
     }
     return sb.toString();
   }
@@ -58,31 +69,11 @@ public class PolicyEntitiesProtoUtil {
         .setCoveragePct(policyDTOPolicy.getSchedule().getPgCovPct())
         .setDuration(policyDTOPolicy.getSchedule().getDuration())
         .setDescription(policyDTOPolicy.getDescription())
-        .addAllWork(policyDTOPolicy.getWorkList().stream().map(PolicyEntitiesProtoUtil::translateToBackendDTOWork).collect(Collectors.toList()));
+        .addAllWork(policyDTOPolicy.getWorkList());
     if (policyDTOPolicy.getSchedule().hasMinHealthy()) {
       recordingPolicyBuilder.setMinHealthy(policyDTOPolicy.getSchedule().getMinHealthy());
     }
     return recordingPolicyBuilder.build();
-  }
-
-  private static WorkEntities.WorkType translateToBackendDTOWorkType(WorkEntities.WorkType workType) {
-    switch (workType) {
-      case cpu_sample_work:
-        return WorkEntities.WorkType.cpu_sample_work;
-      default:
-        return null;
-    }
-  }
-
-  private static WorkEntities.Work translateToBackendDTOWork(WorkEntities.Work work) {
-    WorkEntities.Work.Builder backendDTOWorkBuilder = WorkEntities.Work.newBuilder().setWType(translateToBackendDTOWorkType(work.getWType()));
-
-    if (work.hasCpuSample()) {
-      WorkEntities.CpuSampleWork policyDTOCPUSample = work.getCpuSample();
-      backendDTOWorkBuilder.setCpuSample(WorkEntities.CpuSampleWork.newBuilder().setFrequency(policyDTOCPUSample.getFrequency())
-          .setMaxFrames(policyDTOCPUSample.getMaxFrames()).build());
-    }
-    return backendDTOWorkBuilder.build();
   }
 
   public static void validatePolicyValues(PolicyEntities.VersionedPolicyDetails versionedPolicyDetails) throws Exception {
@@ -93,14 +84,23 @@ public class PolicyEntitiesProtoUtil {
       validateField("minHealthy", policy.getSchedule().getMinHealthy(), 1,10000);
     }
     for (WorkEntities.Work work : policy.getWorkList()) {
-      int workDetailsCount = 0;
       if (work.hasCpuSample()) {
-        validateField("cpuSample: frequency", work.getCpuSample().getFrequency(), 50, 100);
-        validateField("cpuSample: maxFrames", work.getCpuSample().getMaxFrames(), 1, 999);
-        workDetailsCount++;
+        if(WorkEntities.WorkType.cpu_sample_work.equals(work.getWType())) {
+          validateField("cpuSample: frequency", work.getCpuSample().getFrequency(), 50, 100);
+          validateField("cpuSample: maxFrames", work.getCpuSample().getMaxFrames(), 1, 999);
+        } else {
+          throw new IllegalArgumentException("Wrong work type details provided for: " + work.getWType());
+        }
       }
-      if (workDetailsCount != 1)
-        throw new IllegalArgumentException("Only one work details per work supported, given: " + workDetailsCount);
+
+      if (work.hasIoTrace()) {
+        if(WorkEntities.WorkType.io_trace_work.equals(work.getWType())) {
+          validateField("ioTrace: latThreshold", work.getIoTrace().getLatencyThresholdMs(), 1, Integer.MAX_VALUE);
+          validateField("ioTrace: maxFrames", work.getIoTrace().getMaxFrames(), 1, 999);
+        } else {
+          throw new IllegalArgumentException("Wrong work type details provided for: " + work.getWType());
+        }
+      }
     }
   }
 
