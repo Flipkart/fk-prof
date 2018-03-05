@@ -74,7 +74,7 @@ static void BM_Queue_Event_Push(benchmark::State &state) {
             int c = state.threads - 1;
             while (c > 0) {
                 c--;
-                iteration = 1000000;
+                iteration = 100000;
                 while (iteration > 0) {
                     while (!q.pop()) {
                     };
@@ -83,7 +83,7 @@ static void BM_Queue_Event_Push(benchmark::State &state) {
             }
         } else {
             // push
-            iteration = 1000000;
+            iteration = 100000;
             while (iteration > 0) {
                 while (!push_to_queue(q))
                     ;
@@ -97,7 +97,7 @@ BENCHMARK(BM_Queue_Event_Push)
     ->Iterations(1)
     ->Repetitions(10)
     ->ReportAggregatesOnly()
-    ->ThreadRange(2, 2);
+    ->ThreadRange(2, 8);
 
 static void BM_Queue_1_Event_Push(benchmark::State &state) {
     std::size_t iteration;
@@ -107,7 +107,7 @@ static void BM_Queue_1_Event_Push(benchmark::State &state) {
             int c = state.threads - 1;
             while (c > 0) {
                 c--;
-                iteration = 1000000;
+                iteration = 100000;
                 while (iteration > 0) {
                     while (!q_1.pop()) {
                     };
@@ -116,7 +116,7 @@ static void BM_Queue_1_Event_Push(benchmark::State &state) {
             }
         } else {
             // push
-            iteration = 1000000;
+            iteration = 100000;
             while (iteration > 0) {
                 while (!push_to_queue(q_1))
                     ;
@@ -130,6 +130,6 @@ BENCHMARK(BM_Queue_1_Event_Push)
     ->Iterations(1)
     ->Repetitions(10)
     ->ReportAggregatesOnly()
-    ->ThreadRange(2, 2);
+    ->ThreadRange(2, 8);
 
 BENCHMARK_MAIN();
