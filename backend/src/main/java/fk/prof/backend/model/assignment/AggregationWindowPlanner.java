@@ -29,6 +29,7 @@ import io.vertx.core.logging.LoggerFactory;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -184,7 +185,8 @@ public class AggregationWindowPlanner {
               " for process_group=" + RecorderProtoUtil.processGroupCompactRepr(processGroup) +
               " because coverage is zero");
         } else {
-          int healthyRecorders = processGroupContextForScheduling.getHealthyRecordersCount();
+          Set<WorkEntities.WorkType> requestedWorkTypes = latestRecordingPolicy.getWorkList().stream().map(WorkEntities.Work::getWType).collect(Collectors.toSet());
+          int healthyRecorders = processGroupContextForScheduling.getHealthyRecordersCount(requestedWorkTypes);
 
           if(latestRecordingPolicy.hasMinHealthy() && healthyRecorders < latestRecordingPolicy.getMinHealthy()) {
             mtrWindowSkipUnhealthy.mark();
@@ -242,9 +244,7 @@ public class AggregationWindowPlanner {
     for (int i = 0; i < workIds.length; i++) {
       WorkEntities.WorkAssignment.Builder workAssignmentBuilder = WorkEntities.WorkAssignment.newBuilder()
           .setWorkId(BitOperationUtil.constructLongFromInts(backendId, workIdCounter++))
-          .addAllWork(latestRecordingPolicy.getWorkList().stream()
-              .map(RecorderProtoUtil::translateWorkFromBackendDTO)
-              .collect(Collectors.toList()))
+          .addAllWork(latestRecordingPolicy.getWorkList())
           .setDescription(latestRecordingPolicy.getDescription())
           .setDuration(latestRecordingPolicy.getDuration());
 

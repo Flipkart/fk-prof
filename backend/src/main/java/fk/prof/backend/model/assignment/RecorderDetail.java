@@ -10,6 +10,8 @@ import fk.prof.idl.WorkEntities;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.RecorderTag;
 
+import java.util.Set;
+
 public class RecorderDetail {
   private static final double NANOSECONDS_IN_SECOND = Math.pow(10, 9);
 
@@ -19,6 +21,7 @@ public class RecorderDetail {
   private long lastReportedTick = 0;
   private Long lastReportedTime = null;
   private WorkEntities.WorkResponse currentWorkResponse;
+  private Recorder.RecorderCapabilities lastReportedCapability = null;
 
   private final MetricRegistry metricRegistry = SharedMetricRegistries.getOrCreate(ConfigManager.METRIC_REGISTRY);
   private final Meter mtrPollReset, mtrPollStale, mtrPollComplete;
@@ -47,6 +50,7 @@ public class RecorderDetail {
         mtrPollReset.mark();
       }
       this.currentWorkResponse = pollReq.getWorkLastIssued();
+      this.lastReportedCapability = pollReq.getRecorderInfo().getCapabilities();
       mtrPollComplete.mark();
     } else {
       mtrPollStale.mark();
@@ -57,6 +61,32 @@ public class RecorderDetail {
   public boolean isDefunct() {
     return lastReportedTime == null ||
         ((System.nanoTime() - lastReportedTime) > thresholdForDefunctRecorderInNanos);
+  }
+
+  public boolean canSupportWork(Set<WorkEntities.WorkType> workTypes) {
+    System.out.println("YO");
+    workTypes.forEach(w -> System.out.print(w));
+    System.out.println("lastReportedCapability" + lastReportedCapability);
+    if(lastReportedCapability == null) {
+      return false;
+    }
+
+    boolean canSupport = true;
+    for(WorkEntities.WorkType workType: workTypes) {
+      switch(workType) {
+        case cpu_sample_work:
+          canSupport = canSupport
+              && lastReportedCapability.hasCanCpuSample() && lastReportedCapability.getCanCpuSample();
+          break;
+        case io_trace_work:
+          canSupport = canSupport
+              && lastReportedCapability.hasCanTraceIo() && lastReportedCapability.getCanTraceIo();
+          break;
+        default:
+          canSupport = false;
+      }
+    }
+    return canSupport;
   }
 
   public boolean canAcceptWork() {

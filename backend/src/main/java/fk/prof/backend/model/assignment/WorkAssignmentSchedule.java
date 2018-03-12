@@ -18,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 /**
  * vars prefixed with d are duration in seconds
@@ -33,6 +34,7 @@ public class WorkAssignmentSchedule {
   private final int dMaxDelay;
   private final int cMaxParallel;
 
+  private final Set<WorkEntities.WorkType> workTypes;
   private final PriorityQueue<ScheduleEntry> entries = new PriorityQueue<>();
   private Map<RecorderIdentifier, ScheduleEntry> assignedSchedule = new HashMap<>();
   private final ReentrantLock entriesLock = new ReentrantLock();
@@ -45,6 +47,9 @@ public class WorkAssignmentSchedule {
                                 WorkEntities.WorkAssignment.Builder[] workAssignmentBuilders,
                                 int dProfileLen,
                                 ProcessGroupTag processGroupTag) {
+    this.workTypes = workAssignmentBuilders[0].getWorkList() == null
+        ? new HashSet<>()
+        : workAssignmentBuilders[0].getWorkList().stream().map(WorkEntities.Work::getWType).collect(Collectors.toSet());
     this.nRef = System.nanoTime();
     int cRequired = workAssignmentBuilders.length;
 
@@ -76,6 +81,10 @@ public class WorkAssignmentSchedule {
     this.ctrEntriesLockInterrupt = metricRegistry.counter(MetricRegistry.name(MetricName.WA_Entries_Lock_Interrupt.get(), processGroupStr));
     this.ctrAssignmentFetchFail = metricRegistry.counter(MetricRegistry.name(MetricName.WA_Fetch_Failure.get(), processGroupStr));
     this.mtrSchedulingMiss = metricRegistry.meter(MetricRegistry.name(MetricName.WA_Scheduling_Miss.get(), processGroupStr));
+  }
+
+  public Set<WorkEntities.WorkType> getAssociatedWorkTypes() {
+    return this.workTypes;
   }
 
   /**

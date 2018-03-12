@@ -425,7 +425,7 @@ public class PollAndLoadApiTest {
   }
 
   public static Recorder.RecorderCapabilities enableCpuSamplingAndIOTracing() {
-    return Recorder.RecorderCapabilities.newBuilder().setCanCpuSample(true).build();
+    return Recorder.RecorderCapabilities.newBuilder().setCanCpuSample(true).setCanTraceIo(true).build();
   }
 
   private WorkEntities.WorkResponse buildWorkResponse(long workId, WorkEntities.WorkResponse.WorkState workState) {

@@ -65,13 +65,6 @@ public class RecorderProtoUtil {
         ", delay=" + pollRes.getAssignment().getDelay();
   }
 
-  public static WorkEntities.Work translateWorkFromBackendDTO(WorkEntities.Work backendDTOWork) {
-    return WorkEntities.Work.newBuilder()
-        .setWType(translateWorkTypeFromBackendDTO(backendDTOWork.getWType()))
-        .setCpuSample(translateCpuSampleWorkFromBackendDTO(backendDTOWork.getCpuSample()))
-        .build();
-  }
-
   private static WorkEntities.WorkType translateWorkTypeFromBackendDTO(WorkEntities.WorkType backendDTOWorkType) {
     return WorkEntities.WorkType.forNumber(backendDTOWorkType.getNumber());
   }

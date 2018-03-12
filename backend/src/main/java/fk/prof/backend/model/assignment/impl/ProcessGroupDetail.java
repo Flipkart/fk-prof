@@ -53,7 +53,8 @@ public class ProcessGroupDetail implements ProcessGroupContextForScheduling, Pro
     boolean canAcceptWork = recorderDetail.canAcceptWork();
     if (pollReceived
         && workAssignmentSchedule != null
-        && canAcceptWork) {
+        && canAcceptWork
+        && recorderDetail.canSupportWork(workAssignmentSchedule.getAssociatedWorkTypes())) {
 
       try {
         return workAssignmentSchedule.getNextWorkAssignment(recorderIdentifier);
@@ -80,9 +81,9 @@ public class ProcessGroupDetail implements ProcessGroupContextForScheduling, Pro
 
   //Called by backend daemon thread
   @Override
-  public int getHealthyRecordersCount() {
+  public int getHealthyRecordersCount(Set<WorkEntities.WorkType> workTypes) {
     final List<RecorderDetail> availableRecorders = this.recorderLookup.values().stream()
-        .filter(recorderDetail -> !recorderDetail.isDefunct())
+        .filter(recorderDetail -> !recorderDetail.isDefunct() && recorderDetail.canSupportWork(workTypes))
         .collect(Collectors.toList());
     return availableRecorders.size();
   }

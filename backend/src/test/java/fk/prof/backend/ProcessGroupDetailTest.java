@@ -1,5 +1,6 @@
 package fk.prof.backend;
 
+import com.google.common.collect.Sets;
 import fk.prof.backend.model.assignment.RecorderIdentifier;
 import fk.prof.backend.model.assignment.WorkAssignmentSchedule;
 import fk.prof.backend.model.assignment.impl.ProcessGroupDetail;
@@ -18,6 +19,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import static fk.prof.backend.PollAndLoadApiTest.enableCpuSamplingAndIOTracing;
 import static org.mockito.Mockito.mock;
@@ -94,9 +96,28 @@ public class ProcessGroupDetailTest {
 
   @Test
   public void testTargetRecordersCalculationGivenCoverage(TestContext context) throws InterruptedException {
+    testTargetRecordersCalculationGivenCoverageAndWorkTypes(context, Sets.newHashSet(WorkEntities.WorkType.cpu_sample_work), Sets.newHashSet(WorkEntities.WorkType.cpu_sample_work, WorkEntities.WorkType.io_trace_work));
+    testTargetRecordersCalculationGivenCoverageAndWorkTypes(context, Sets.newHashSet(WorkEntities.WorkType.io_trace_work), Sets.newHashSet(WorkEntities.WorkType.cpu_sample_work));
+    testTargetRecordersCalculationGivenCoverageAndWorkTypes(context, Sets.newHashSet(WorkEntities.WorkType.cpu_sample_work, WorkEntities.WorkType.io_trace_work), null);
+  }
+
+  @Test
+  public void testEquality(TestContext context) {
+    ProcessGroupDetail pgd1 = new ProcessGroupDetail(mockPG, 1);
+    ProcessGroupDetail pgd2 = new ProcessGroupDetail(mockPG, 10);
+    context.assertEquals(pgd1, pgd2);
+  }
+
+  private void testTargetRecordersCalculationGivenCoverageAndWorkTypes(TestContext context, Set<WorkEntities.WorkType> wtypes, Set<WorkEntities.WorkType> complement) throws InterruptedException {
     ProcessGroupDetail processGroupDetail = new ProcessGroupDetail(mockPG, 1);
+    List<Recorder.RecorderInfo.Builder> builders = Arrays.asList(
+        mockRIBuilders.get(0).setCapabilities(buildRecCapabilities(wtypes)),
+        mockRIBuilders.get(1).setCapabilities(buildRecCapabilities(wtypes)),
+        mockRIBuilders.get(2).setCapabilities(buildRecCapabilities(wtypes))
+    );
+
     Recorder.PollReq pollReq1 = Recorder.PollReq.newBuilder()
-        .setRecorderInfo(mockRIBuilders.get(0).setRecorderTick(1).build())
+        .setRecorderInfo(builders.get(0).setRecorderTick(1).build())
         .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(0)
@@ -109,7 +130,7 @@ public class ProcessGroupDetailTest {
     Thread.sleep(1000);
 
     Recorder.PollReq pollReq2 = Recorder.PollReq.newBuilder()
-        .setRecorderInfo(mockRIBuilders.get(1).setRecorderTick(1).build())
+        .setRecorderInfo(builders.get(1).setRecorderTick(1).build())
         .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(100)
@@ -119,7 +140,7 @@ public class ProcessGroupDetailTest {
     processGroupDetail.getWorkAssignment(pollReq2);
 
     Recorder.PollReq pollReq3 = Recorder.PollReq.newBuilder()
-        .setRecorderInfo(mockRIBuilders.get(2).setRecorderTick(1).build())
+        .setRecorderInfo(builders.get(2).setRecorderTick(1).build())
         .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(0)
@@ -128,15 +149,15 @@ public class ProcessGroupDetailTest {
         .build();
     processGroupDetail.getWorkAssignment(pollReq3);
 
-    context.assertEquals(2, processGroupDetail.getHealthyRecordersCount());
-    context.assertEquals(2, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 100));
-    context.assertEquals(1, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 99));
-    context.assertEquals(0, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 34));
-    context.assertEquals(0, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 0));
+    context.assertEquals(2, processGroupDetail.getHealthyRecordersCount(wtypes));
+    context.assertEquals(2, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(wtypes), 100));
+    context.assertEquals(1, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(wtypes), 99));
+    context.assertEquals(0, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(wtypes), 34));
+    context.assertEquals(0, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(wtypes), 0));
 
     //first recorder comes back up
     Recorder.PollReq pollReq4 = Recorder.PollReq.newBuilder()
-        .setRecorderInfo(mockRIBuilders.get(0).setRecorderTick(1).build())
+        .setRecorderInfo(builders.get(0).setRecorderTick(1).build())
         .setWorkLastIssued(WorkEntities.WorkResponse.newBuilder()
             .setElapsedTime(100)
             .setWorkId(0)
@@ -145,18 +166,14 @@ public class ProcessGroupDetailTest {
         .build();
     processGroupDetail.getWorkAssignment(pollReq4);
 
-    context.assertEquals(3, processGroupDetail.getHealthyRecordersCount());
-    context.assertEquals(3, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 100));
-    context.assertEquals(2, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 99));
-    context.assertEquals(1, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 34));
-    context.assertEquals(0, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(), 0));
-  }
-
-  @Test
-  public void testEquality(TestContext context) {
-    ProcessGroupDetail pgd1 = new ProcessGroupDetail(mockPG, 1);
-    ProcessGroupDetail pgd2 = new ProcessGroupDetail(mockPG, 10);
-    context.assertEquals(pgd1, pgd2);
+    context.assertEquals(3, processGroupDetail.getHealthyRecordersCount(wtypes));
+    if(complement != null ) {
+      context.assertEquals(0, processGroupDetail.getHealthyRecordersCount(complement));
+    }
+    context.assertEquals(3, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(wtypes), 100));
+    context.assertEquals(2, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(wtypes), 99));
+    context.assertEquals(1, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(wtypes), 34));
+    context.assertEquals(0, processGroupDetail.applyCoverage(processGroupDetail.getHealthyRecordersCount(wtypes), 0));
   }
 
   private Recorder.RecorderInfo.Builder buildRecorderInfo(String recorderId) {
@@ -176,6 +193,29 @@ public class ProcessGroupDetailTest {
         .setZone("1")
         .setCapabilities(enableCpuSamplingAndIOTracing())
         .setIp(recorderId);
+  }
+
+  private Recorder.RecorderCapabilities.Builder buildRecCapabilities(Set<WorkEntities.WorkType> wtypes) {
+    Recorder.RecorderCapabilities.Builder builder = Recorder.RecorderCapabilities.newBuilder();
+    builder.setCanCpuSample(false);
+    builder.setCanTraceIo(false);
+    builder.setCanInstrumentJava(false);
+    builder.setCanTraceAlloc(false);
+    builder.setCanTraceElapsedTime(false);
+    builder.setCanTraceMonitor(false);
+    builder.setCanTraceOffcpuTime(false);
+
+    for(WorkEntities.WorkType wtype: wtypes) {
+      switch (wtype) {
+        case cpu_sample_work:
+          builder.setCanCpuSample(true);
+          break;
+        case io_trace_work:
+          builder.setCanTraceIo(true);
+          break;
+      }
+    }
+    return builder;
   }
 
 }
