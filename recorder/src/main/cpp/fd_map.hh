@@ -4,7 +4,7 @@
 #include "linked_concurrent_map.hh"
 #include "globals.hh"
 
-typedef std::int32_t fd_type_t;
+typedef std::int32_t fd_t;
 
 enum FdType {
     File, Socket
@@ -34,7 +34,7 @@ class FdMapBase : public LinkedMapBase<map::ConcurrentMapProvider<TrivialIntHash
 
     void put(map::KeyType key, Value* info);
     
-    map::KeyType toKey(fd_type_t fd) {
+    map::KeyType toKey(fd_t fd) {
         auto p = static_cast<uintptr_t>(fd);
         return (map::KeyType) p;
     }
@@ -42,13 +42,13 @@ class FdMapBase : public LinkedMapBase<map::ConcurrentMapProvider<TrivialIntHash
 public:
     FdMapBase(int capacity);
     
-    void putFileInfo(fd_type_t fd, const char* path);
+    void putFileInfo(fd_t fd, const char* path);
     
-    void putSocketInfo(fd_type_t fd, const char* remote_path, bool connect);
+    void putSocketInfo(fd_t fd, const char* remote_path, bool connect);
 
-    Value* get(fd_type_t fd);
+    Value* get(fd_t fd);
 
-    void remove(fd_type_t fd);
+    void remove(fd_t fd);
 };
 
 typedef FdMapBase FdMap;

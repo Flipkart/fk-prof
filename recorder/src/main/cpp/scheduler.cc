@@ -2,9 +2,9 @@
 #include <thread>
 #include <iostream>
 
-void Scheduler::schedule(Time::Pt time, Scheduler::Cb task) {
+void Scheduler::schedule(Time::Pt time, Scheduler::Task task) {
     auto sec_in_future = std::chrono::duration_cast<Time::sec>(time - Time::now());
-    logger->debug("Scheduling {} {}s in future", typeid(task).name(), sec_in_future.count());//TODO: handle me better
+    logger->debug("Scheduling \"{}\" {}s in future", task.description, sec_in_future.count());//TODO: handle me better
     std::lock_guard<std::mutex> g(m);
     q.push({time, task});
     s_c_q_sz.inc();
@@ -12,6 +12,10 @@ void Scheduler::schedule(Time::Pt time, Scheduler::Cb task) {
     if (time < top_expiry) {
         nearest_entry_changed.notify_one();
     }
+}
+
+void Scheduler::schedule(Time::Pt time, Task::Cb cb, std::string desc) {
+    schedule(time, Scheduler::Task{.callback = cb, .description = desc});
 }
 
 Time::usec usec_to_expiry(const Time::Pt& tm) {
@@ -49,7 +53,7 @@ void execute_top(Scheduler::Q& q, Lock& l, metrics::Timer& s_t_exec, metrics::Ct
     Scheduler::Ent sched_for = std::move(q.top());
     q.pop();
     s_c_q_sz.dec();
-    logger->debug("Scheduler is now triggering {}", typeid(sched_for).name());
+    logger->debug("Scheduler is now triggering \"{}\"", sched_for.second.description);
     {
         Unlocker ul(l);
         auto _ = s_t_exec.time_scope();

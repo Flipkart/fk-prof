@@ -71,7 +71,9 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
     // Will definitely land here if jnienv == null
     // Can land here despite jnienv != null if asgct could not walk the stack of current thread.
     // We want to be absolutely sure if native bt capture has been enabled before proceeding
-    if(!capture_native_bt) return;
+    if(!capture_native_bt) {
+        return;
+    }
     STATIC_ARRAY(native_trace, NativeFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
 
     auto bt_len = Stacktraces::fill_backtrace(native_trace, capture_stack_depth());
@@ -131,7 +133,6 @@ Profiler::Profiler(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap &_thread_map, Profi
       prob_pct(_prob_pct), sampling_attempts(0), noctx_cov_pct(_noctx_cov_pct), capture_native_bt(_capture_native_bt), capture_unknown_thd_bt(_capture_unknown_thd_bt), running(false), samples_handled(0),
 
       s_c_cpu_samp_total(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "opportunities"})),
-
       s_c_cpu_samp_err_no_jni(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "err_no_jni"})),
       s_c_cpu_samp_err_unexpected(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "err_unexpected"})),
 
@@ -164,4 +165,8 @@ void Profiler::run() {
         }
         samples_handled = 0;
     }
+}
+
+Time::msec Profiler::run_itvl() {
+    return Time::msec(Size * itvl_min / 1000 / 2);
 }

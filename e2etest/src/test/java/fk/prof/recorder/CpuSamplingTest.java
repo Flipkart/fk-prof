@@ -66,6 +66,7 @@ public class CpuSamplingTest {
             "backoff_max=5," +
             "poll_itvl=1," +
             "log_lvl=trace," +
+            "capture_native_bt=y," +
             "stats_syslog_tag=foobar";
     private static final String DEFAULT_CTX_NAME = "~ OTHERS ~";
     private static final String UNKNOWN_CTX_NAME = "~ UNKNOWN ~";
@@ -121,7 +122,7 @@ public class CpuSamplingTest {
             recorderTickMatcher = greaterThan(previousTick);
             assertItHadNoWork(prwt.req.getWorkLastIssued(), idx == 0 ? idx : idx + 99);
             if (idx > 0) {
-                assertThat("idx = " + idx, prwt.time - prevTime, approximatelyBetween(1000l, 2000l)); //~1 sec tolerance
+                assertThat("idx = " + idx, prwt.time - prevTime, approximatelyBetween(900l, 2000l)); //~1 sec tolerance
             }
             prevTime = prwt.time;
             idx++;
@@ -649,19 +650,24 @@ public class CpuSamplingTest {
         }
     }
 
-    private void assertPollIntervalIsGood(PollReqWithTime[] pollReqs, long prevTime) {
+    public static void assertPollIntervalIsGood(PollReqWithTime[] pollReqs, long prevTime, long range_start, long range_end,
+                                                Recorder.RecorderCapabilities rc, boolean matchCapabilities) {
         long idx = 0;
         long previousTick;
         Matcher<Long> recorderTickMatcher = is(0l);
         for (PollReqWithTime prwt : pollReqs) {
-            previousTick = assertRecorderInfoAllGood_AndGetTick(prwt.req.getRecorderInfo(), recorderTickMatcher, AssociationTest.rc(true));
+            previousTick = assertRecorderInfoAllGood_AndGetTick(prwt.req.getRecorderInfo(), recorderTickMatcher, rc, matchCapabilities);
             recorderTickMatcher = greaterThan(previousTick);
             if (idx > 0) {
-                assertThat("idx = " + idx, prwt.time - prevTime, approximatelyBetween(970l, 2000l)); //~1 sec tolerance
+                assertThat("idx = " + idx, prwt.time - prevTime, approximatelyBetween(range_start, range_end)); //~1 sec tolerance
             }
             prevTime = prwt.time;
             idx++;
         }
+    }
+
+    public static void assertPollIntervalIsGood(PollReqWithTime[] pollReqs, long prevTime) {
+        assertPollIntervalIsGood(pollReqs, prevTime, 970l ,2000l, AssociationTest.rc(true), true);
     }
 
     private void assertRecordingHeaderIsGood(String cpuSamplingWorkIssueTime, MutableObject<Recording.RecordingHeader> hdr, final int maxFrames) {

@@ -39,12 +39,12 @@ public:
     explicit CircularQueue(Listener &listener, std::uint32_t maxFrameSize);
 
     virtual ~CircularQueue();
-
-    //TODO: see if instead of push/pop semantic, acquire/release slot sematic helps in avoiding stacktrace copy.
     
     bool push(const InMsg& in_msg);
 
     bool pop();
+    
+    size_t size();
 
 private:
     Listener& listener_;
@@ -150,5 +150,7 @@ namespace iotrace {
         void write(Sample& entry, StackFrame* fb, const InMsg& in_msg);
     };
 }
+
+extern template class ::CircularQueue<iotrace::Sample, iotrace::InMsg>;
 
 #endif /* CIRCULAR_QUEUE_H */

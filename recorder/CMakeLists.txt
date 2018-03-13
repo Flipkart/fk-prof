@@ -109,56 +109,28 @@ include_directories("/usr/include/i386-linux-gnu/c++/4.8/")
 
 set(SOURCE_FILES
     ${SRC}/checksum.cc
-    ${SRC}/checksum.hh
     ${SRC}/circular_queue.cc
-    ${SRC}/circular_queue.hh
     ${SRC}/common.cc
-    ${SRC}/common.hh
     ${SRC}/controller.cc
-    ${SRC}/controller.hh
-    ${SRC}/metrics.hh
-    ${SRC}/globals.hh
     ${SRC}/globals.cc
-    ${SRC}/ti_thd.hh
     ${SRC}/ti_thd.cc
     ${SRC}/signal_handler.cc
-    ${SRC}/signal_handler.hh
     ${SRC}/processor.cc
-    ${SRC}/processor.hh
-    ${SRC}/mapping_parser.hh
     ${SRC}/mapping_parser.cc
     ${SRC}/site_resolver.cc
-    ${SRC}/site_resolver.hh
     ${SRC}/profiler.cc
-    ${SRC}/profiler.hh
     ${SRC}/io_tracer.cc
-    ${SRC}/io_tracer.hh
-    ${SRC}/stacktraces.hh
     ${SRC}/stacktraces.cc
-    ${SRC}/trace.hh
-    ${SRC}/thread_map.hh
     ${SRC}/thread_map.cc
-    ${SRC}/fd_map.hh
     ${SRC}/fd_map.cc
-    ${SRC}/concurrent_map.hh
     ${SRC}/concurrent_map.cc
     ${SRC}/profile_writer.cc
-    ${SRC}/profile_writer.hh
     ${SRC}/blocking_ring_buffer.cc
-    ${SRC}/blocking_ring_buffer.hh
-    ${SRC}/config.hh
     ${SRC}/config.cc
-    ${SRC}/scheduler.hh
     ${SRC}/scheduler.cc
-    ${SRC}/util.hh
-    ${SRC}/perf_ctx_jni.hh
-    ${SRC}/perf_ctx.hh
     ${SRC}/perf_ctx.cc
-    ${SRC}/prob_pct.hh
     ${SRC}/prob_pct.cc
-    ${SRC}/metric_formatter.hh
-    ${SRC}/metric_formatter.cc
-    ${SRC}/unique_readsafe_ptr.hh)
+    ${SRC}/metric_formatter.cc)
 
 set(PRELOAD_SOURCE_FILES
     ${SRC_PRELOAD}/preload.c)
@@ -170,11 +142,9 @@ set(TEST_BASE_FILES
     ${SRC_TEST}/test.cc)
     
 set(TEST_FILES
-    ${SRC_TEST}/fixtures.hh
     ${SRC_TEST}/test_circular_queue.cc
     ${SRC_TEST}/test_cpu_sampling_profile_serialization.cc
     ${SRC_TEST}/test_config.cc
-    ${SRC_TEST}/test.hh
     ${SRC_TEST}/test_checksum.cc
     ${SRC_TEST}/test_maps.cc
     ${SRC_TEST}/test_scheduler.cc
@@ -185,17 +155,16 @@ set(TEST_FILES
     ${SRC_TEST}/test_syslog_tsdb_metric_formatter.cc
     ${SRC_TEST}/test_unique_readsafe_ptr.cc
     ${SRC_TEST}/test_site_resolver.cc
+    ${SRC_TEST}/test_processor.cc
     ${SRC_TEST}/test.cc)
 
 set(TEST_UTIL_FILES
-    ${SRC_TEST}/test_helpers.hh
     ${SRC_TEST}/test_helpers.cc)
 
 set(SYMINFO_TEST_EXT_FILES
     ${SRC_TEST}/syminfo_test_ext.cc)
 
 set(TEST_JNI_FILES
-    ${SRC_TEST}/test_jni.hh
     ${SRC_TEST}/test_jni.cc)
 
 ##########################################################
@@ -238,7 +207,7 @@ if (${VERBOSE_LOGS} MATCHES "y")
   set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} -DSPDLOG_TRACE_ON -DSPDLOG_DEBUG_ON")
 endif()
 # to enable tracing add: -DENABLE_TRACING
-set(CMAKE_CXX_FLAGS "-I${INCLUDE_VENDOR_SPDLOG} -I${INCLUDE_VENDOR_CONCQUEUE} -I${PROTOBUF_INCLUDE_DIR} ${CMAKE_CXX_FLAGS} ${GLOBAL_WARNINGS} ${GLOBAL_COPTS} -pthread -std=c++0x -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS "-I${INCLUDE_VENDOR_SPDLOG} -I${INCLUDE_VENDOR_CONCQUEUE} -I${PROTOBUF_INCLUDE_DIR} ${CMAKE_CXX_FLAGS} ${GLOBAL_WARNINGS} ${GLOBAL_COPTS} -pthread -std=c++11 -fno-omit-frame-pointer")
 
 ##########################################################
 # Build
@@ -247,9 +216,9 @@ add_library(${BASE_OUTPUT} STATIC ${SOURCE_FILES})
 add_library(${AGENT_LIB} SHARED ${TI_SRC_FILES})
 
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD") 
-    target_link_libraries(${BASE_OUTPUT} proto ${PROTOBUF_LIBRARY} ${ZLIB_LDFLAGS} ${CURL_LDFLAGS} ${MEDIDA_LDFLAGS} ${ELF_LDFLAGS} ${UNWIND_LDFLAGS})
+    target_link_libraries(${BASE_OUTPUT} proto ${PROTOBUF_LIBRARY} ${ZLIB_LDFLAGS} ${CURL_LDFLAGS} ${MEDIDA_LDFLAGS} ${ELF_LDFLAGS} ${UNWIND_LDFLAGS} atomic)
 else()
-    target_link_libraries(${BASE_OUTPUT} proto ${PROTOBUF_LIBRARY} ${ZLIB_LDFLAGS} ${CURL_LDFLAGS} ${MEDIDA_LDFLAGS} ${ELF_LDFLAGS} ${UNWIND_LDFLAGS} dl)
+    target_link_libraries(${BASE_OUTPUT} proto ${PROTOBUF_LIBRARY} ${ZLIB_LDFLAGS} ${CURL_LDFLAGS} ${MEDIDA_LDFLAGS} ${ELF_LDFLAGS} ${UNWIND_LDFLAGS} dl atomic)
 endif()
 target_link_libraries(${AGENT_LIB} ${BASE_OUTPUT})
 add_library(${PRELOAD_LIB} SHARED ${PRELOAD_SOURCE_FILES})
@@ -278,3 +247,10 @@ install(TARGETS  ${AGENT_LIB}
 LIBRARY DESTINATION lib)
 install(TARGETS  ${PRELOAD_LIB}
 LIBRARY DESTINATION lib)
+
+if (${_FK_PROF_BENCHMARK} MATCHES "y")
+  find_package(benchmark REQUIRED)
+  set(BENCH_FILES ${SRC_TEST}/benchmarks.cc)
+  add_executable(fkp_benchmarks ${BENCH_FILES})
+  target_link_libraries(fkp_benchmarks benchmark ${BASE_OUTPUT} testbase)
+endif()

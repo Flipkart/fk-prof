@@ -26,7 +26,7 @@ bool CircularQueue<TraceType, InMsg>::acquire_write_slot(size_t& slot) {
             return false;
         }
         // TODO: have someone review the memory ordering constraints
-    } while (!input.compare_exchange_strong(currentInput, nextInput, std::memory_order_relaxed));
+    } while (!input.compare_exchange_weak(currentInput, nextInput, std::memory_order_relaxed));
 
     slot = currentInput;
     return true;
@@ -74,6 +74,14 @@ bool CircularQueue<TraceType, InMsg>::pop() {
 
 template <typename TraceType, typename InMsg> size_t CircularQueue<TraceType, InMsg>::advance(size_t index) const {
     return (index + 1) % Capacity;
+}
+
+template<typename TraceType, typename InMsg>
+size_t CircularQueue<TraceType, InMsg>::size() {
+    auto current_input = input.load(std::memory_order_relaxed);
+    auto current_output = output.load(std::memory_order_relaxed);
+    return current_input < current_output ?
+            (current_input + Capacity - current_output) : current_input - current_output;
 }
 
 // cpu sampling
@@ -166,3 +174,5 @@ void iotrace::Queue::write(iotrace::Sample& entry, StackFrame* fb, const iotrace
     entry.trace.type = BacktraceType::Java;
     entry.trace.error = in_msg.frame_count < 0 ? BacktraceError::Fkp_getstacktrace_error : BacktraceError::Fkp_no_error;  
 }
+
+template class CircularQueue<iotrace::Sample, iotrace::InMsg>;

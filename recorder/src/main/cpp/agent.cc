@@ -212,7 +212,7 @@ void JNICALL OnNativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread th
 volatile bool main_started = false;
 
 void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread) {
-    SPDLOG_TRACE(logger, "Some thraed started");
+    SPDLOG_TRACE(logger, "Some thread started");
     jvmtiThreadInfo thread_info;
     int error = jvmti_env->GetThreadInfo(thread, &thread_info);
     if (error == JNI_OK) {
@@ -357,16 +357,6 @@ AGENTEXPORT void JNICALL Agent_OnUnload(JavaVM *vm) {
     delete formatter;
     delete CONFIGURATION;
 }
-
-//extern "C" JNIEXPORT void JNICALL Java_fk_prof_InstrumentationStub_fsMethodExit(JNIEnv* env, jclass _, jlong elapsed, jint fd, jstring filename) {
-//    std::int32_t n_fd = static_cast<std::int32_t>(fd);
-//    std::int64_t  n_elapsed = static_cast<std::int64_t>(elapsed);
-//    std::unique_ptr<const char, std::function<void(const char*)>>
-//            n_filename(env->GetStringUTFChars(filename, nullptr),
-//                     [&](const char* str) { if (str != nullptr) env->ReleaseStringUTFChars(filename, str); });
-//    logger->info("Death to Republic: {}, {}, {}", n_fd, n_elapsed, n_filename.get());
-//}
-
 
 ThreadMap& get_thread_map() {
     return thread_map;

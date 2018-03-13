@@ -58,29 +58,21 @@ public class IOTracer {
         private native void _accept(int fd, String address, long ts, long elapsed);
 
         public void accept(FileDescriptor fd, String address, long elapsed) {
-            if (elapsed >= latencyThreshold) {
-                _accept(toFd(fd), address, System.currentTimeMillis(), elapsed);
-            }
+            _accept(toFd(fd), address, System.currentTimeMillis(), elapsed);
         }
 
         public void accept(int fd, String address, long elapsed) {
-            if (elapsed >= latencyThreshold) {
-                _accept(fd, address, System.currentTimeMillis(), elapsed);
-            }
+            _accept(fd, address, System.currentTimeMillis(), elapsed);
         }
 
         private native void _connect(int fd, String address, long ts, long elapsed);
 
         public void connect(FileDescriptor fd, String address, long elapsed) {
-            if (elapsed >= latencyThreshold) {
-                _connect(toFd(fd), address, System.currentTimeMillis(), elapsed);
-            }
+            _connect(toFd(fd), address, System.currentTimeMillis(), elapsed);
         }
 
         public void connect(int fd, String address, long elapsed) {
-            if (elapsed >= latencyThreshold) {
-                _connect(fd, address, System.currentTimeMillis(), elapsed);
-            }
+            _connect(fd, address, System.currentTimeMillis(), elapsed);
         }
 
         private native void _read(int fd, long count, long ts, long elapsed, boolean timeout);
@@ -105,9 +97,7 @@ public class IOTracer {
         private native void _open(int fd, String path, long ts, long elapsed);
 
         public void open(FileDescriptor fd, String path, long elapsed) {
-            if (elapsed >= latencyThreshold) {
-                _open(toFd(fd), path, System.currentTimeMillis(), elapsed);
-            }
+            _open(toFd(fd), path, System.currentTimeMillis(), elapsed);
         }
 
         private native void _read(int fd, long count, long ts, long elapsed);

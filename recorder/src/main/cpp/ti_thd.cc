@@ -59,7 +59,7 @@ struct ThreadTargetProc {
     void await_stop() {
         std::unique_lock<std::mutex> l(m);
         if (state != State::stopped) {
-            logger->trace("Will now wait for thread '{}' to be stopped, state as of now: {}", name, state);
+            logger->trace("Will now wait for thread '{}' to be stopped, state as of now: {}", name, static_cast<std::uint32_t>(state));
             v.wait(l, [&] { return state == State::stopped; });
         }
     }
@@ -129,8 +129,14 @@ ThdProcP start_new_thd(JNIEnv *env, jvmtiEnv *jvmti, const char* thd_name, jvmti
 }
 
 void await_thd_death(ThdProcP ttp) {
-    auto name = ttp->name.c_str();
-    logger->info("Awaiting death of thread named '{}'", name);
-    ttp->await_stop();
-    logger->info("Thread named '{}' reaped", name);
+    if(ttp != nullptr) {
+        auto name = ttp->name.c_str();
+        logger->info("Awaiting death of thread named '{}'", name);
+        ttp->await_stop();
+        logger->info("Thread named '{}' reaped", name);
+    }
+    else {
+        // possible during testing
+        logger->warn("stop called on null ThdProc");
+    }
 }

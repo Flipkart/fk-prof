@@ -24,7 +24,6 @@
 #include "blocking_ring_buffer.hh"
 #include "ti_thd.hh"
 
-#define MAX_DATA_SIZE 100
 #define PROCESSOR_ITVL_FACTOR 2
 
 class Controller {
@@ -66,7 +65,7 @@ private:
     WRes current_work_result;
     Time::Pt work_start, work_end;
 
-    SerializationFlushThresholds sft;
+    FlushCtr sft;
     TruncationThresholds tts;
 
     std::string vm_id;
@@ -111,7 +110,13 @@ private:
     void issue(const recording::IOTraceWork& csw, Processes& processes, JNIEnv* env);
     void retire(const recording::IOTraceWork& csw);
     
-    static std::uint32_t sampling_freq_to_itvl(std::uint32_t sampling_freq);
+    void reset_flush_ctr() {
+        sft = std::numeric_limits<decltype(sft)>::max();
+    }
+    
+    void update_flush_ctr(FlushCtr ctr) {
+        sft = std::min(sft, ctr);
+    }
 };
 
 #endif

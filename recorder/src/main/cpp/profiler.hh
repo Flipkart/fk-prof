@@ -34,6 +34,8 @@ public:
     void run() override;
 
     void handle(int signum, siginfo_t *info, void *context);
+    
+    Time::msec run_itvl() override;
 
     ~Profiler();
 
@@ -75,8 +77,6 @@ private:
     SiteResolver::SymInfo si;
 
     void set_sampling_freq(std::uint32_t sampling_freq);
-
-    void set_max_stack_depth(std::uint32_t max_stack_depth);
 
     void configure();
 

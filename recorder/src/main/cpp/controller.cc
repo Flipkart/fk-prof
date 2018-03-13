@@ -1,6 +1,6 @@
-#include "controller.hh"
 #include <chrono>
 #include <curl/curl.h>
+#include "controller.hh"
 #include "buff.hh"
 #include "blocking_ring_buffer.hh"
 #include "io_tracer.hh"
@@ -26,6 +26,11 @@ std::string load_vm_id(jvmtiEnv* env) {
     write_system_prop(env, "java.vm.info", ss);
     write_system_prop(env, "java.vm.vendor", ss);
     return ss.str();
+}
+
+bool bci_agent_loaded_without_fail() {
+    IOTracerJavaState& state = getIOTracerJavaState();
+    return state.isBciAgentLoaded() && (state.getBciFailedCount() == 0);
 }
 
 Controller::Controller(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap& _thread_map, ConfigurationOptions& _cfg) :
@@ -63,7 +68,7 @@ void Controller::stop() {
             //  We can either schedule something or we'd need additional stop-control in scheduler.
             //  This hack (in a good way) simplifies scheduler.
             keep_running.store(false, std::memory_order_relaxed);
-        });
+        }, "Stop Controller Task");
     await_thd_death(thd_proc);
     thd_proc.reset();
 }
@@ -111,6 +116,8 @@ static void populate_recorder_info(recording::RecorderInfo& ri, const Configurat
 
     auto c = ri.mutable_capabilities();
     c->set_can_cpu_sample(cfg.allow_sigprof);
+    c->set_can_instrument_java(true);
+    c->set_can_trace_io(bci_agent_loaded_without_fail());
 }
 
 static void populate_issued_work_status(recording::WorkResponse& w_res, std::uint64_t work_id, recording::WorkResponse::WorkState state, recording::WorkResponse::WorkResult result, Time::Pt& start_tm, Time::Pt& end_tm) {
@@ -214,7 +221,7 @@ void Controller::run() {
     curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, read_from_curl_response);
     curl_easy_setopt(curl.get(), CURLOPT_TIMEOUT, cfg.rpc_timeout);
 
-    std::function<void()> poll_cb, assoc_cb;
+    Scheduler::Task poll_cb, assoc_cb;
 
     // setup things necessary for POLL
     std::string poll_url, poll_host;
@@ -222,7 +229,7 @@ void Controller::run() {
     auto poll_backoff_seconds = cfg.backoff_start;
     auto poll_retries_used = 0;
     std::uint64_t poll_tick = 0;
-    poll_cb = [&]() {
+    poll_cb = Scheduler::Task{.callback = [&]() {
         recording::PollReq p_req;
         populate_recorder_info(*p_req.mutable_recorder_info(), cfg, vm_id, start_time, poll_tick);
 
@@ -253,17 +260,17 @@ void Controller::run() {
                 logger->error("COMM failed too many times, giving up on the associate: {}", poll_url);
                 poll_retries_used = 0;
                 poll_backoff_seconds = cfg.backoff_start;
-                scheduler.schedule(Time::now(), assoc_cb);
+                scheduler.schedule(Time::now(), assoc_cb, "Get Associated Backend");
                 return;
             }
             next_tick += Time::sec(backoff(poll_backoff_seconds, cfg.backoff_multiplier, cfg.backoff_max));
         }
         scheduler.schedule(next_tick, poll_cb);
-    };
+    }, .description = "Poll Backend For Work"};
 
     // setup things necessary for discovering ASSOCIATE
     auto assoc_backoff_seconds = cfg.backoff_start;
-    assoc_cb = [&] {
+    assoc_cb = Scheduler::Task{.callback = [&] {
         recording::RecorderInfo ri;
         populate_recorder_info(ri, cfg, vm_id, start_time, 0);
         auto serialized_size = ri.ByteSize();
@@ -288,7 +295,7 @@ void Controller::run() {
             auto next_attempt = Time::now() + Time::sec(backoff(assoc_backoff_seconds, cfg.backoff_multiplier, cfg.backoff_max));
             scheduler.schedule(next_attempt, assoc_cb);
         }
-    };
+    }, .description = "Get Associated Backend"};
 
     // discover associate (it'll setup poll post discovery)
     scheduler.schedule(Time::now(), assoc_cb);
@@ -421,7 +428,7 @@ public:
         await_thd_death(thd_proc);
     }
 
-    void write_unbuffered(const std::uint8_t* data, std::uint32_t sz, std::uint32_t offset) {
+    void write_unbuffered(const std::uint8_t* data, std::uint32_t sz, std::uint32_t offset) override {
         ring.write(data, offset, sz);
     }
 
@@ -472,16 +479,6 @@ void populate_recording_header(recording::RecordingHeader& rh, const recording::
     *wa = w;
 }
 
-std::uint32_t Controller::sampling_freq_to_itvl(std::uint32_t sampling_freq) {
-    auto mean_sampling_itvl_us = 1000000 / sampling_freq;
-    auto itvl_10_pct_us = mean_sampling_itvl_us / 10;
-    auto min_itvl_us = mean_sampling_itvl_us - itvl_10_pct_us;
-
-    auto itvl_ms = Size * min_itvl_us / 1000 / PROCESSOR_ITVL_FACTOR;
-
-    return itvl_ms;
-}
-
 void Controller::issue_work(const std::string& host, const std::uint32_t port, std::uint32_t controller_id, std::uint32_t controller_version) {
     auto at = Time::now() + Time::sec(current_work.delay());
     scheduler.schedule(at, [&, port, controller_id, controller_version]() {
@@ -491,16 +488,14 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                         raw_writer_ring.readonly(); //because now there is no point in reading/writing anything anyway, this prevents some races:
                         // 1. Where processor wants to write more but raw-writer can't read any more
                         // 2. When user shuts down the JVM while profile is being recorded
+                        
                         scheduler.schedule(Time::now(), [&] {
                                 wres = recording::WorkResponse::failure;
                                 retire_work(work_id);
-                            });
+                            }, Util::to_s("Cancel Ongoing Work: ", work_id));
                     };
 
                     if (w.work_size() > 0) {//something actually needs to be done
-
-                        // TODO: important! right now CpuSampleProcess calculates the itvl from sampling freq. Refactor that calculation to a common place.
-                        auto sampling_freq = w.work(0).cpu_sample().frequency();
 
                         std::uint32_t tx_timeout = cfg.slow_tx_tolerance * w.duration();
                         std::shared_ptr<HttpRawProfileWriter> raw_writer(new HttpRawProfileWriter(jvm, jvmti, host, port, raw_writer_ring, cancel_work, tx_timeout));
@@ -523,10 +518,7 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                             issue(work, processes, env);
                         }
 
-                        auto processor_interval = sampling_freq_to_itvl(sampling_freq);
-                        logger->warn("Processor is using processor-interval value: {}", processor_interval);
-
-                        processor.reset(new Processor(jvmti, std::move(processes), processor_interval));
+                        processor.reset(new Processor(jvmti, std::move(processes)));
                         processor->start(env);
                     }
 
@@ -534,11 +526,11 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                     auto stop_at = start_tm + Time::sec(w.duration());
                     scheduler.schedule(stop_at, [&, work_id]() {
                             retire_work(work_id);
-                        });
+                        }, Util::to_s("Retiring Work: ", work_id));
                     logger->info("Issuing work-id {} (sz: {}), it is slated for retire in {} seconds", w.work_id(), w.work_size(), w.duration());
                     wst = recording::WorkResponse::running;
                 });
-        });
+        }, "Issue Work");
 }
 
 void Controller::retire_work(const std::uint64_t work_id) {
@@ -669,12 +661,11 @@ void Controller::retire(const recording::Work& work) {
 
 bool Controller::capable(const recording::CpuSampleWork& csw) {
     bool capable = cfg.allow_sigprof;
-    if (! capable) logger->warn("Not capable of cpu-sampling work");
     return capable;
 }
 
 void Controller::prep(const recording::CpuSampleWork& csw) {
-    sft.cpu_samples = csw.serialization_flush_threshold();
+    update_flush_ctr(csw.serialization_flush_threshold());
     tts.cpu_samples_max_stack_sz = Profiler::calculate_max_stack_depth(csw.max_frames());
 }
 
@@ -684,18 +675,27 @@ class ProcessWrapper : public Process {
     bool available;
 
 public:
-    ProcessWrapper(UniqueReadsafePtr<T>& ptr) : p(ptr) {
+    ProcessWrapper(UniqueReadsafePtr<T> &ptr) : p(ptr) {
         available = p.available();
     }
 
-    virtual ~ProcessWrapper() {}
-
-    void run() {
-        if (available) p->run();
+    virtual ~ProcessWrapper() {
     }
 
-    void stop() {
-        if (available) p->stop();
+    void run() override {
+        if (available)
+            p->run();
+    }
+
+    void stop() override {
+        if (available)
+            p->stop();
+    }
+
+    Time::msec run_itvl() override {
+        if (available)
+            return p->run_itvl();
+        return Process::run_itvl_ignore;
     }
 };
 
@@ -714,23 +714,22 @@ void Controller::retire(const recording::CpuSampleWork& csw) {
     GlobalCtx::recording.cpu_profiler.reset();
 }
 
-bool Controller::capable(const recording::IOTraceWork& csw) {
-    IOTracerJavaState& state = getIOTracerJavaState();
-    return state.isBciAgentLoaded() && (state.getBciFailedCount() == 0);
+bool Controller::capable(const recording::IOTraceWork& w) {
+    return bci_agent_loaded_without_fail();
 }
 
-void Controller::prep(const recording::IOTraceWork& csw) {
-    sft.io_trace_evts = csw.serialization_flush_threshold();
-    tts.io_trace_max_stack_sz = Profiler::calculate_max_stack_depth(csw.max_frames());
+void Controller::prep(const recording::IOTraceWork& w) {
+    update_flush_ctr(w.serialization_flush_threshold());
+    tts.io_trace_max_stack_sz = Profiler::calculate_max_stack_depth(w.max_frames());
 }
 
-void Controller::issue(const recording::IOTraceWork& csw, Processes& processes, JNIEnv* env) {
-    std::uint64_t latency_threshold = csw.latency_threshold_ms() * NANOS_IN_MILLIS;
+void Controller::issue(const recording::IOTraceWork& w, Processes& processes, JNIEnv* env) {
+    std::uint64_t latency_threshold = w.latency_threshold_ms() * NANOS_IN_MILLIS;
     
-    logger->info("Starting io-tracing with threashold {} ms and for upto {} frames", csw.latency_threshold_ms(), tts.io_trace_max_stack_sz);
+    logger->info("Starting io-tracing with threashold {} ms and for upto {} frames", w.latency_threshold_ms(), tts.io_trace_max_stack_sz);
     
     // process instance
-    GlobalCtx::recording.io_tracer.reset(new IOTracer(jvm, jvmti, thread_map, getFdMap(), *serializer, latency_threshold, tts.io_trace_max_stack_sz));
+    GlobalCtx::recording.io_tracer.reset(new IOTracer(jvm, jvmti, thread_map, getFdMap(), processor, *serializer, latency_threshold, tts.io_trace_max_stack_sz));
 
     ReadsafePtr<IOTracer> p(GlobalCtx::recording.io_tracer);
 
