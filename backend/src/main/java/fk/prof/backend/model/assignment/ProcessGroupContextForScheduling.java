@@ -1,13 +1,14 @@
 package fk.prof.backend.model.assignment;
 
-
 import fk.prof.idl.Entities;
 import fk.prof.idl.WorkEntities;
 
 import java.util.Set;
 
 public interface ProcessGroupContextForScheduling {
+
   Entities.ProcessGroup getProcessGroup();
+
   void updateWorkAssignmentSchedule(WorkAssignmentSchedule workAssignmentSchedule);
 
   /**

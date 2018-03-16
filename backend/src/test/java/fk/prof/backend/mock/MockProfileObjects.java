@@ -185,7 +185,7 @@ public class MockProfileObjects {
     Set<Integer> newFDIds = Sets.difference(currentFDIds, prevFDIds);
     return newFDIds.stream()
         .map(fId -> Recording.FDInfo.newBuilder()
-            .setId(fId).setFd(fId)
+            .setId(fId)
             .setFdType(fId % 2 == 0 ? Recording.FDType.file : Recording.FDType.socket)
             .setFileInfo(fId % 2 == 0 ? Recording.FileInfo.newBuilder().setFilename("/hello_world.txt").setFlags("").build() : null)
             .setSocketInfo(fId % 2 != 0 ? Recording.SocketInfo.newBuilder().setAddress("http://hello.world").setConnect(true).build() : null)

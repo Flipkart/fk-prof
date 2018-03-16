@@ -1,6 +1,5 @@
 package fk.prof.backend.model.slot;
 
-import fk.prof.idl.Backend;
 import fk.prof.idl.Profile;
 import fk.prof.idl.WorkEntities;
 

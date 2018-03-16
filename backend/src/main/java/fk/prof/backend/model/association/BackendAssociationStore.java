@@ -7,10 +7,15 @@ import fk.prof.idl.Recorder;
 import io.vertx.core.Future;
 
 public interface BackendAssociationStore {
+
   Future<Entities.ProcessGroups> reportBackendLoad(Backend.LoadReportRequest payload);
+
   Future<Recorder.AssignedBackend> associateAndGetBackend(Entities.ProcessGroup processGroup);
+
   Recorder.AssignedBackend getAssociatedBackend(Entities.ProcessGroup processGroup);
+
   Backend.BackendAssociations getAssociations();
+
   Recorder.AssignedBackend removeAssociation(Entities.ProcessGroup processGroup) throws BackendAssociationException;
 
   /**

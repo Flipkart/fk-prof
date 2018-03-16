@@ -1,12 +1,10 @@
 package fk.prof.backend.util.proto;
 
-import fk.prof.idl.Backend;
 import fk.prof.idl.PolicyEntities;
 import fk.prof.idl.Profile;
 import fk.prof.idl.WorkEntities;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Utility methods for policy proto
@@ -14,7 +12,7 @@ import java.util.stream.Collectors;
  */
 public class PolicyEntitiesProtoUtil {
   private static String policyDetailsCompactRepr(PolicyEntities.PolicyDetails policyDetails) {
-    return String.format("modAt=%s,creatAt=%s,creatBy=%s,policy={%s}", policyDetails.getModifiedAt(), policyDetails.getCreatedAt(), policyDetails.getModifiedBy(), policyCompactRepr(policyDetails.getPolicy()));
+    return String.format("modAt=%s,createAt=%s,createBy=%s,policy={%s}", policyDetails.getModifiedAt(), policyDetails.getCreatedAt(), policyDetails.getModifiedBy(), policyCompactRepr(policyDetails.getPolicy()));
   }
 
   private static String policyCompactRepr(PolicyEntities.Policy policy) {

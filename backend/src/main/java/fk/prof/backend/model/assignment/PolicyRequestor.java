@@ -1,7 +1,6 @@
 package fk.prof.backend.model.assignment;
 
 import com.codahale.metrics.Meter;
-import fk.prof.idl.Backend;
 import fk.prof.idl.Entities;
 import fk.prof.idl.Profile;
 import io.vertx.core.Future;
