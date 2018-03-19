@@ -1,6 +1,5 @@
 package fk.prof.aggregation.model;
 
-import fk.prof.aggregation.serialize.SerializationException;
 import fk.prof.aggregation.serialize.Serializer;
 import fk.prof.idl.Profile;
 import fk.prof.idl.WorkEntities;
@@ -10,9 +9,9 @@ import java.io.OutputStream;
 import java.util.zip.Adler32;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.Checksum;
-import java.util.zip.GZIPOutputStream;
 
 /**
+ * Serializes the profiling data captured during an aggregation window.
  * @author gaurav.ashok
  */
 public class AggregationWindowSerializer implements Serializer {
@@ -61,12 +60,14 @@ public class AggregationWindowSerializer implements Serializer {
         switch (workType) {
             case cpu_sample_work:
                 new CpuSamplingAggregatedSamplesSerializer(STACKTRACETREE_SERIAL_BATCHSIZE,
-                    (FinalizedCpuSamplingAggregationBucket)aggregation.workSpecificBuckets.get(WorkEntities.WorkType.cpu_sample_work), traceNames)
+                    (FinalizedCpuSamplingAggregationBucket)
+                            aggregation.workSpecificBuckets.get(WorkEntities.WorkType.cpu_sample_work), traceNames)
                     .serialize(out);
                 break;
             case io_trace_work:
                 new IOTracingAggregatedSamplesSerializer(STACKTRACETREE_SERIAL_BATCHSIZE,
-                    (FinalizedIOTracingAggregationBucket) aggregation.workSpecificBuckets.get(WorkEntities.WorkType.io_trace_work), traceNames)
+                    (FinalizedIOTracingAggregationBucket)
+                            aggregation.workSpecificBuckets.get(WorkEntities.WorkType.io_trace_work), traceNames)
                     .serialize(out);
         }
     }

@@ -5,9 +5,7 @@ import fk.prof.idl.Recording;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 public class IOTracingFrameNodeTest {
@@ -44,6 +42,6 @@ public class IOTracingFrameNodeTest {
         .setFdIdx(2).setTraceType(Recording.IOTraceType.file_write)
         .setSamples(1).setLatency95(20).setLatency99(20)
         .setMean(20).setBytes(200).setDropped(false).build());
-    Assert.assertEquals(props, new HashSet<Profile.IOTracingNodeProps>(fn.getIoTracingPropsList()));
+    Assert.assertEquals(props, new HashSet<>(fn.getIoTracingPropsList()));
   }
 }

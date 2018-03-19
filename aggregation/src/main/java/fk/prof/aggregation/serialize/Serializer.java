@@ -2,11 +2,9 @@ package fk.prof.aggregation.serialize;
 
 import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.CodedOutputStream;
-import com.google.protobuf.Message;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.zip.Adler32;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.Checksum;
 

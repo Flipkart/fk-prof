@@ -9,7 +9,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class IOTracingFrameNode extends StacktraceFrameNode<IOTracingFrameNode> {
@@ -17,7 +16,7 @@ public class IOTracingFrameNode extends StacktraceFrameNode<IOTracingFrameNode> 
   private final int lineNumber;
   private final List<IOTracingFrameNode> children = new ArrayList<>();
 
-  private Map<Recording.IOTraceType, Map<Integer, IOTracingProps>> props = new ConcurrentHashMap<>(Recording.IOTraceType.values().length * 2);
+  private Map<Recording.IOTraceType, Map<Integer, IOTracingProps>> props;
 
   public IOTracingFrameNode(int methodId, int lineNumber) {
     this.methodId = methodId;
@@ -48,6 +47,9 @@ public class IOTracingFrameNode extends StacktraceFrameNode<IOTracingFrameNode> 
   }
 
   public boolean addTrace(int fdIdx, Recording.IOTraceType traceType, long latency, int bytes, boolean timeout) {
+    if(props == null) {
+      props = new ConcurrentHashMap<>(Recording.IOTraceType.values().length * 2);
+    }
     props.putIfAbsent(traceType, new ConcurrentHashMap<>());
     props.get(traceType).putIfAbsent(fdIdx, new IOTracingProps(fdIdx, traceType));
     return props.get(traceType).get(fdIdx).addSample(latency, bytes, timeout);

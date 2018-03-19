@@ -8,12 +8,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class IOTracingProps {
-  private final static Logger logger = LoggerFactory.getLogger(IOTracingProps.class);
-
   public final static int MAX_SAMPLES = 1500;
 
   private final int fdIdx;
@@ -71,6 +67,7 @@ public class IOTracingProps {
   }
 
   protected Profile.IOTracingNodeProps buildProto() {
+    Collections.sort(latencies);
     return Profile.IOTracingNodeProps.newBuilder()
         .setFdIdx(fdIdx)
         .setTraceType(traceType)
@@ -78,8 +75,8 @@ public class IOTracingProps {
         .setDropped(samples.get() > MAX_SAMPLES)
         .setBytes(bytesSum.get())
         .setMean((float)latencySum.get() / samples.get())
-        .setLatency95((float)quantile(95.0, latencies))
-        .setLatency99((float)quantile(99.0, latencies))
+        .setLatency95((float)quantile(0.95, latencies))
+        .setLatency99((float)quantile(0.99, latencies))
         .build();
   }
 
@@ -101,5 +98,4 @@ public class IOTracingProps {
       return values.get(intIndex + 1) * (index - intIndex) + values.get(intIndex) * (intIndex + 1 - index);
     }
   }
-
 }
