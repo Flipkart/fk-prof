@@ -111,6 +111,8 @@ public class ProfileWorkInfo extends FinalizableBuilder<FinalizedProfileWorkInfo
     switch(wse.getWType()) {
       case cpu_sample_work:
         return wse.getCpuSampleEntry().getStackSampleCount();
+      case io_trace_work:
+        return wse.getIoTraceEntry().getTracesCount();
       default:
         throw new AggregationFailure(String.format("Not supported worktype=%s for fetching sample count", wse.getWType()));
     }

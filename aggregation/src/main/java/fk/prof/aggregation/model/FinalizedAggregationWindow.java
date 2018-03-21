@@ -82,7 +82,7 @@ public class FinalizedAggregationWindow {
         && this.procId.equals(other.procId)
         && this.start.equals(other.start)
         && this.durationInSecs == other.durationInSecs
-        && this.endedAt == null ? other.endedAt == null : this.endedAt.equals(other.endedAt)
+        && (this.endedAt == null ? other.endedAt == null : this.endedAt.equals(other.endedAt))
         && this.workInfoLookup.equals(other.workInfoLookup)
         && this.policy.equals(other.policy)
         && this.workSpecificBuckets.equals(other.workSpecificBuckets);

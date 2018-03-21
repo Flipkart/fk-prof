@@ -52,9 +52,8 @@ public class IOTracingAggregationBucket extends WorkSpecificAggregationBucket<Fi
               currentNode = currentNode.getOrAddChild(methodId, frame.getLineNo());
               //The first frame is the on-cpu frame so incrementing on-cpu samples count
               if (i == 0) {
-                int bytes = ioTrace.getRead() != null ? ioTrace.getRead().getCount() : 0;
-                bytes = ioTrace.getWrite() != null ? ioTrace.getWrite().getCount() : bytes;
-                boolean timeout = ioTrace.getRead() != null && ioTrace.getRead().getTimeout();
+                int bytes = ioTrace.hasRead() ? ioTrace.getRead().getCount() : ioTrace.getWrite().getCount();
+                boolean timeout = ioTrace.hasRead() && ioTrace.getRead().getTimeout();
                 currentNode.addTrace(ioTrace.getFdId(), ioTrace.getType(), ioTrace.getLatencyNs(), bytes, timeout);
               }
             }

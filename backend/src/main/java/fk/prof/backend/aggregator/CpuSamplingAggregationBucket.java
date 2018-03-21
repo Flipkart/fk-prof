@@ -1,7 +1,6 @@
 package fk.prof.backend.aggregator;
 
 import com.codahale.metrics.Meter;
-import fk.prof.aggregation.FinalizableBuilder;
 import fk.prof.aggregation.model.*;
 import fk.prof.backend.exception.AggregationFailure;
 import fk.prof.backend.model.profile.RecordedProfileIndexes;

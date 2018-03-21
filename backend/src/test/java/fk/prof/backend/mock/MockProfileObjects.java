@@ -3,55 +3,104 @@ package fk.prof.backend.mock;
 import com.google.common.collect.Sets;
 import fk.prof.idl.Recording;
 import fk.prof.idl.WorkEntities;
+import fk.prof.idl.WorkEntities.WorkType;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static fk.prof.idl.WorkEntities.WorkType.*;
+
 public class MockProfileObjects {
+
+  public static Set<WorkType> wType_cpu = new HashSet<>(Arrays.asList(cpu_sample_work));
+  public static Set<WorkType> wType_all = new HashSet<>(Arrays.asList(cpu_sample_work, io_trace_work));
+
   public static Recording.RecordingHeader getRecordingHeader(long workId) {
-    return getRecordingHeader(workId, 1);
+    return getRecordingHeader(workId, wType_cpu);
+  }
+
+  public static Recording.RecordingHeader getRecordingHeader(long workId, Set<WorkType> workTypes) {
+    return getRecordingHeader(workId, 1, workTypes);
   }
 
   public static Recording.RecordingHeader getRecordingHeader(long workId, int recorderVersion) {
-    WorkEntities.WorkAssignment workAssignment = WorkEntities.WorkAssignment.newBuilder()
-        .addWork(
-            WorkEntities.Work.newBuilder()
-                .setWType(WorkEntities.WorkType.cpu_sample_work)
-                .setCpuSample(WorkEntities.CpuSampleWork.newBuilder()
-                    .setFrequency(100)
-                    .setMaxFrames(64)
-                )
-        )
-        .addWork(
-            WorkEntities.Work.newBuilder()
-                .setWType(WorkEntities.WorkType.io_trace_work)
-                .setIoTrace(WorkEntities.IOTraceWork.newBuilder()
-                    .setLatencyThresholdMs(100)
-                    .setMaxFrames(64)
-                )
-        )
+    return getRecordingHeader(workId, recorderVersion, wType_cpu);
+  }
+
+  public static Recording.RecordingHeader getRecordingHeader(long workId, int recorderVersion, Set<WorkType> workTypes) {
+    WorkEntities.WorkAssignment.Builder workAssignmentBuilder = WorkEntities.WorkAssignment.newBuilder()
         .setWorkId(workId)
         .setIssueTime(LocalDateTime.now().toString())
         .setDelay(180)
         .setDuration(60)
-        .setDescription("Test Work")
-        .build();
+        .setDescription("Test Work");
+
+    for(WorkType wt: workTypes) {
+      switch (wt) {
+        case cpu_sample_work:
+          workAssignmentBuilder.addWork(WorkEntities.Work.newBuilder()
+                  .setWType(cpu_sample_work)
+                  .setCpuSample(WorkEntities.CpuSampleWork.newBuilder()
+                          .setFrequency(100)
+                          .setMaxFrames(64)
+                  )
+          );
+          break;
+        case io_trace_work:
+          workAssignmentBuilder.addWork(WorkEntities.Work.newBuilder()
+                  .setWType(io_trace_work)
+                  .setIoTrace(WorkEntities.IOTraceWork.newBuilder()
+                          .setLatencyThresholdMs(100)
+                          .setMaxFrames(64)
+                  )
+          );
+          break;
+        default:
+          throw new IllegalArgumentException("suppror for wType: " + wt.name() + "not added");
+      }
+    }
+
     Recording.RecordingHeader recordingHeader = Recording.RecordingHeader.newBuilder()
         .setRecorderVersion(recorderVersion)
         .setControllerVersion(2)
         .setControllerId(3)
-        .setWorkAssignment(workAssignment)
+        .setWorkAssignment(workAssignmentBuilder.build())
         .build();
 
     return recordingHeader;
   }
 
   public static List<Recording.StackSample> getPredefinedStackSamples(int traceId) {
-    Recording.StackSample stackSample1 = getMockStackSample(1, new char[]{'D', 'C', 'D', 'C', 'Y'});
-    Recording.StackSample stackSample2 = getMockStackSample(1, new char[]{'D', 'C', 'E', 'D', 'C', 'Y'});
-    Recording.StackSample stackSample3 = getMockStackSample(1, new char[]{'C', 'F', 'E', 'D', 'C', 'Y'});
+    Recording.StackSample stackSample1 = getMockStackSample(traceId, new char[]{'D', 'C', 'D', 'C', 'Y'});
+    Recording.StackSample stackSample2 = getMockStackSample(traceId, new char[]{'D', 'C', 'E', 'D', 'C', 'Y'});
+    Recording.StackSample stackSample3 = getMockStackSample(traceId, new char[]{'C', 'F', 'E', 'D', 'C', 'Y'});
     return Arrays.asList(stackSample1, stackSample2, stackSample3);
+  }
+
+  public static List<Recording.IOTrace> getPredefinedIOTraces(int traceId) {
+    return Arrays.asList(
+        buildIOTraceProto(10, 1000, true, getMockStackSample(traceId, new char[]{'A', 'B', 'D'})),
+        buildIOTraceProto(11, 1100, true, getMockStackSample(traceId, new char[]{'A', 'B', 'E', 'F'})),
+        buildIOTraceProto(10, 1000, false, getMockStackSample(traceId, new char[]{'A', 'B', 'E'})),
+        buildIOTraceProto(11, 1100, false, getMockStackSample(traceId, new char[]{'A', 'B', 'E', 'E'}))
+    );
+  }
+
+  public static Recording.IOTrace buildIOTraceProto(int fd, int count, boolean read, Recording.StackSample ss) {
+    Recording.IOTrace.Builder builder = Recording.IOTrace.newBuilder().setFdId(fd).setLatencyNs(1000).setTs(1000)
+        .setStack(ss);
+    if(read) {
+      builder
+          .setType(fd % 2 == 0 ? Recording.IOTraceType.file_read : Recording.IOTraceType.socket_read)
+          .setRead(Recording.FdRead.newBuilder().setCount(count).setTimeout(false).build());
+    }
+    else {
+      builder
+          .setType(fd % 2 == 0 ? Recording.IOTraceType.file_write : Recording.IOTraceType.socket_write)
+          .setWrite(Recording.FdWrite.newBuilder().setCount(count).build());
+    }
+    return builder.build();
   }
 
   //TODO: Keeping the logic around in case we want to generate random samples in high volume later
@@ -89,39 +138,87 @@ public class MockProfileObjects {
     return samples;
   }
 
-  public static Recording.RecordingChunk getMockChunkWithCpuWseAndStackSample(Recording.StackSampleWse currentStackSampleWse, Recording.StackSampleWse prevStackSampleWse) {
-    Recording.RecordingChunk.Builder chunkBuilder = Recording.RecordingChunk.newBuilder();
-    chunkBuilder.setIndexedData(
-        Recording.IndexedData.newBuilder()
-            .addAllMethodInfo(generateMethodIndex(currentStackSampleWse, prevStackSampleWse))
-            .addAllTraceCtx(generateTraceIndex(currentStackSampleWse, prevStackSampleWse))
-            .build())
-        .addWse(Recording.Wse.newBuilder()
-            .setWType(WorkEntities.WorkType.cpu_sample_work)
-            .setCpuSampleEntry(currentStackSampleWse)
-            .build());
-    return chunkBuilder.build();
+  public static List<Recording.RecordingChunk> getMockRecordingChunks(Map<WorkType, List> wses) {
+    boolean allSamplesProcessed = false;
+    int iteration = 0;
+    List<Recording.RecordingChunk> chunks = new ArrayList<>();
+
+    List<Recording.MethodInfo> prevMethodInfo = new ArrayList<>();
+    List<Recording.TraceContext> prevTraceCtx = new ArrayList<>();
+    List<Recording.FDInfo> prevFdInfo = new ArrayList<>();
+
+    while(true) {
+      allSamplesProcessed = true;
+      Recording.RecordingChunk.Builder builder = Recording.RecordingChunk.newBuilder();
+
+      for(WorkType wt: wses.keySet()) {
+        if(wses.get(wt).size() > iteration) {
+          switch (wt) {
+            case cpu_sample_work:
+              appendCpuWse(builder, (Recording.StackSampleWse) wses.get(wt).get(iteration), prevMethodInfo, prevTraceCtx);
+              break;
+            case io_trace_work:
+              appendIoTraceWse(builder, (Recording.IOTraceWse) wses.get(wt).get(iteration), prevMethodInfo, prevTraceCtx,
+                  prevFdInfo);
+              break;
+            default:
+                throw new IllegalStateException("support for wType: " + wt.name() + "not added");
+          }
+          allSamplesProcessed = false;
+        }
+      }
+
+      if(allSamplesProcessed)
+        break;
+
+      chunks.add(builder.build());
+      iteration++;
+    }
+    return chunks;
   }
 
-  public static Recording.RecordingChunk getMockChunkWithIOWseAndStackSample(Recording.IOTraceWse currentIOTraceWse, Recording.IOTraceWse prevIOTraceWse) {
-    Recording.RecordingChunk.Builder chunkBuilder = Recording.RecordingChunk.newBuilder();
-    chunkBuilder.setIndexedData(
-        Recording.IndexedData.newBuilder()
-            .addAllMethodInfo(generateMethodIndex(currentIOTraceWse, prevIOTraceWse))
-            .addAllTraceCtx(generateTraceIndex(currentIOTraceWse, prevIOTraceWse))
-            .addAllFdInfo(generateFDIndex(currentIOTraceWse, prevIOTraceWse))
-            .build())
-        .addWse(Recording.Wse.newBuilder()
-            .setWType(WorkEntities.WorkType.io_trace_work)
-            .setIoTraceEntry(currentIOTraceWse)
-            .build());
-    return chunkBuilder.build();
+  static void appendCpuWse(Recording.RecordingChunk.Builder builder, Recording.StackSampleWse wse,
+                                  List<Recording.MethodInfo> prevMethodInfo,
+                                  List<Recording.TraceContext> prevTraceCtx) {
+    List<Recording.MethodInfo> newMethodInfo = generateMethodIndex(wse, prevMethodInfo);
+    List<Recording.TraceContext> newTraceCtx = generateTraceIndex(wse, prevTraceCtx);
+
+    builder.getIndexedDataBuilder().addAllMethodInfo(newMethodInfo).addAllTraceCtx(newTraceCtx);
+    builder.addWse(Recording.Wse.newBuilder()
+        .setWType(cpu_sample_work)
+        .setCpuSampleEntry(wse)
+        .build());
+
+    // update prev indices
+    prevMethodInfo.addAll(newMethodInfo);
+    prevTraceCtx.addAll(newTraceCtx);
   }
 
+  static void appendIoTraceWse(Recording.RecordingChunk.Builder builder, Recording.IOTraceWse wse,
+                               List<Recording.MethodInfo> prevMethodInfo,
+                               List<Recording.TraceContext> prevTraceCtx,
+                               List<Recording.FDInfo> prevFdInfo) {
+    List<Recording.MethodInfo> newMethodInfo = generateMethodIndex(wse, prevMethodInfo);
+    List<Recording.TraceContext> newTraceCtx = generateTraceIndex(wse, prevTraceCtx);
+    List<Recording.FDInfo> newFds = generateFDIndex(wse, prevFdInfo);
 
-  private static List<Recording.MethodInfo> generateMethodIndex(Recording.StackSampleWse currentStackSampleWse, Recording.StackSampleWse prevStackSampleWse) {
+    builder.getIndexedDataBuilder().addAllMethodInfo(newMethodInfo).addAllTraceCtx(newTraceCtx)
+        .addAllFdInfo(newFds);
+    builder.addWse(Recording.Wse.newBuilder()
+        .setWType(io_trace_work)
+        .setIoTraceEntry(wse)
+        .build());
+
+    // update prev indices
+    prevMethodInfo.addAll(newMethodInfo);
+    prevTraceCtx.addAll(newTraceCtx);
+    prevFdInfo.addAll(newFds);
+  }
+
+  private static List<Recording.MethodInfo> generateMethodIndex(Recording.StackSampleWse currentStackSampleWse,
+                                                                List<Recording.MethodInfo> prevMethodInfo) {
     Set<Long> currentMethodIds = uniqueMethodIdsInWse(currentStackSampleWse);
-    Set<Long> prevMethodIds = uniqueMethodIdsInWse(prevStackSampleWse);
+    Set<Long> prevMethodIds = prevMethodInfo.stream().map(Recording.MethodInfo::getMethodId).collect(Collectors.toSet());
     Set<Long> newMethodIds = Sets.difference(currentMethodIds, prevMethodIds);
     return newMethodIds.stream()
         .map(mId -> Recording.MethodInfo.newBuilder()
@@ -132,9 +229,10 @@ public class MockProfileObjects {
         .collect(Collectors.toList());
   }
 
-  private static List<Recording.MethodInfo> generateMethodIndex(Recording.IOTraceWse currentIOTraceWse, Recording.IOTraceWse prevIOTraceWse) {
+  private static List<Recording.MethodInfo> generateMethodIndex(Recording.IOTraceWse currentIOTraceWse,
+                                                                List<Recording.MethodInfo> prevMethodInfo) {
     Set<Long> currentMethodIds = uniqueMethodIdsInWse(currentIOTraceWse);
-    Set<Long> prevMethodIds = uniqueMethodIdsInWse(prevIOTraceWse);
+    Set<Long> prevMethodIds = prevMethodInfo.stream().map(Recording.MethodInfo::getMethodId).collect(Collectors.toSet());
     Set<Long> newMethodIds = Sets.difference(currentMethodIds, prevMethodIds);
     return newMethodIds.stream()
         .map(mId -> Recording.MethodInfo.newBuilder()
@@ -145,11 +243,12 @@ public class MockProfileObjects {
         .collect(Collectors.toList());
   }
 
-  private static List<Recording.TraceContext> generateTraceIndex(Recording.StackSampleWse currentStackSampleWse, Recording.StackSampleWse prevStackSampleWse) {
+  private static List<Recording.TraceContext> generateTraceIndex(Recording.StackSampleWse currentStackSampleWse,
+                                                                 List<Recording.TraceContext> prevTraceCtx) {
     Set<Integer> currentTraceIds = currentStackSampleWse.getStackSampleList().stream().flatMap(stackSample -> stackSample.getTraceIdList().stream()).collect(Collectors.toSet());
-    Set<Integer> prevTraceIds = prevStackSampleWse == null
+    Set<Integer> prevTraceIds = prevTraceCtx == null
         ? new HashSet<>()
-        : prevStackSampleWse.getStackSampleList().stream().flatMap(stackSample -> stackSample.getTraceIdList().stream()).collect(Collectors.toSet());
+        : prevTraceCtx.stream().map(Recording.TraceContext::getTraceId).collect(Collectors.toSet());
     Set<Integer> newTraceIds = Sets.difference(currentTraceIds, prevTraceIds);
     return newTraceIds.stream()
         .map(tId -> Recording.TraceContext.newBuilder()
@@ -161,11 +260,12 @@ public class MockProfileObjects {
         .collect(Collectors.toList());
   }
 
-  private static List<Recording.TraceContext> generateTraceIndex(Recording.IOTraceWse currentIOTraceWse, Recording.IOTraceWse prevIOTraceWse) {
+  private static List<Recording.TraceContext> generateTraceIndex(Recording.IOTraceWse currentIOTraceWse,
+                                                                 List<Recording.TraceContext> prevTraceCtx) {
     Set<Integer> currentTraceIds = currentIOTraceWse.getTracesList().stream().flatMap(ioTrace -> ioTrace.getStack().getTraceIdList().stream()).collect(Collectors.toSet());
-    Set<Integer> prevTraceIds = prevIOTraceWse == null
+    Set<Integer> prevTraceIds = prevTraceCtx == null
         ? new HashSet<>()
-        : prevIOTraceWse.getTracesList().stream().flatMap(ioTrace -> ioTrace.getStack().getTraceIdList().stream()).collect(Collectors.toSet());
+        : prevTraceCtx.stream().map(Recording.TraceContext::getTraceId).collect(Collectors.toSet());
     Set<Integer> newTraceIds = Sets.difference(currentTraceIds, prevTraceIds);
     return newTraceIds.stream()
         .map(tId -> Recording.TraceContext.newBuilder()
@@ -177,19 +277,32 @@ public class MockProfileObjects {
         .collect(Collectors.toList());
   }
 
-  private static List<Recording.FDInfo> generateFDIndex(Recording.IOTraceWse currentIOTraceWse, Recording.IOTraceWse prevIOTraceWse) {
-    Set<Integer> currentFDIds = currentIOTraceWse.getTracesList().stream().map(ioTrace -> ioTrace.getFdId()).collect(Collectors.toSet());
-    Set<Integer> prevFDIds = prevIOTraceWse == null
+  private static List<Recording.FDInfo> generateFDIndex(Recording.IOTraceWse currentIOTraceWse,
+                                                        List<Recording.FDInfo> prevFdInfo) {
+    Set<Integer> currentFDIds = currentIOTraceWse.getTracesList().stream().map(Recording.IOTrace::getFdId)
+        .collect(Collectors.toSet());
+
+    Set<Integer> prevFDIds = prevFdInfo == null
         ? new HashSet<>()
-        : prevIOTraceWse.getTracesList().stream().map(ioTrace -> ioTrace.getFdId()).collect(Collectors.toSet());
+        : prevFdInfo.stream().map(Recording.FDInfo::getId).collect(Collectors.toSet());
+
     Set<Integer> newFDIds = Sets.difference(currentFDIds, prevFDIds);
+
     return newFDIds.stream()
-        .map(fId -> Recording.FDInfo.newBuilder()
-            .setId(fId)
-            .setFdType(fId % 2 == 0 ? Recording.FDType.file : Recording.FDType.socket)
-            .setFileInfo(fId % 2 == 0 ? Recording.FileInfo.newBuilder().setFilename("/hello_world.txt").setFlags("").build() : null)
-            .setSocketInfo(fId % 2 != 0 ? Recording.SocketInfo.newBuilder().setAddress("http://hello.world").setConnect(true).build() : null)
-            .build())
+        .map(fId -> {
+          Recording.FDInfo.Builder builder = Recording.FDInfo.newBuilder().setId(fId);
+          if(fId % 2 == 0) {
+            builder
+                .setFileInfo(Recording.FileInfo.newBuilder().setFilename("/hello_world.txt").setFlags(""))
+                .setFdType(Recording.FDType.file);
+          }
+          else {
+            builder
+                .setSocketInfo(Recording.SocketInfo.newBuilder().setAddress("http://hello.world").setConnect(true))
+                .setFdType(Recording.FDType.socket);
+          }
+          return builder.build();
+        })
         .collect(Collectors.toList());
   }
 

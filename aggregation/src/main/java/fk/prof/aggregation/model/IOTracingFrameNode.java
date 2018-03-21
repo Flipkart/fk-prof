@@ -47,12 +47,7 @@ public class IOTracingFrameNode extends StacktraceFrameNode<IOTracingFrameNode> 
   }
 
   public boolean addTrace(int fdIdx, Recording.IOTraceType traceType, long latency, int bytes, boolean timeout) {
-    if(props == null) {
-      props = new ConcurrentHashMap<>(Recording.IOTraceType.values().length * 2);
-    }
-    props.putIfAbsent(traceType, new ConcurrentHashMap<>());
-    props.get(traceType).putIfAbsent(fdIdx, new IOTracingProps(fdIdx, traceType));
-    return props.get(traceType).get(fdIdx).addSample(latency, bytes, timeout);
+    return getTracesForFd(fdIdx, traceType).addSample(latency, bytes, timeout);
   }
 
   @Override
@@ -98,5 +93,32 @@ public class IOTracingFrameNode extends StacktraceFrameNode<IOTracingFrameNode> 
   @Override
   protected Iterable<IOTracingFrameNode> children() {
     return children;
+  }
+
+  private Map<Recording.IOTraceType, Map<Integer, IOTracingProps>> getProps() {
+    if(props == null) {
+      props = new ConcurrentHashMap<>(Recording.IOTraceType.values().length * 2);
+    }
+    return props;
+  }
+
+  private Map<Integer, IOTracingProps> getPropsForActivityType(Recording.IOTraceType type) {
+    Map<Recording.IOTraceType, Map<Integer, IOTracingProps>> props = getProps();
+    Map<Integer, IOTracingProps> propsForType = props.get(type);
+    if(propsForType == null) {
+      propsForType = new ConcurrentHashMap<>();
+      props.put(type, propsForType);
+    }
+    return propsForType;
+  }
+
+  private IOTracingProps getTracesForFd(int fd, Recording.IOTraceType type) {
+    Map<Integer, IOTracingProps> propsForType = getPropsForActivityType(type);
+    IOTracingProps traces = propsForType.get(fd);
+    if(traces == null) {
+      traces = new IOTracingProps(fd, type);
+      propsForType.put(fd, traces);
+    }
+    return traces;
   }
 }

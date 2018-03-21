@@ -113,6 +113,56 @@ public class ProfileApiTest {
   }
 
   @Test(timeout = 5000)
+  public void testWithValidSingleProfile_AllWorkTypes(TestContext context) {
+    long workId = workIdCounter.incrementAndGet();
+    Profile.RecordingPolicy policy = buildRecordingPolicy(new HashSet<>(Arrays.asList(
+            WorkEntities.WorkType.cpu_sample_work, WorkEntities.WorkType.io_trace_work)),
+            60);
+    LocalDateTime awStart = LocalDateTime.now(Clock.systemUTC());
+    activeAggregationWindows.associateAggregationWindow(new long[] {workId},
+            new AggregationWindow("a", "c", "p", awStart, 30 * 60, new long[]{workId}, policy));
+
+    final Async async = context.async();
+    Future<ResponsePayload> future = makeValidProfileRequest(
+            MockProfileObjects.getRecordingHeader(workId, MockProfileObjects.wType_all),
+            getMockWseEntriesForSingleProfile(MockProfileObjects.wType_all));
+
+    future.setHandler(ar -> {
+      if (ar.failed()) {
+        context.fail(ar.cause());
+      } else {
+        context.assertEquals(200, ar.result().statusCode);
+        //Validate aggregation
+        AggregationWindow aggregationWindow = activeAggregationWindows.getAssociatedAggregationWindow(workId);
+        FinalizedAggregationWindow actual = aggregationWindow.finalizeEntity();
+
+        FinalizedCpuSamplingAggregationBucket expectedAggregationBucket = getExpectedAggregationBucketOfPredefinedSamples();
+        FinalizedIOTracingAggregationBucket expectedIOTracingBucket = getExpectedAggregationBucketForIOTracing();
+
+        Map<WorkEntities.WorkType, Integer> expectedSamplesMap = new HashMap<>();
+        expectedSamplesMap.put(WorkEntities.WorkType.cpu_sample_work, 3);
+        expectedSamplesMap.put(WorkEntities.WorkType.io_trace_work, 4);
+
+        FinalizedProfileWorkInfo expectedWorkInfo = getExpectedWorkInfo(actual.getDetailsForWorkId(workId).getStartedAt(),
+                actual.getDetailsForWorkId(workId).getEndedAt(), expectedSamplesMap);
+
+        Map<Long, FinalizedProfileWorkInfo> expectedWorkLookup = new HashMap<>();
+        expectedWorkLookup.put(workId, expectedWorkInfo);
+
+        Map<WorkEntities.WorkType, FinalizedWorkSpecificAggregationBucket> expectedWorkSpecificBuckets = new HashMap<>();
+        expectedWorkSpecificBuckets.put(WorkEntities.WorkType.cpu_sample_work, expectedAggregationBucket);
+        expectedWorkSpecificBuckets.put(WorkEntities.WorkType.io_trace_work, expectedIOTracingBucket);
+
+        FinalizedAggregationWindow expected = new FinalizedAggregationWindow("a", "c", "p",
+                awStart, null, 30 * 60,
+                expectedWorkLookup, policy, expectedWorkSpecificBuckets);
+        context.assertTrue(expected.equals(actual));
+        async.complete();
+      }
+    });
+  }
+
+  @Test(timeout = 5000)
   public void testWithValidMultipleProfiles(TestContext context) {
     long workId1 = workIdCounter.incrementAndGet();
     long workId2 = workIdCounter.incrementAndGet();
@@ -521,6 +571,8 @@ public class ProfileApiTest {
     c4.incrementOnCpuSamples();
 
     for (int i = 0; i < 3; i++) {
+      expectedTraceDetail.getGlobalRoot().incrementOnStackSamples();
+      expectedRoot.incrementOnStackSamples();
       expectedTraceDetail.incrementSamples();
     }
     expectedTraceDetailLookup.put("1", expectedTraceDetail);
@@ -530,6 +582,48 @@ public class ProfileApiTest {
     );
 
     return expected;
+  }
+
+  private FinalizedIOTracingAggregationBucket getExpectedAggregationBucketForIOTracing() {
+    MethodIdLookup expectedMethodIdLookup = new MethodIdLookup();
+    expectedMethodIdLookup.getOrAdd("#D ()");
+    expectedMethodIdLookup.getOrAdd("#B ()");
+    expectedMethodIdLookup.getOrAdd("#A ()");
+    expectedMethodIdLookup.getOrAdd("#F ()");
+    expectedMethodIdLookup.getOrAdd("#E ()");
+
+    Map<String, IOTracingTraceDetail> traces = new HashMap<>();
+
+    IOTracingTraceDetail expectedDetails = new IOTracingTraceDetail();
+
+    IOTracingFrameNode expectedRoot = expectedDetails.getUnclassifiableRoot();
+    IOTracingFrameNode d1 = expectedRoot.getOrAddChild(2, 10);
+    IOTracingFrameNode b1 = d1.getOrAddChild(3, 10);
+    IOTracingFrameNode a1 = b1.getOrAddChild(4, 10);
+    a1.addTrace(10, Recording.IOTraceType.file_read, 1000, 1000, false);
+
+    IOTracingFrameNode f1 = expectedRoot.getOrAddChild(5, 10);
+    IOTracingFrameNode e1 = f1.getOrAddChild(6, 10);
+    IOTracingFrameNode b2 = e1.getOrAddChild(3, 10);
+    IOTracingFrameNode a2 = b2.getOrAddChild(4, 10);
+    a2.addTrace(11, Recording.IOTraceType.socket_read, 1000, 1100, false);
+
+    IOTracingFrameNode e2 = expectedRoot.getOrAddChild(6, 10);
+    IOTracingFrameNode b3 = e2.getOrAddChild(3, 10);
+    IOTracingFrameNode a3 = b3.getOrAddChild(4, 10);
+    a3.addTrace(10, Recording.IOTraceType.file_write, 1000, 1000, false);
+
+    IOTracingFrameNode e3 = e2.getOrAddChild(6, 10);
+    IOTracingFrameNode b4 = e3.getOrAddChild(3, 10);
+    IOTracingFrameNode a4 = b4.getOrAddChild(4, 10);
+    a4.addTrace(11, Recording.IOTraceType.socket_write, 1000, 1100, false);
+
+    for (int i = 0; i < 4; i++) {
+      expectedDetails.incrementSamples();
+    }
+    traces.put("1", expectedDetails);
+
+    return new FinalizedIOTracingAggregationBucket(expectedMethodIdLookup, traces);
   }
 
   private FinalizedProfileWorkInfo getExpectedWorkInfo(LocalDateTime startedAt, LocalDateTime endedAt, Map<WorkEntities.WorkType, Integer> samplesMap) {
@@ -711,20 +805,47 @@ public class ProfileApiTest {
     outputStream.writeTo(requestStream);
   }
 
-  public static List<Recording.RecordingChunk> getMockWseEntriesForSingleProfile() {
+  private static List<Recording.StackSampleWse> getMockCpuStackSampleWse() {
     List<Recording.StackSample> samples = MockProfileObjects.getPredefinedStackSamples(1);
     Recording.StackSampleWse ssw1 = Recording.StackSampleWse.newBuilder()
-        .addStackSample(samples.get(0))
-        .addStackSample(samples.get(1))
-        .build();
+            .addStackSample(samples.get(0))
+            .addStackSample(samples.get(1))
+            .build();
     Recording.StackSampleWse ssw2 = Recording.StackSampleWse.newBuilder()
-        .addStackSample(samples.get(2))
-        .build();
+            .addStackSample(samples.get(2))
+            .build();
+    return Arrays.asList(ssw1, ssw2);
+  }
 
-    Recording.RecordingChunk rec1 = MockProfileObjects.getMockChunkWithCpuWseAndStackSample(ssw1, null);
-    Recording.RecordingChunk rec2 = MockProfileObjects.getMockChunkWithCpuWseAndStackSample(ssw2, ssw1);
+  private static List<Recording.IOTraceWse> getMockIOTraceStackSampleWse() {
+    List<Recording.IOTrace> traces = MockProfileObjects.getPredefinedIOTraces(1);
 
-    return Arrays.asList(rec1, rec2);
+    return Arrays.asList(
+        Recording.IOTraceWse.newBuilder()
+            .addTraces(traces.get(0))
+            .addTraces(traces.get(1)).build(),
+        Recording.IOTraceWse.newBuilder()
+            .addTraces(traces.get(2))
+            .addTraces(traces.get(3)).build()
+    );
+  }
+
+  private static Map<WorkEntities.WorkType, List> sampleWse = new HashMap<WorkEntities.WorkType, List>() {{
+    put(WorkEntities.WorkType.cpu_sample_work, getMockCpuStackSampleWse());
+    put(WorkEntities.WorkType.io_trace_work, getMockIOTraceStackSampleWse());
+  }};
+
+  public static List<Recording.RecordingChunk> getMockWseEntriesForSingleProfile(Set<WorkEntities.WorkType> workTypes) {
+    Map<WorkEntities.WorkType, List> wses = new HashMap<>();
+    for(WorkEntities.WorkType wt: workTypes) {
+      wses.put(wt, sampleWse.get(wt));
+    }
+
+    return MockProfileObjects.getMockRecordingChunks(wses);
+  }
+
+  public static List<Recording.RecordingChunk> getMockWseEntriesForSingleProfile() {
+    return getMockWseEntriesForSingleProfile(new HashSet<>(Arrays.asList(WorkEntities.WorkType.cpu_sample_work)));
   }
 
   public static List<Recording.RecordingChunk> getMockChunksForMultipleProfiles() {
@@ -739,9 +860,16 @@ public class ProfileApiTest {
         .addStackSample(samples.get(2))
         .build();
 
-    Recording.RecordingChunk rec1 = MockProfileObjects.getMockChunkWithCpuWseAndStackSample(ssw1, null);
-    Recording.RecordingChunk rec2 = MockProfileObjects.getMockChunkWithCpuWseAndStackSample(ssw2, null);
-    Recording.RecordingChunk rec3 = MockProfileObjects.getMockChunkWithCpuWseAndStackSample(ssw3, null);
+    Map<WorkEntities.WorkType, List> wses = new HashMap<>();
+
+    wses.put(WorkEntities.WorkType.cpu_sample_work, Arrays.asList(ssw1));
+    Recording.RecordingChunk rec1 = MockProfileObjects.getMockRecordingChunks(wses).get(0);
+
+    wses.put(WorkEntities.WorkType.cpu_sample_work, Arrays.asList(ssw2));
+    Recording.RecordingChunk rec2 = MockProfileObjects.getMockRecordingChunks(wses).get(0);
+
+    wses.put(WorkEntities.WorkType.cpu_sample_work, Arrays.asList(ssw3));
+    Recording.RecordingChunk rec3 = MockProfileObjects.getMockRecordingChunks(wses).get(0);
 
     return Arrays.asList(rec1, rec2, rec3);
   }

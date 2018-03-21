@@ -172,6 +172,7 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
         }
         cpuSamplingAggregationBucket.aggregate(stackSampleWse, indexes, mtrCSAggrFailures);
         break;
+
       case io_trace_work:
         IOTracingAggregationBucket ioTracingAggregationBucket = (IOTracingAggregationBucket)workSpecificBuckets.get(WorkEntities.WorkType.io_trace_work);
         Recording.IOTraceWse ioTraceWse = wse.getIoTraceEntry();
@@ -179,6 +180,8 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
           throw new AggregationFailure(String.format("work type=%s did not have associated samples", wse.getWType()));
         }
         ioTracingAggregationBucket.aggregate(ioTraceWse, indexes, mtrIOAggrFailures);
+        break;
+
       default:
         throw new AggregationFailure(String.format("Aggregation not supported for work type=%s", wse.getWType()));
     }
