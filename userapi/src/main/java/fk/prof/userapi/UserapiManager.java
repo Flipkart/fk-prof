@@ -13,10 +13,7 @@ import com.google.common.base.Preconditions;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.S3AsyncStorage;
 import fk.prof.storage.S3ClientFactory;
-import fk.prof.userapi.api.AggregatedProfileLoader;
-import fk.prof.userapi.api.ProfileStoreAPI;
-import fk.prof.userapi.api.ProfileStoreAPIImpl;
-import fk.prof.userapi.api.ProfileViewCreator;
+import fk.prof.userapi.api.*;
 import fk.prof.userapi.cache.ClusterAwareCache;
 import fk.prof.userapi.deployer.VerticleDeployer;
 import fk.prof.userapi.deployer.impl.UserapiHttpVerticleDeployer;
@@ -25,6 +22,7 @@ import fk.prof.userapi.model.json.ProtoSerializers;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
+import io.vertx.core.WorkerExecutor;
 import io.vertx.core.json.Json;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -41,14 +39,12 @@ import java.util.concurrent.*;
 import static fk.prof.userapi.http.UserapiApiPathConstants.*;
 
 public class UserapiManager {
-    private static Logger logger = LoggerFactory.getLogger(UserapiManager.class);
+    private static final Logger logger = LoggerFactory.getLogger(UserapiManager.class);
 
     private final Vertx vertx;
     private final Configuration config;
-    private final MetricRegistry metricRegistry;
     private final CuratorFramework curatorClient;
     private final AsyncStorage storage;
-    private final ClusterAwareCache cache;
 
     public UserapiManager(String configFilePath) throws Exception {
         this(UserapiConfigManager.loadConfig(configFilePath));
@@ -61,19 +57,12 @@ public class UserapiManager {
         VertxOptions vertxOptions = config.getVertxOptions();
         vertxOptions.setMetricsOptions(buildMetricsOptions());
         this.vertx = Vertx.vertx(vertxOptions);
-        this.metricRegistry = SharedMetricRegistries.getOrCreate(UserapiConfigManager.METRIC_REGISTRY);
 
         this.curatorClient = createCuratorClient();
         curatorClient.start();
         curatorClient.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
 
         this.storage = initStorage();
-
-        this.cache = new ClusterAwareCache(curatorClient,
-            vertx.createSharedWorkerExecutor(this.config.getBlockingWorkerPool().getName(), this.config.getBlockingWorkerPool().getSize()),
-            new AggregatedProfileLoader(this.storage),
-            new ProfileViewCreator(),
-            this.config);
     }
 
     public Future<Void> close() {
@@ -98,10 +87,29 @@ public class UserapiManager {
         registerSerializers(Json.mapper);
         registerSerializers(Json.prettyMapper);
 
-        ProfileStoreAPI profileStoreAPI = new ProfileStoreAPIImpl(vertx, this.storage, cache, config);
+        SharedMetricRegistries.getOrCreate(UserapiConfigManager.METRIC_REGISTRY);
+
+        WorkerExecutor workerExecutor = vertx.createSharedWorkerExecutor(
+            config.getBlockingWorkerPool().getName(), config.getBlockingWorkerPool().getSize());
+
+        ProfileLoader profileLoader = new StorageBackedProfileLoader(storage);
+
+        ClusterAwareCache profileCache = new ClusterAwareCache(curatorClient,
+            profileLoader,
+            new ProfileViewCreator(),
+            workerExecutor,
+            config);
+
+        ProfileStoreAPI profileStoreAPI = new ProfileStoreAPIImpl(vertx,
+            storage,
+            profileLoader,
+            profileCache,
+            workerExecutor,
+            config);
+
         VerticleDeployer userapiHttpVerticleDeployer = new UserapiHttpVerticleDeployer(vertx, config, profileStoreAPI);
 
-        cache.onClusterJoin().setHandler(ar -> {
+        profileCache.onClusterJoin().setHandler(ar -> {
             if (ar.failed()) {
                 result.fail(ar.cause());
             } else {
@@ -135,19 +143,28 @@ public class UserapiManager {
     }
 
     private S3AsyncStorage initStorage() {
+        MetricRegistry metricRegistry = SharedMetricRegistries.getOrCreate(UserapiConfigManager.METRIC_REGISTRY);
+
         Configuration.FixedSizeThreadPoolConfig threadPoolConfig = config.getStorageConfig().getTpConfig();
         Meter threadPoolRejectionsMtr = metricRegistry.meter(MetricRegistry.name(AsyncStorage.class, "threadpool.rejections"));
 
         // thread pool with bounded queue for s3 io.
         BlockingQueue ioTaskQueue = new LinkedBlockingQueue(threadPoolConfig.getQueueMaxSize());
         ExecutorService storageExecSvc = new InstrumentedExecutorService(
-            new ThreadPoolExecutor(threadPoolConfig.getCoreSize(), threadPoolConfig.getMaxSize(), threadPoolConfig.getIdleTimeSec(), TimeUnit.SECONDS, ioTaskQueue,
+            new ThreadPoolExecutor(threadPoolConfig.getCoreSize(),
+                threadPoolConfig.getMaxSize(),
+                threadPoolConfig.getIdleTimeSec(),
+                TimeUnit.SECONDS,
+                ioTaskQueue,
                 new AbortPolicy("storageExectorSvc", threadPoolRejectionsMtr)),
             metricRegistry, "executors.fixed_thread_pool.storage");
 
         Configuration.S3Config s3Config = config.getStorageConfig().getS3Config();
-        return new S3AsyncStorage(S3ClientFactory.create(s3Config.getEndpoint(), s3Config.getAccessKey(), s3Config.getSecretKey()),
-            storageExecSvc, s3Config.getListObjectsTimeoutMs());
+        return new S3AsyncStorage(S3ClientFactory.create(s3Config.getEndpoint(),
+            s3Config.getAccessKey(),
+            s3Config.getSecretKey()),
+            storageExecSvc,
+            s3Config.getListObjectsTimeoutMs());
     }
 
 

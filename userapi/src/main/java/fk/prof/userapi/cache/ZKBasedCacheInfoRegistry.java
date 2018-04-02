@@ -58,12 +58,14 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
 
     private final byte[] myResidencyInfoInBytes;
     private final ProfileResidencyInfo myProfileResidencyInfo;
-    private Runnable cacheInvalidator;
+
+
+    private Runnable onConnect;
 
     private Counter lockAcquireTimeoutCounter = Util.counter("zk.lock.timeouts");
     private Counter onReconnectFailures = Util.counter("zk.onreconnect.failures");
 
-    ZKBasedCacheInfoRegistry(CuratorFramework curatorClient, String myIp, int port, Runnable cacheInvalidator) {
+    ZKBasedCacheInfoRegistry(CuratorFramework curatorClient, String myIp, int port, Runnable onConnect) {
         this.curatorClient = curatorClient;
 
         this.zkNodesLoadInfoPath = "/nodesInfo/" + myIp + ":" + port;
@@ -75,16 +77,18 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
         this.curatorClient.getConnectionStateListenable().addListener(this::zkStateChangeListener,
             Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("curator-state-listener").build()));
 
-        this.cacheInvalidator = cacheInvalidator;
+        this.onConnect = onConnect;
 
         this.connectionState = new AtomicReference<>(
             curatorClient.getZookeeperClient().isConnected() ? ConnectionState.Connected : ConnectionState.Disconnected);
     }
 
-    @Override
-    public void init() throws Exception {
+    public void onInit() throws Exception {
         ensureConnected();
         ensureRequiredZkNodesPresent();
+
+        if(onConnect != null)
+            onConnect.run();
     }
 
     @Override
@@ -103,7 +107,7 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
             ProfileResidencyInfo residencyInfo = getProfileResidencyInfo(profileName);
             if (residencyInfo == null) {
                 putProfileResidencyInfo(profileName, false);
-            } else if(Objects.equals(residencyInfo, myProfileResidencyInfo) && sessionIdMatches(profileName)) {
+            } else if(Objects.equals(residencyInfo, myProfileResidencyInfo)) {
                 putProfileResidencyInfo(profileName, true);
             } else {
               throw new CachedProfileNotFoundException(residencyInfo.getIp(), residencyInfo.getPort());
@@ -257,8 +261,8 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
     }
 
     private void reInit() throws Exception {
-        cacheInvalidator.run();
         ensureRequiredZkNodesPresent();
+        onConnect.run();
     }
 
 }

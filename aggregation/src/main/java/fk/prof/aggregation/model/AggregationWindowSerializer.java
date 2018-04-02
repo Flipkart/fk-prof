@@ -9,7 +9,6 @@ import java.io.OutputStream;
 import java.util.zip.Adler32;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.Checksum;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * @author gaurav.ashok

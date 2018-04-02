@@ -7,14 +7,12 @@ import fk.prof.aggregation.model.FinalizedAggregationWindow;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.proto.AggregatedProfileModel.FrameNode;
 import fk.prof.storage.AsyncStorage;
-import fk.prof.userapi.api.AggregatedProfileLoader;
+import fk.prof.userapi.api.StorageBackedProfileLoader;
 import fk.prof.userapi.api.MockAggregationWindow;
 import fk.prof.userapi.model.AggregatedOnCpuSamples;
-import fk.prof.userapi.model.AggregatedProfileInfo;
 import fk.prof.userapi.model.AggregatedSamplesPerTraceCtx;
 import fk.prof.userapi.model.json.CustomSerializers;
 import fk.prof.userapi.model.json.ProtoSerializers;
-import io.vertx.core.Future;
 
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -62,15 +60,12 @@ public class CallTreeTest {
         storage.store(window);
 
         // init loader
-        AggregatedProfileLoader loader = new AggregatedProfileLoader(asyncStorage);
+        StorageBackedProfileLoader loader = new StorageBackedProfileLoader(asyncStorage);
 
-        Future<AggregatedProfileInfo> f1 =  Future.future();
         AggregatedProfileNamingStrategy file1 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, 1800, AggregatedProfileModel.WorkType.cpu_sample_work);
-        // load
-        loader.load(f1, file1);
 
         // get cpu sampling data
-        AggregatedSamplesPerTraceCtx fullTraceDetail = f1.result().getAggregatedSamples("full-app-trace");
+        AggregatedSamplesPerTraceCtx fullTraceDetail = loader.load(file1).getAggregatedSamples("full-app-trace");
         methodIdLookup = fullTraceDetail.getMethodLookup();
 
         AggregatedOnCpuSamples cpusampleData = (AggregatedOnCpuSamples) fullTraceDetail.getAggregatedSamples();

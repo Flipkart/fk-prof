@@ -9,7 +9,7 @@ import fk.prof.userapi.model.tree.CallTreeView;
 import fk.prof.userapi.model.tree.CalleesTreeView;
 import fk.prof.userapi.util.Pair;
 import fk.prof.userapi.UserapiConfigManager;
-import fk.prof.userapi.api.AggregatedProfileLoader;
+import fk.prof.userapi.api.StorageBackedProfileLoader;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.api.ProfileViewCreator;
 import fk.prof.userapi.model.AggregatedProfileInfo;
@@ -38,7 +38,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -93,13 +92,13 @@ public class ClusterAwareCacheTest {
         cleanUpZookeeper();
     }
 
-    private void setUpDefaultCache(TestContext context, AggregatedProfileLoader profileLoader, ProfileViewCreator viewCreator) {
+    private void setUpDefaultCache(TestContext context, StorageBackedProfileLoader profileLoader, ProfileViewCreator viewCreator) {
         setUpCache(context, new LocalProfileCache(config, viewCreator), profileLoader);
     }
 
-    private void setUpCache(TestContext context, LocalProfileCache localCache, AggregatedProfileLoader profileLoader) {
+    private void setUpCache(TestContext context, LocalProfileCache localCache, StorageBackedProfileLoader profileLoader) {
         localProfileCache = localCache;
-        cache = new ClusterAwareCache(curatorClient, executor, profileLoader, config, localProfileCache);
+        cache = new ClusterAwareCache(curatorClient, profileLoader, executor, config, localProfileCache);
         Async async = context.async();
         cache.onClusterJoin().setHandler(ar -> {
             context.assertTrue(ar.succeeded());
@@ -121,7 +120,7 @@ public class ClusterAwareCacheTest {
     public void testLoadProfile_shouldCallLoaderOnlyOnceOnMultipleInvocations(TestContext context) throws Exception {
         Async async = context.async(2);
         NameProfilePair npPair = npPair("proc1", dt(0));
-        AggregatedProfileLoader loader = mockedProfileLoader(npPair);
+        StorageBackedProfileLoader loader = mockedProfileLoader(npPair);
 
         setUpDefaultCache(context, loader, null);
 
@@ -141,7 +140,7 @@ public class ClusterAwareCacheTest {
         });
 
         async.awaitSuccess(2000);
-        verify(loader, times(1)).load(any(), eq(npPair.name));
+        verify(loader, times(1)).load(eq(npPair.name));
 
         // fetch it again after waiting for some time
         Thread.sleep(1000);
@@ -242,7 +241,7 @@ public class ClusterAwareCacheTest {
         verify(viewCreator, times(1)).buildCacheableView(same(npPair.profileInfo), eq("t2"), eq(ProfileViewType.CALLERS));
     }
 
-    @Test(timeout = 2500000)
+    @Test(timeout = 3000)
     public void testLoadCallersAndThenCalleesView(TestContext context) throws Exception {
         Async async = context.async(2);
 
@@ -267,7 +266,7 @@ public class ClusterAwareCacheTest {
             async.countDown();
         });
 
-        async.awaitSuccess(2000000);
+        async.awaitSuccess(2000);
         verify(viewCreator, times(1)).buildCacheableView(same(npPair.profileInfo), eq("t1"), eq(ProfileViewType.CALLEES));
         verify(viewCreator, times(1)).buildCacheableView(same(npPair.profileInfo), eq("t1"), eq(ProfileViewType.CALLERS));
     }
@@ -309,12 +308,12 @@ public class ClusterAwareCacheTest {
         });
     }
 
-    @Test(timeout = 4000)
+    @Test(timeout = 10000)
     public void testProfileExpiry_cacheShouldGetInvalidated_EntryShouldBeRemovedFromZookeeper(TestContext context) throws Exception {
         TestTicker ticker = new TestTicker();
 
         NameProfilePair npPair = npPair("proc2", dt(0));
-        AggregatedProfileLoader loader = mockedProfileLoader(npPair);
+        StorageBackedProfileLoader loader = mockedProfileLoader(npPair);
         ProfileViewCreator viewCreator = mockedViewCreator(npPair);
 
         setUpCache(context, new LocalProfileCache(config, viewCreator, ticker), loader);
@@ -336,7 +335,7 @@ public class ClusterAwareCacheTest {
             context.assertTrue(ar.succeeded());
             async2.countDown();
         });
-        async2.awaitSuccess(500);
+        async2.awaitSuccess(5000);
 
         // all objects are loaded. advance time
         ticker.advance(config.getProfileRetentionDurationMin() + 1, TimeUnit.MINUTES);
@@ -346,22 +345,21 @@ public class ClusterAwareCacheTest {
         view1 = cache.getProfileView(npPair.name,"t1", ProfileViewType.CALLERS);
         view1.setHandler(ar -> {
             context.assertTrue(ar.failed());
-            context.assertTrue(ar.cause() instanceof CachedProfileNotFoundException);
+            // earlier getView used to fail in case the profile was evicted. Now it will initiate the profile load.
+            context.assertTrue(ar.cause() instanceof ProfileLoadInProgressException);
             async3.countDown();
         });
         async3.awaitSuccess(1000);
 
         verify(viewCreator, times(1)).buildCacheableView(same(npPair.profileInfo), eq("t1"), eq(ProfileViewType.CALLERS));
-        verify(loader, times(1)).load(any(), same(npPair.name));
+        // 1 in the starting and 1 after the eviction
+        verify(loader, times(2)).load(same(npPair.name));
     }
 
-    private AggregatedProfileLoader mockedProfileLoader(NameProfilePair... npPairs) {
-        AggregatedProfileLoader loader = mock(AggregatedProfileLoader.class);
+    private StorageBackedProfileLoader mockedProfileLoader(NameProfilePair... npPairs) throws Exception {
+        StorageBackedProfileLoader loader = mock(StorageBackedProfileLoader.class);
         for(NameProfilePair npPair : npPairs) {
-            doAnswer(invocation -> {
-                getDelayedFuture(invocation.getArgument(0), 500, npPair.profileInfo);
-                return null;
-            }).when(loader).load(any(), eq(npPair.name));
+            doAnswer(invocation -> getDelayedResponse(500, npPair.profileInfo)).when(loader).load(eq(npPair.name));
         }
         return loader;
     }
@@ -382,7 +380,8 @@ public class ClusterAwareCacheTest {
         return new AggregatedProfileNamingStrategy(config.getProfilesBaseDir(), 1, "app1", "cluster1", procId, dt, 1200, AggregatedProfileModel.WorkType.cpu_sample_work);
     }
 
-    private <T> void getDelayedFuture(Future<T> f, int ms, T obj) {
+    private <T> Future<T> getDelayedFuture(int ms, T obj) {
+        Future<T> f = Future.future();
         vertx.setTimer(ms, h -> {
             if(obj instanceof Throwable) {
                 f.fail((Throwable) obj);
@@ -391,6 +390,16 @@ public class ClusterAwareCacheTest {
                 f.complete(obj);
             }
         });
+        return f;
+    }
+
+    private <T> T getDelayedResponse(int ms, T obj) {
+        try {
+            Thread.sleep(ms);
+        } catch (Exception e) {
+            // ignore
+        }
+        return obj;
     }
 
     private ZonedDateTime dt(int offsetInSec) {

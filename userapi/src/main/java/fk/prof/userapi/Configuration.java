@@ -16,7 +16,6 @@ import java.util.Map;
  */
 public class Configuration {
 
-    private static final String ioWorkerPoolName = "workerpool.io";
     private static final String blockingWorkerPoolName = "workerpool.blocking";
 
     @NotNull
@@ -32,8 +31,8 @@ public class Configuration {
     @JsonProperty("profileView.retention.duration.min")
     private Integer profileViewRetentionDurationMin = 10;
 
-    @JsonProperty("max.list_profiles.duration.days")
-    private Integer maxListProfilesDurationInDays = 7;
+    @JsonProperty("profile.list.duration.days")
+    private Integer profileListDurationDays = 7;
 
     @JsonProperty("profile.load.timeout")
     private Integer profileLoadTimeout = 10000;
@@ -47,16 +46,10 @@ public class Configuration {
     @JsonProperty("http.client")
     private HttpClientConfig httpClientConfig;
 
-
     @NotNull
     @Valid
     @JsonProperty("curatorOptions")
     private CuratorConfig curatorConfig;
-
-    @NotNull
-    @Valid
-    @JsonProperty("vertx.workerpool.io")
-    private VertxWorkerPoolConfig ioWorkerPool;
 
     @NotNull
     @Valid
@@ -94,6 +87,13 @@ public class Configuration {
     @JsonProperty("maxProfileViewsToCache")
     private Integer maxProfileViewsToCache = 100;
 
+    @JsonProperty("maxProfileSummaryCacheWeight")
+    private Integer maxProfileSummaryCacheWeight = 1000;
+
+    public Integer getMaxProfileSummaryCacheWeight() {
+        return maxProfileSummaryCacheWeight;
+    }
+
     public String getIpAddress() {
         return ipAddress;
     }
@@ -110,8 +110,8 @@ public class Configuration {
         return profileViewRetentionDurationMin;
     }
 
-    public Integer getMaxListProfilesDurationInDays() {
-        return maxListProfilesDurationInDays;
+    public Integer getProfileListDurationDays() {
+        return profileListDurationDays;
     }
 
     public Integer getProfileLoadTimeout() {
@@ -147,10 +147,6 @@ public class Configuration {
         return curatorConfig;
     }
 
-    public VertxWorkerPoolConfig getIoWorkerPool() {
-        return ioWorkerPool;
-    }
-
     public Integer getMaxDepthExpansion() {
         return maxDepthExpansion;
     }
@@ -161,11 +157,6 @@ public class Configuration {
 
     public Integer getMaxProfileViewsToCache() {
         return maxProfileViewsToCache;
-    }
-
-    private void setIoWorkerPool(VertxWorkerPoolConfig ioWorkerPool) {
-        this.ioWorkerPool = ioWorkerPool;
-        this.ioWorkerPool.setName(ioWorkerPoolName);
     }
 
     public VertxWorkerPoolConfig getBlockingWorkerPool() {

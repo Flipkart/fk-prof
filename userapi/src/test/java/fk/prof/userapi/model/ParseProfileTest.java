@@ -9,7 +9,7 @@ import fk.prof.storage.ObjectNotFoundException;
 import fk.prof.storage.S3AsyncStorage;
 import fk.prof.userapi.Configuration;
 import fk.prof.userapi.UserapiConfigManager;
-import fk.prof.userapi.api.AggregatedProfileLoader;
+import fk.prof.userapi.api.StorageBackedProfileLoader;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.cache.ClusterAwareCache;
@@ -71,7 +71,11 @@ public class ParseProfileTest {
         vertx = Vertx.vertx();
         asyncStorage = mock(AsyncStorage.class);
         config = UserapiConfigManager.loadConfig(ParseProfileTest.class.getClassLoader().getResource("userapi-conf.json").getFile());
-        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, mock(ClusterAwareCache.class), config);
+        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, new StorageBackedProfileLoader(asyncStorage),
+            mock(ClusterAwareCache.class),
+            vertx.createSharedWorkerExecutor(
+                config.getBlockingWorkerPool().getName(), config.getBlockingWorkerPool().getSize()),
+            config);
     }
 
     @After
@@ -95,19 +99,21 @@ public class ParseProfileTest {
             throw new ObjectNotFoundException("not found");
         }));
 
-        AggregatedProfileLoader loader = new AggregatedProfileLoader(storage);
+        StorageBackedProfileLoader loader = new StorageBackedProfileLoader(storage);
         ClusterAwareCache cache = mock(ClusterAwareCache.class);
-        doAnswer(inv -> {
-            Future<AggregatedProfileInfo> result = Future.future();
-            loader.load(result, inv.getArgument(0));
-            return result;
-        }).when(cache).getAggregatedProfile(eq(profileName));
+        doAnswer(inv -> Future.succeededFuture(loader.load(inv.getArgument(0))))
+            .when(cache)
+            .getAggregatedProfile(eq(profileName));
 
-        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, cache, config);
+        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, new StorageBackedProfileLoader(asyncStorage),
+            cache,
+            vertx.createSharedWorkerExecutor(
+                config.getBlockingWorkerPool().getName(), config.getBlockingWorkerPool().getSize()),
+            config);
 
-        Future<AggregatedProfileInfo> future1 = Future.future();
-
-        future1.setHandler(result -> {
+        profileDiscoveryAPI
+            .load(AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader()))
+            .setHandler(result -> {
             try {
                 if (result.failed()) {
                     context.fail(result.cause());
@@ -128,8 +134,6 @@ public class ParseProfileTest {
                 async.complete();
             }
         });
-
-        profileDiscoveryAPI.load(future1, AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader()));
     }
 
     private void testEquality(TestContext context, AggregatedProfileInfo expected, AggregatedProfileInfo actual) {
