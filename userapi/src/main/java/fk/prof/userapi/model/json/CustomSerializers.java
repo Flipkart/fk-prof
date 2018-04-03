@@ -30,7 +30,7 @@ public class CustomSerializers {
 
     static class IndexedNodeSerializer extends StdSerializer<IndexedTreeNode> {
 
-        private StdSerializer dataSerializer;
+        private final StdSerializer dataSerializer;
 
         IndexedNodeSerializer(StdSerializer dataSerializer) {
             super(IndexedTreeNode.class);
@@ -85,7 +85,7 @@ public class CustomSerializers {
 
     static class TreeViewResponseSerializer extends StdSerializer<TreeViewResponse> {
 
-        private StdSerializer indexedNodeSerializer;
+        private final StdSerializer indexedNodeSerializer;
 
         TreeViewResponseSerializer(StdSerializer indexedNodeSerializer) {
             super(TreeViewResponse.class);

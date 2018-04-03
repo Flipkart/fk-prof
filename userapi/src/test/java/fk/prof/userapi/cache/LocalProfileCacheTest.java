@@ -58,8 +58,6 @@ public class LocalProfileCacheTest {
         Assert.assertNotNull(profileViewPair);
         Assert.assertNull(profileViewPair.first);
         Assert.assertNull(profileViewPair.second);
-
-        Assert.assertTrue(cache.cachedProfiles().size() == 0);
     }
 
     @Test

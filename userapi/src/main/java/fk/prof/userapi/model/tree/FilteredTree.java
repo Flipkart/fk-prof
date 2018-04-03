@@ -24,8 +24,9 @@ import java.util.stream.Collectors;
 public class FilteredTree<T> implements Tree<T> {
 
     private final List<Integer> hotMethodNodeIds;
-    private Tree<T> tree;
-    private boolean[] visible;
+    private final Tree<T> tree;
+    private final boolean[] visible;
+
     private int filteredTreeSize = 0;
 
     public FilteredTree(Tree<T> tree, List<Integer> hotMethodNodeIds, VisibilityPredicate<T> predicate) {

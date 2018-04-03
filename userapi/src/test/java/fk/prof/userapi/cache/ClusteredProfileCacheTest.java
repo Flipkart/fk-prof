@@ -44,7 +44,7 @@ import static org.mockito.Mockito.*;
  * Created by gaurav.ashok on 14/07/17.
  */
 @RunWith(VertxUnitRunner.class)
-public class ClusterAwareCacheTest {
+public class ClusteredProfileCacheTest {
     private static final int zkPort = 2191;
 
     static {
@@ -56,7 +56,7 @@ public class ClusterAwareCacheTest {
     private static TestingServer zookeeper;
     private static CuratorFramework curatorClient;
     private WorkerExecutor executor;
-    private ClusterAwareCache cache;
+    private ClusteredProfileCache cache;
     private LocalProfileCache localProfileCache;
 
     private static ZonedDateTime beginning = ZonedDateTime.now(Clock.systemUTC());
@@ -98,7 +98,7 @@ public class ClusterAwareCacheTest {
 
     private void setUpCache(TestContext context, LocalProfileCache localCache, StorageBackedProfileLoader profileLoader) {
         localProfileCache = localCache;
-        cache = new ClusterAwareCache(curatorClient, profileLoader, executor, config, localProfileCache);
+        cache = new ClusteredProfileCache(curatorClient, profileLoader, executor, config, localProfileCache);
         Async async = context.async();
         cache.onClusterJoin().setHandler(ar -> {
             context.assertTrue(ar.succeeded());
@@ -116,7 +116,7 @@ public class ClusterAwareCacheTest {
         Assert.assertNotNull(LoadInfoEntities.NodeLoadInfo.parseFrom(bytes));
     }
 
-    @Test(timeout = 3500)
+    @Test(timeout = 4000)
     public void testLoadProfile_shouldCallLoaderOnlyOnceOnMultipleInvocations(TestContext context) throws Exception {
         Async async = context.async(2);
         NameProfilePair npPair = npPair("proc1", dt(0));
@@ -140,6 +140,7 @@ public class ClusterAwareCacheTest {
         });
 
         async.awaitSuccess(2000);
+        Thread.sleep(500);
         verify(loader, times(1)).load(eq(npPair.name));
 
         // fetch it again after waiting for some time

@@ -13,24 +13,27 @@ import java.util.*;
  */
 public class CallTree implements Tree<FrameNode> {
 
-    private List<FrameNode> nodes;
-    private int[] subtreeSizes;
-    private int[] parentIds;
-    private List<Integer> hotMethodNodeIds;
+    private final List<FrameNode> nodes;
+    private final int[] subtreeSizes;
+    private final int[] parentIds;
+    private final List<Integer> hotMethodNodeIds;
 
     /**
-     * Constructor for creating a CallTree from a list of FrameNodes orders in a dfs manner. i.e.
+     * Constructor for creating a CallTree from a list of FrameNodes ordered in a dfs manner. i.e.
      * first node should be the root node and then followed by its subtree, with the subtree ordered
      * in the same way recursively.
      * @param frameNodes the list of frameNodes
      */
     public CallTree(List<FrameNode> frameNodes) {
         this.nodes = frameNodes;
+        this.subtreeSizes = new int[nodes.size()];
+        this.parentIds = new int[nodes.size()];
+        this.hotMethodNodeIds = new ArrayList<>() ;
         treeify();
     }
 
     /**
-     * Parses a serialized tree from provided inputStream into a CallTree object. Input should be a dfs serialization
+     * Parses a serialized tree from the provided inputStream into a CallTree object. Input should be a dfs serialization
      * of the tree i.e. first node should be the root node and then followed by its subtree, with the subtree serialized
      * using the same definition recursively.
      *
@@ -115,10 +118,6 @@ public class CallTree implements Tree<FrameNode> {
      * nodes list
      */
     private void treeify() {
-        subtreeSizes = new int[nodes.size()];
-        parentIds = new int[nodes.size()];
-        hotMethodNodeIds = new ArrayList<>() ;
-
         int treeSize = 0;
         if (nodes.size() > 0) {
             treeSize = buildTree(0,-1);
@@ -132,7 +131,7 @@ public class CallTree implements Tree<FrameNode> {
      * Recursively traverses the tree node list and populates parentIds and subtreeSizes helping the treeify
      * method
      * @param idx the index of the current in the node list
-     * @param parentIdx the index of the current node in the node list
+     * @param parentIdx the index of the parent of the current node in the node list
      * @return the size of the subtree rooted at index idx including the root itself
      */
     private int buildTree(int idx, int parentIdx) {

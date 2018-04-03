@@ -29,8 +29,8 @@ import java.util.Optional;
  *
  * Created by gaurav.ashok on 21/06/17.
  */
-public class ClusterAwareCache {
-    private static final Logger logger = LoggerFactory.getLogger(ClusterAwareCache.class);
+public class ClusteredProfileCache {
+    private static final Logger logger = LoggerFactory.getLogger(ClusteredProfileCache.class);
 
     private final LocalProfileCache cache;
 
@@ -41,14 +41,14 @@ public class ClusterAwareCache {
     private final String myIp;
     private final int port;
 
-    public ClusterAwareCache(CuratorFramework curatorClient, ProfileLoader profileLoader,
-                             ProfileViewCreator viewCreator, WorkerExecutor workerExecutor, Configuration config) {
+    public ClusteredProfileCache(CuratorFramework curatorClient, ProfileLoader profileLoader,
+                                 ProfileViewCreator viewCreator, WorkerExecutor workerExecutor, Configuration config) {
         this(curatorClient, profileLoader, workerExecutor, config, new LocalProfileCache(config, viewCreator));
     }
 
     @VisibleForTesting
-    ClusterAwareCache(CuratorFramework curatorClient, ProfileLoader profileLoader,
-                      WorkerExecutor workerExecutor, Configuration config, LocalProfileCache localCache) {
+    ClusteredProfileCache(CuratorFramework curatorClient, ProfileLoader profileLoader,
+                          WorkerExecutor workerExecutor, Configuration config, LocalProfileCache localCache) {
         this.myIp = config.getIpAddress();
         this.port = config.getHttpConfig().getHttpPort();
 

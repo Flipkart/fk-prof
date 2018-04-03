@@ -5,7 +5,7 @@ import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 /**
  * Interface for a shared storage which stores the mapping profile -> ip:port and maintains resource utilization counters
  * for each node in cluster.
- * It is used by {@link ClusterAwareCache}.
+ * It is used by {@link ClusteredProfileCache}.
  */
 public interface CacheInfoRegistry {
 

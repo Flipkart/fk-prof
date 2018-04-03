@@ -7,7 +7,7 @@ import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
 import fk.prof.userapi.api.StorageBackedProfileLoader;
-import fk.prof.userapi.cache.ClusterAwareCache;
+import fk.prof.userapi.cache.ClusteredProfileCache;
 import fk.prof.userapi.model.json.ProtoSerializers;
 import io.vertx.core.*;
 import io.vertx.core.json.Json;
@@ -87,7 +87,7 @@ public class ProfileDiscoveryAPITest {
         WorkerExecutor executor = vertx.createSharedWorkerExecutor(
             config.getBlockingWorkerPool().getName(), config.getBlockingWorkerPool().getSize());
         profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, new StorageBackedProfileLoader(asyncStorage),
-            mock(ClusterAwareCache.class), executor, config);
+            mock(ClusteredProfileCache.class), executor, config);
 
         when(asyncStorage.listAsync(anyString(), anyBoolean())).thenAnswer(invocation -> {
             String path1 = invocation.getArgument(0);

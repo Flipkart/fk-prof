@@ -6,7 +6,7 @@ import com.google.common.io.BaseEncoding;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.userapi.Configuration;
-import fk.prof.userapi.cache.ClusterAwareCache;
+import fk.prof.userapi.cache.ClusteredProfileCache;
 import fk.prof.userapi.model.ProfileView;
 import fk.prof.userapi.model.*;
 import fk.prof.userapi.util.Pair;
@@ -24,7 +24,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
- * Interacts with the {@link AsyncStorage} and the {@link ClusterAwareCache} based on invocations from controller.
+ * Interacts with the {@link AsyncStorage} and the {@link ClusteredProfileCache} based on invocations from controller.
  * Created by rohit.patiyal on 19/01/17.
  */
 public class ProfileStoreAPIImpl implements ProfileStoreAPI {
@@ -41,14 +41,14 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
 
     private final Cache<String, AggregationWindowSummary> summaryCache;
 
-    private final ClusterAwareCache profileCache;
+    private final ClusteredProfileCache profileCache;
 
     /* stores all requested futures that are waiting on file to be loaded from S3. If a file loading
     * is in progress, this map will contain its corresponding key */
     private final ConcurrentHashMap<String, FuturesList<AggregationWindowSummary>> filesBeingLoaded;
 
     public ProfileStoreAPIImpl(Vertx vertx, AsyncStorage asyncStorage, ProfileLoader profileLoader,
-                               ClusterAwareCache profileCache, WorkerExecutor workerExecutor,
+                               ClusteredProfileCache profileCache, WorkerExecutor workerExecutor,
                                Configuration config) {
         this.asyncStorage = asyncStorage;
         this.profileLoader = profileLoader;

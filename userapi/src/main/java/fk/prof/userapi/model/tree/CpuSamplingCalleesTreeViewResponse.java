@@ -7,7 +7,8 @@ import java.util.Map;
 
 public class CpuSamplingCalleesTreeViewResponse extends TreeViewResponse<AggregatedProfileModel.FrameNode> {
 
-  public CpuSamplingCalleesTreeViewResponse(List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> tree, Map<Integer, String> methodLookup) {
+  public CpuSamplingCalleesTreeViewResponse(List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> tree,
+                                            Map<Integer, String> methodLookup) {
     super(tree, methodLookup);
   }
 

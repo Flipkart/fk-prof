@@ -12,7 +12,7 @@ import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.StorageBackedProfileLoader;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
-import fk.prof.userapi.cache.ClusterAwareCache;
+import fk.prof.userapi.cache.ClusteredProfileCache;
 import fk.prof.userapi.model.json.ProtoSerializers;
 import fk.prof.userapi.model.tree.CallTree;
 import fk.prof.userapi.util.ProtoUtil;
@@ -72,7 +72,7 @@ public class ParseProfileTest {
         asyncStorage = mock(AsyncStorage.class);
         config = UserapiConfigManager.loadConfig(ParseProfileTest.class.getClassLoader().getResource("userapi-conf.json").getFile());
         profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, new StorageBackedProfileLoader(asyncStorage),
-            mock(ClusterAwareCache.class),
+            mock(ClusteredProfileCache.class),
             vertx.createSharedWorkerExecutor(
                 config.getBlockingWorkerPool().getName(), config.getBlockingWorkerPool().getSize()),
             config);
@@ -100,7 +100,7 @@ public class ParseProfileTest {
         }));
 
         StorageBackedProfileLoader loader = new StorageBackedProfileLoader(storage);
-        ClusterAwareCache cache = mock(ClusterAwareCache.class);
+        ClusteredProfileCache cache = mock(ClusteredProfileCache.class);
         doAnswer(inv -> Future.succeededFuture(loader.load(inv.getArgument(0))))
             .when(cache)
             .getAggregatedProfile(eq(profileName));

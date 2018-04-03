@@ -7,6 +7,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.AbstractMessage;
 import com.google.protobuf.Parser;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
+import fk.prof.metrics.MetricName;
 import fk.prof.metrics.Util;
 import fk.prof.userapi.proto.LoadInfoEntities.NodeLoadInfo;
 import fk.prof.userapi.proto.LoadInfoEntities.ProfileResidencyInfo;
@@ -30,7 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Shared storage based on zookeeper to store the mapping profile -> ip:port and maintain resource utilization counters
  * for each node in cluster.
- * It is used by {@link ClusterAwareCache}.
+ * It is used by {@link ClusteredProfileCache}.
  *
  * zookeeper node structure:
  * /fkprof-userapi                                                                    (session namespace)
@@ -46,9 +47,10 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
     private static final Logger logger = LoggerFactory.getLogger(ZKBasedCacheInfoRegistry.class);
-    private static final String distributedLockPath = "/global_mutex";
+    private static final String distributedLockPath = "/profile_cache_mutex";
 
     private final String zkNodesLoadInfoPath;
+    private final String zkProfileLoadStatusPath = "/profilesLoadStatus";
     private final CuratorFramework curatorClient;
     private final InterProcessLock interProcessLock;
 
@@ -56,24 +58,27 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
     private final AtomicReference<LocalDateTime> lastZkLostTime;
     private final AtomicBoolean recentlyZkConnectionLost;
 
-    private final byte[] myResidencyInfoInBytes;
-    private final ProfileResidencyInfo myProfileResidencyInfo;
+    private final byte[] selfResidencyInfoInBytes;
+    private final ProfileResidencyInfo selfProfileResidencyInfo;
 
 
-    private Runnable onConnect;
+    private final Runnable onConnect;
 
-    private Counter lockAcquireTimeoutCounter = Util.counter("zk.lock.timeouts");
-    private Counter onReconnectFailures = Util.counter("zk.onreconnect.failures");
+    private final Counter lockAcquireTimeoutCounter = Util.counter(MetricName.ZK_Userapi_Cache_Lock_Timeouts.get());
+    private final Counter onReconnectFailures = Util.counter(MetricName.ZK_Userapi_Cache_OnReconnect_Failures.get());
 
-    ZKBasedCacheInfoRegistry(CuratorFramework curatorClient, String myIp, int port, Runnable onConnect) {
+    ZKBasedCacheInfoRegistry(CuratorFramework curatorClient, String selfIp, int port, Runnable onConnect) {
         this.curatorClient = curatorClient;
 
-        this.zkNodesLoadInfoPath = "/nodesInfo/" + myIp + ":" + port;
+        this.zkNodesLoadInfoPath = "/nodesInfo/" + selfIp + ":" + port;
         this.interProcessLock = new InterProcessMutex(curatorClient, distributedLockPath);
         this.lastZkLostTime = new AtomicReference<>(LocalDateTime.MIN);
         this.recentlyZkConnectionLost = new AtomicBoolean(false);
-        this.myProfileResidencyInfo = ProfileResidencyInfo.newBuilder().setIp(myIp).setPort(port).build();
-        this.myResidencyInfoInBytes = this.myProfileResidencyInfo.toByteArray();
+        this.selfProfileResidencyInfo = ProfileResidencyInfo.newBuilder().setIp(selfIp).setPort(port).build();
+        this.selfResidencyInfoInBytes = this.selfProfileResidencyInfo.toByteArray();
+
+        // adding stateChangeListener to be scheduled on a single thread executor so that we don't have to worry about
+        // concurrency.
         this.curatorClient.getConnectionStateListenable().addListener(this::zkStateChangeListener,
             Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("curator-state-listener").build()));
 
@@ -95,7 +100,7 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
     public void releaseOwnership(AggregatedProfileNamingStrategy profileName) throws Exception {
         try(AutoCloseable ignored = getLock()) {
             ProfileResidencyInfo residencyInfo = getProfileResidencyInfo(profileName);
-            if(residencyInfo != null && Objects.equals(residencyInfo, myProfileResidencyInfo)) {
+            if(residencyInfo != null && Objects.equals(residencyInfo, selfProfileResidencyInfo)) {
                 removeProfileResidencyInfo(profileName);
             }
         }
@@ -107,7 +112,7 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
             ProfileResidencyInfo residencyInfo = getProfileResidencyInfo(profileName);
             if (residencyInfo == null) {
                 putProfileResidencyInfo(profileName, false);
-            } else if(Objects.equals(residencyInfo, myProfileResidencyInfo)) {
+            } else if(Objects.equals(residencyInfo, selfProfileResidencyInfo)) {
                 putProfileResidencyInfo(profileName, true);
             } else {
               throw new CachedProfileNotFoundException(residencyInfo.getIp(), residencyInfo.getPort());
@@ -137,7 +142,8 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
 
     /**
      * Create profile residency node for the provided profile name, along with incrementing the owner node's load
-     * Note : This method deletes the existing profile node before creating it
+     * Note : This method deletes the existing profile node in case the node is not owned by current session
+     * before creating it.
      * @param profileName name of the profile
      * @param profileNodeExists whether a profile residency node already exists
      * @throws Exception zookeeper exception
@@ -147,10 +153,17 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
         NodeLoadInfo nodeLoadInfo = readFrom(zkNodesLoadInfoPath, NodeLoadInfo.parser());
         int profileLoadedCount = nodeLoadInfo.getProfilesLoaded() + 1;
         CuratorTransactionFinal transaction = curatorClient.inTransaction().setData().forPath(zkNodesLoadInfoPath, buildNodeLoadInfo(profileLoadedCount).toByteArray()).and();
+
         if (profileNodeExists) {
-            transaction = transaction.delete().forPath(zkPathForProfile(profileName)).and();
+            boolean staleNode = !sessionIdMatches(profileName);
+            if (staleNode) {
+                transaction = transaction.delete().forPath(zkPathForProfile(profileName)).and();
+            } else {
+                transaction = transaction.setData().forPath(zkPathForProfile(profileName), selfResidencyInfoInBytes).and();
+            }
+        } else {
+            transaction = transaction.create().withMode(CreateMode.EPHEMERAL).forPath(zkPathForProfile(profileName), selfResidencyInfoInBytes).and();
         }
-        transaction = transaction.create().withMode(CreateMode.EPHEMERAL).forPath(zkPathForProfile(profileName), myResidencyInfoInBytes).and();
         transaction.commit();
     }
 
@@ -175,27 +188,9 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
         return new CloseableSharedLock();
     }
 
+    @VisibleForTesting
     ConnectionState getState() {
         return connectionState.get();
-    }
-
-    private class CloseableSharedLock implements AutoCloseable {
-        CloseableSharedLock() throws Exception {
-            if (!interProcessLock.acquire(5, TimeUnit.SECONDS)) {
-                lockAcquireTimeoutCounter.inc();
-                throw new ZkStoreUnavailableException("Could not acquire lock in the given time.");
-            }
-        }
-
-        @Override
-        public void close() throws Exception {
-            interProcessLock.release();
-        }
-    }
-
-    public enum ConnectionState {
-        Disconnected,
-        Connected
     }
 
     private void ensureConnected() throws ZkStoreUnavailableException {
@@ -219,44 +214,47 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
     }
 
     private String zkPathForProfile(AggregatedProfileNamingStrategy profileName) {
-        return "/profilesLoadStatus/" +  BaseEncoding.base32().encode(profileName.toString().getBytes(Charset.forName("utf-8")));
+        return zkProfileLoadStatusPath + "/" + BaseEncoding.base32().encode(profileName.toString().getBytes(Charset.forName("utf-8")));
     }
 
     private void zkStateChangeListener(CuratorFramework client, org.apache.curator.framework.state.ConnectionState newState) {
-        if(org.apache.curator.framework.state.ConnectionState.RECONNECTED.equals(newState)) {
-            try {
-                if(recentlyZkConnectionLost.get()) {
-                    reInit();
-                    recentlyZkConnectionLost.set(false);
+        switch (newState) {
+            case RECONNECTED:
+                try {
+                    if(recentlyZkConnectionLost.get()) {
+                        reInit();
+                        recentlyZkConnectionLost.set(false);
+                    }
+                    connectionState.set(ConnectionState.Connected);
                 }
-                connectionState.set(ConnectionState.Connected);
-            }
-            catch (Exception e) {
-                onReconnectFailures.inc();
-                logger.error("Error while reinitializing zookeeper after reconnection.", e);
-            }
+                catch (Exception e) {
+                    onReconnectFailures.inc();
+                    logger.error("Error while reinitializing zookeeper after reconnection.", e);
+                }
+                break;
+            case LOST:
+                connectionState.set(ConnectionState.Disconnected);
+                lastZkLostTime.set(LocalDateTime.now());
+                recentlyZkConnectionLost.set(true);
+                break;
+            case SUSPENDED:
+            case READ_ONLY:
+                connectionState.set(ConnectionState.Disconnected);
         }
-        else if(org.apache.curator.framework.state.ConnectionState.LOST.equals(newState)) {
-            connectionState.set(ConnectionState.Disconnected);
-            lastZkLostTime.set(LocalDateTime.now());
-            recentlyZkConnectionLost.set(true);
-        }
-        else if(org.apache.curator.framework.state.ConnectionState.SUSPENDED.equals(newState) || org.apache.curator.framework.state.ConnectionState.READ_ONLY.equals(newState)) {
-            connectionState.set(ConnectionState.Disconnected);
-        }
+
         logger.info("zookeeper state changed to \"{}\"", newState.name());
     }
 
     private void ensureRequiredZkNodesPresent() throws Exception {
         try {
             curatorClient.delete().forPath(zkNodesLoadInfoPath);
-        } catch (KeeperException.NoNodeException e){
-            logger.info("Node does not exist while deleting zkNodeInfoPath Node, exception: ", e);
+        } catch (KeeperException.NoNodeException e) {
+            logger.error("Node does not exist while deleting zkNodeInfoPath Node, exception: ", e);
         }
         curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkNodesLoadInfoPath, buildNodeLoadInfo(0).toByteArray());
 
-        if (curatorClient.checkExists().forPath("/profilesLoadStatus") == null) {
-            curatorClient.create().withMode(CreateMode.PERSISTENT).forPath("/profilesLoadStatus");
+        if (curatorClient.checkExists().forPath(zkProfileLoadStatusPath) == null) {
+            curatorClient.create().withMode(CreateMode.PERSISTENT).forPath(zkProfileLoadStatusPath);
         }
     }
 
@@ -265,4 +263,22 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
         onConnect.run();
     }
 
+    private class CloseableSharedLock implements AutoCloseable {
+        CloseableSharedLock() throws Exception {
+            if (!interProcessLock.acquire(5, TimeUnit.SECONDS)) {
+                lockAcquireTimeoutCounter.inc();
+                throw new ZkStoreUnavailableException("Could not acquire lock in the given time.");
+            }
+        }
+
+        @Override
+        public void close() throws Exception {
+            interProcessLock.release();
+        }
+    }
+
+    public enum ConnectionState {
+        Disconnected,
+        Connected
+    }
 }

@@ -14,7 +14,7 @@ import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.S3AsyncStorage;
 import fk.prof.storage.S3ClientFactory;
 import fk.prof.userapi.api.*;
-import fk.prof.userapi.cache.ClusterAwareCache;
+import fk.prof.userapi.cache.ClusteredProfileCache;
 import fk.prof.userapi.deployer.VerticleDeployer;
 import fk.prof.userapi.deployer.impl.UserapiHttpVerticleDeployer;
 import fk.prof.userapi.model.json.CustomSerializers;
@@ -94,7 +94,7 @@ public class UserapiManager {
 
         ProfileLoader profileLoader = new StorageBackedProfileLoader(storage);
 
-        ClusterAwareCache profileCache = new ClusterAwareCache(curatorClient,
+        ClusteredProfileCache profileCache = new ClusteredProfileCache(curatorClient,
             profileLoader,
             new ProfileViewCreator(),
             workerExecutor,

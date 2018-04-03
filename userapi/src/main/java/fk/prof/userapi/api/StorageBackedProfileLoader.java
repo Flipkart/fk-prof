@@ -7,6 +7,7 @@ import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.aggregation.model.AggregationWindowSerializer;
 import fk.prof.aggregation.model.AggregationWindowSummarySerializer;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
 import fk.prof.metrics.Util;
 import fk.prof.storage.AsyncStorage;
@@ -34,13 +35,10 @@ import java.util.zip.GZIPInputStream;
  */
 public class StorageBackedProfileLoader implements ProfileLoader {
 
-    private static final String profileLoadTimerPrefix = "profile.load.timer";
-    private static final String profileSummaryLoadTimerPrefix = "profilesummary.load.timer";
-
     private static final Logger LOGGER = LoggerFactory.getLogger(StorageBackedProfileLoader.class);
 
-    private final Meter profileLoadFailureCounter = Util.meter("profile.load.failures.meter");
-    private final Meter profileSummaryLoadFailureCounter = Util.meter("profilesummary.load.failures.meter");
+    private final Meter profileLoadFailureCounter = Util.meter(MetricName.Profile_Load_Failures.get());
+    private final Meter profileSummaryLoadFailureCounter = Util.meter(MetricName.ProfileSummary_Load_Failures.get());
 
     private final AsyncStorage asyncStorage;
 
@@ -56,7 +54,7 @@ public class StorageBackedProfileLoader implements ProfileLoader {
         InputStream in = new StorageBackedInputStream(asyncStorage, filename);
 
         ProcessGroupTag pgTag = new ProcessGroupTag(filename.appId, filename.clusterId, filename.procId);
-        Timer.Context timerCtx = Util.timer(profileLoadTimerPrefix, pgTag.toString()).time();
+        Timer.Context timerCtx = Util.timer(MetricName.Profile_Load_Time_Prefix.get(), pgTag.toString()).time();
 
         try {
             in = new GZIPInputStream(in);
@@ -89,7 +87,7 @@ public class StorageBackedProfileLoader implements ProfileLoader {
         InputStream in = new StorageBackedInputStream(asyncStorage, filename);
 
         ProcessGroupTag pgTag = new ProcessGroupTag(filename.appId, filename.clusterId, filename.procId);
-        Timer.Context timerCtx = Util.timer(profileSummaryLoadTimerPrefix, pgTag.toString()).time();
+        Timer.Context timerCtx = Util.timer(MetricName.ProfileSummary_Load_Time_Prefix.get(), pgTag.toString()).time();
 
         try {
             in = new GZIPInputStream(in);
