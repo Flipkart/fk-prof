@@ -157,10 +157,6 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
         return profiles;
     }
 
-    public Future<AggregatedProfileInfo> load(AggregatedProfileNamingStrategy filename) {
-        return profileCache.getAggregatedProfile(filename);
-    }
-
     public Future<AggregationWindowSummary> loadSummary(AggregatedProfileNamingStrategy filename) {
         String fileNameKey = filename.getFileName(0);
         if(!filename.isSummaryFile) {

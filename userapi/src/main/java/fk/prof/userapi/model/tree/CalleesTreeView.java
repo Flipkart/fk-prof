@@ -85,6 +85,11 @@ public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Ca
                 if(!forceExpand && methodIdLineNumSet.size() > 1) {
                     return;
                 }
+
+                // break if no callers found.
+                if(methodIdLineNumSet.size() == 0) {
+                    break;
+                }
             }
         }
 

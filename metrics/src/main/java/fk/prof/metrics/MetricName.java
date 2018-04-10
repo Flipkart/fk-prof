@@ -46,15 +46,13 @@ public enum MetricName {
   Profile_Header_Size("profile.header.size"),
 
   Profile_Load_Failures("profile.load.failures"),
+  Profile_Load_Intermittent_Failures("profile.load.intermittent.failures"),
   Profile_Load_Time_Prefix("profile.load.time"),
   Profile_Cache_Size("profile.cache.count"),
 
   ProfileSummary_Load_Failures("profilesummary.load.failures"),
   ProfileSummary_Load_Time_Prefix("profilesummary.load.time"),
   ProfileSummary_Cache_Size("profilesummary.cache.count"),
-
-  ProfileView_CallTree_Creation_Prefix("profileview.calltree.create"),
-  ProfileView_CalleeTree_Creation_Prefix("profileview.calleetree.create"),
 
   Recorder_Poll_Complete("recorder.poll.complete"),
   Recorder_Poll_Reset("recorder.poll.reset"),
@@ -91,8 +89,10 @@ public enum MetricName {
   ZK_Backend_Assoc_Remove("zk.backend.assoc.remove"),
   ZK_Backend_Assoc_LoadReport_Existing("zk.backend.assoc.loadreport.existing"),
   ZK_Backend_Assoc_Enqueue_Failure("zk.backend.assoc.enqueue.fail"),
-  ZK_Userapi_Cache_Lock_Timeouts("zk.userapi.cache.lock.timeouts"),
-  ZK_Userapi_Cache_OnReconnect_Failures("zk.userapi.cache.onreconnect.failures"),
+  ZK_Userapi_Cache_Lock_Timeout("zk.userapi.cache.lock.timeout"),
+  ZK_Userapi_Cache_OnReconnect_Failure("zk.userapi.cache.onreconnect.failure"),
+  Zk_Userapi_Profile_Claim_Failure("zk.userapi.profile.claim.failure"),
+  Zk_Userapi_Profile_Release_Failure("zk.userapi.profile.release.failure"),
 
   Daemon_LoadReport_Success("daemon.loadreport.success"),
   Daemon_LoadReport_Failure("daemon.loadreport.failure"),

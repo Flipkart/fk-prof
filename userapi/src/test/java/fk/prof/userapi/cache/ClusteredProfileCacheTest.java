@@ -89,7 +89,7 @@ public class ClusteredProfileCacheTest {
     public void beforeTest() throws Exception {
         vertx = Vertx.vertx();
         executor = vertx.createSharedWorkerExecutor(config.getBlockingWorkerPool().getName(), 3);
-        cleanUpZookeeper();
+        cleanUpZookeeper(curatorClient);
     }
 
     private void setUpDefaultCache(TestContext context, StorageBackedProfileLoader profileLoader, ProfileViewCreator viewCreator) {
@@ -448,7 +448,7 @@ public class ClusteredProfileCacheTest {
         return new NameProfilePair(procId, dt, traceCount);
     }
 
-    private void cleanUpZookeeper() throws Exception {
+    public static void cleanUpZookeeper(CuratorFramework curatorClient) throws Exception {
         List<String> profileNodes = new ArrayList<>();
         List<String> nodes = new ArrayList<>();
         if(curatorClient.checkExists().forPath("/profilesLoadStatus") != null) {

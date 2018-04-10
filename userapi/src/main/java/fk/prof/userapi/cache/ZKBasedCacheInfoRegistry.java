@@ -1,6 +1,7 @@
 package fk.prof.userapi.cache;
 
 import com.codahale.metrics.Counter;
+import com.codahale.metrics.Meter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -61,11 +62,12 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
     private final byte[] selfResidencyInfoInBytes;
     private final ProfileResidencyInfo selfProfileResidencyInfo;
 
-
     private final Runnable onConnect;
 
-    private final Counter lockAcquireTimeoutCounter = Util.counter(MetricName.ZK_Userapi_Cache_Lock_Timeouts.get());
-    private final Counter onReconnectFailures = Util.counter(MetricName.ZK_Userapi_Cache_OnReconnect_Failures.get());
+    private final Counter lockAcquireTimeoutCounter = Util.counter(MetricName.ZK_Userapi_Cache_Lock_Timeout.get());
+    private final Counter onReconnectFailures = Util.counter(MetricName.ZK_Userapi_Cache_OnReconnect_Failure.get());
+    private final Meter claimFailures = Util.meter(MetricName.Zk_Userapi_Profile_Claim_Failure.get());
+    private final Meter releaseFailures = Util.meter(MetricName.Zk_Userapi_Profile_Release_Failure.get());
 
     ZKBasedCacheInfoRegistry(CuratorFramework curatorClient, String selfIp, int port, Runnable onConnect) {
         this.curatorClient = curatorClient;
@@ -103,6 +105,9 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
             if(residencyInfo != null && Objects.equals(residencyInfo, selfProfileResidencyInfo)) {
                 removeProfileResidencyInfo(profileName);
             }
+        } catch (Exception e) {
+            releaseFailures.mark();
+            throw e;
         }
     }
 
@@ -117,6 +122,9 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
             } else {
               throw new CachedProfileNotFoundException(residencyInfo.getIp(), residencyInfo.getPort());
             }
+        } catch (Exception e) {
+            claimFailures.mark();
+            throw e;
         }
     }
 
@@ -142,8 +150,7 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
 
     /**
      * Create profile residency node for the provided profile name, along with incrementing the owner node's load
-     * Note : This method deletes the existing profile node in case the node is not owned by current session
-     * before creating it.
+     * Note : This method recreates the existing profile node in case the node is not owned by current session.
      * @param profileName name of the profile
      * @param profileNodeExists whether a profile residency node already exists
      * @throws Exception zookeeper exception
@@ -154,16 +161,16 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
         int profileLoadedCount = nodeLoadInfo.getProfilesLoaded() + 1;
         CuratorTransactionFinal transaction = curatorClient.inTransaction().setData().forPath(zkNodesLoadInfoPath, buildNodeLoadInfo(profileLoadedCount).toByteArray()).and();
 
-        if (profileNodeExists) {
-            boolean staleNode = !sessionIdMatches(profileName);
-            if (staleNode) {
-                transaction = transaction.delete().forPath(zkPathForProfile(profileName)).and();
-            } else {
-                transaction = transaction.setData().forPath(zkPathForProfile(profileName), selfResidencyInfoInBytes).and();
-            }
-        } else {
-            transaction = transaction.create().withMode(CreateMode.EPHEMERAL).forPath(zkPathForProfile(profileName), selfResidencyInfoInBytes).and();
+        String zkProfilePath = zkPathForProfile(profileName);
+        if (profileNodeExists && isStaleNode(zkProfilePath)) {
+            transaction = transaction.delete().forPath(zkProfilePath).and();
+            profileNodeExists = false;
         }
+
+        if(!profileNodeExists) {
+            transaction = transaction.create().withMode(CreateMode.EPHEMERAL).forPath(zkProfilePath, selfResidencyInfoInBytes).and();
+        }
+
         transaction.commit();
     }
 
@@ -203,9 +210,15 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
         return NodeLoadInfo.newBuilder().setProfilesLoaded(profileCount).build();
     }
 
-    private boolean sessionIdMatches(AggregatedProfileNamingStrategy profileName) throws Exception {
-        return curatorClient.getZookeeperClient().getZooKeeper().getSessionId() ==
-            curatorClient.checkExists().forPath(zkPathForProfile(profileName)).getEphemeralOwner();
+    /**
+     * Checks whether the current zk session owns the node at path {@code path}.
+     * @param path
+     * @return
+     * @throws Exception
+     */
+    private boolean isStaleNode(String path) throws Exception {
+        return curatorClient.getZookeeperClient().getZooKeeper().getSessionId() !=
+            curatorClient.checkExists().forPath(path).getEphemeralOwner();
     }
 
     private <T extends AbstractMessage> T readFrom(String path, Parser<T> parser) throws Exception {
@@ -249,9 +262,10 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
         try {
             curatorClient.delete().forPath(zkNodesLoadInfoPath);
         } catch (KeeperException.NoNodeException e) {
-            logger.error("Node does not exist while deleting zkNodeInfoPath Node, exception: ", e);
+            logger.info("Making sure zkNodeLoadPath does not exist.", e);
         }
-        curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(zkNodesLoadInfoPath, buildNodeLoadInfo(0).toByteArray());
+        curatorClient.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL)
+            .forPath(zkNodesLoadInfoPath, buildNodeLoadInfo(0).toByteArray());
 
         if (curatorClient.checkExists().forPath(zkProfileLoadStatusPath) == null) {
             curatorClient.create().withMode(CreateMode.PERSISTENT).forPath(zkProfileLoadStatusPath);
@@ -260,7 +274,9 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
 
     private void reInit() throws Exception {
         ensureRequiredZkNodesPresent();
-        onConnect.run();
+        if(onConnect != null) {
+            onConnect.run();
+        }
     }
 
     private class CloseableSharedLock implements AutoCloseable {

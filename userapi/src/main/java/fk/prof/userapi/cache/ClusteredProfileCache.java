@@ -1,10 +1,14 @@
 package fk.prof.userapi.cache;
 
+import com.codahale.metrics.Meter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.RemovalCause;
 import com.google.common.cache.RemovalNotification;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
+import fk.prof.metrics.MetricName;
+import fk.prof.metrics.Util;
 import fk.prof.userapi.Configuration;
+import fk.prof.userapi.api.DeserializationException;
 import fk.prof.userapi.api.ProfileLoader;
 import fk.prof.userapi.api.ProfileViewCreator;
 import fk.prof.userapi.model.AggregatedProfileInfo;
@@ -31,6 +35,7 @@ import java.util.Optional;
  */
 public class ClusteredProfileCache {
     private static final Logger logger = LoggerFactory.getLogger(ClusteredProfileCache.class);
+    private final Meter profileLoadFailureCounter = Util.meter(MetricName.Profile_Load_Intermittent_Failures.get());
 
     private final LocalProfileCache cache;
 
@@ -38,7 +43,7 @@ public class ClusteredProfileCache {
     private final ProfileLoader profileLoader;
 
     private final CacheInfoRegistry cacheInfoRegistry;
-    private final String myIp;
+    private final String selfIp;
     private final int port;
 
     public ClusteredProfileCache(CuratorFramework curatorClient, ProfileLoader profileLoader,
@@ -49,7 +54,7 @@ public class ClusteredProfileCache {
     @VisibleForTesting
     ClusteredProfileCache(CuratorFramework curatorClient, ProfileLoader profileLoader,
                           WorkerExecutor workerExecutor, Configuration config, LocalProfileCache localCache) {
-        this.myIp = config.getIpAddress();
+        this.selfIp = config.getIpAddress();
         this.port = config.getHttpConfig().getHttpPort();
 
         this.workerExecutor = workerExecutor;
@@ -58,7 +63,7 @@ public class ClusteredProfileCache {
         this.cache = localCache;
         this.cache.setRemovalListener(this::doCleanUpOnEviction);
 
-        this.cacheInfoRegistry = new ZKBasedCacheInfoRegistry(curatorClient, myIp, port, this.cache::invalidateCache);
+        this.cacheInfoRegistry = new ZKBasedCacheInfoRegistry(curatorClient, selfIp, port, this.cache::invalidateCache);
     }
 
     public Future<Void> onClusterJoin() {
@@ -78,8 +83,9 @@ public class ClusteredProfileCache {
      * @param profileName name of the profile
      * @return Future of AggregatedProfileInfo
      *
+     * leaving it at default access modifier for testing
      */
-    public Future<AggregatedProfileInfo> getAggregatedProfile(AggregatedProfileNamingStrategy profileName) {
+    Future<AggregatedProfileInfo> getAggregatedProfile(AggregatedProfileNamingStrategy profileName) {
         try {
             Optional<AggregatedProfileInfo> profile = getFromLocalCache(profileName);
             if(profile.isPresent()) {
@@ -137,16 +143,16 @@ public class ClusteredProfileCache {
 
         // profile not found, so initiate the profile loading and compute view after that
         getAggregatedProfile(profileName).setHandler(ar -> {
-            if(ar.succeeded()) {
-                try {
-                    viewFuture.complete(getOrCreateView(profileName, traceName, profileViewType));
-                    return;
-                } catch (Exception e) {
-                    viewFuture.fail(e);
-                    return;
-                }
+            if(ar.failed()) {
+                viewFuture.fail(ar.cause());
+                return;
             }
-            viewFuture.fail(ar.cause());
+
+            try {
+                viewFuture.complete(getOrCreateView(profileName, traceName, profileViewType));
+            } catch (Exception e) {
+                viewFuture.fail(e);
+            }
         });
 
         return viewFuture;
@@ -157,9 +163,31 @@ public class ClusteredProfileCache {
 
         cache.put(profileName, future);
         future.setHandler(ar -> {
-            logger.info("Profile load complete. file: {}", profileName);
+            if(ar.failed()) {
+                logger.error("Profile load complete in failure: {}", profileName, ar.cause());
+            }
+            else {
+                logger.info("Profile load complete: {}", profileName);
+            }
+
             // load_profile might fail, regardless reinsert to take the new utilization into account.
-            cache.put(profileName, future);
+
+            // ignore in case if intermittent issues
+            if(ar.failed() && !(ar.cause() instanceof DeserializationException)) {
+                profileLoadFailureCounter.mark();
+                doAsync(() -> {
+                    try {
+                        cacheInfoRegistry.releaseOwnership(profileName);
+                    } finally {
+                        // invalidate the key
+                        cache.remove(profileName);
+                    }
+                    return null;
+                });
+            }
+            else {
+                cache.put(profileName, future);
+            }
         });
         return future;
     }
@@ -271,9 +299,7 @@ public class ClusteredProfileCache {
                 if(logError) {
                     logger.error(failMsg, e, objects);
                 }
-                if(!f.isComplete()) {
-                    f.fail(e);
-                }
+                f.fail(e);
             }
         }, result.completer());
         return result;

@@ -15,7 +15,6 @@ import fk.prof.storage.S3AsyncStorage;
 import fk.prof.storage.S3ClientFactory;
 import fk.prof.userapi.api.*;
 import fk.prof.userapi.cache.ClusteredProfileCache;
-import fk.prof.userapi.deployer.VerticleDeployer;
 import fk.prof.userapi.deployer.impl.UserapiHttpVerticleDeployer;
 import fk.prof.userapi.model.json.CustomSerializers;
 import fk.prof.userapi.model.json.ProtoSerializers;
@@ -44,7 +43,6 @@ public class UserapiManager {
     private final Vertx vertx;
     private final Configuration config;
     private final CuratorFramework curatorClient;
-    private final AsyncStorage storage;
 
     public UserapiManager(String configFilePath) throws Exception {
         this(UserapiConfigManager.loadConfig(configFilePath));
@@ -59,10 +57,6 @@ public class UserapiManager {
         this.vertx = Vertx.vertx(vertxOptions);
 
         this.curatorClient = createCuratorClient();
-        curatorClient.start();
-        curatorClient.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
-
-        this.storage = initStorage();
     }
 
     public Future<Void> close() {
@@ -82,7 +76,6 @@ public class UserapiManager {
     }
 
     Future<Void> launch() {
-        Future result = Future.future();
         // register serializers
         registerSerializers(Json.mapper);
         registerSerializers(Json.prettyMapper);
@@ -92,31 +85,45 @@ public class UserapiManager {
         WorkerExecutor workerExecutor = vertx.createSharedWorkerExecutor(
             config.getBlockingWorkerPool().getName(), config.getBlockingWorkerPool().getSize());
 
+        // its non blocking as of now.
+        AsyncStorage storage = initStorage();
+
         ProfileLoader profileLoader = new StorageBackedProfileLoader(storage);
 
+        // curator client is initialized later on. currently cache only saves the reference in its constructor.
         ClusteredProfileCache profileCache = new ClusteredProfileCache(curatorClient,
             profileLoader,
             new ProfileViewCreator(),
             workerExecutor,
             config);
 
-        ProfileStoreAPI profileStoreAPI = new ProfileStoreAPIImpl(vertx,
-            storage,
-            profileLoader,
-            profileCache,
-            workerExecutor,
-            config);
+        return initCuratorAsync(workerExecutor)
+            .compose(v -> profileCache.onClusterJoin())
+            .compose(v -> {
+                ProfileStoreAPI profileStoreAPI = new ProfileStoreAPIImpl(vertx,
+                    storage,
+                    profileLoader,
+                    profileCache,
+                    workerExecutor,
+                    config);
 
-        VerticleDeployer userapiHttpVerticleDeployer = new UserapiHttpVerticleDeployer(vertx, config, profileStoreAPI);
+                return new UserapiHttpVerticleDeployer(vertx, config, profileStoreAPI).deploy();
+            })
+            .mapEmpty();
+    }
 
-        profileCache.onClusterJoin().setHandler(ar -> {
-            if (ar.failed()) {
-                result.fail(ar.cause());
-            } else {
-                userapiHttpVerticleDeployer.deploy().setHandler(result.completer());
+    private Future<Void> initCuratorAsync(WorkerExecutor we) {
+        Future<Void> future = Future.future();
+        we.executeBlocking(f -> {
+            try {
+                curatorClient.start();
+                curatorClient.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
+                f.complete();
+            } catch (Exception e) {
+                f.fail(e);
             }
-        });
-        return result;
+        }, future.completer());
+        return future;
     }
 
     private void registerSerializers(ObjectMapper mapper) {

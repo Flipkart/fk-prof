@@ -27,14 +27,25 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * A wrapper over {@link Cache} to cache aggregated profiles and created views.
  * Provides usual get, put semantics.
- * It is used by {@link ClusteredProfileCache} as a local cache. {@code put} for a {@link AggregatedProfileNamingStrategy}
- * will only be called 2 times, once the profile loading is initiated and the next when loading is finished.
+ * It is used by {@link ClusteredProfileCache} as a local cache. {@link #put(AggregatedProfileNamingStrategy, Future)}
+ * for a {@link AggregatedProfileNamingStrategy} will only be called 2 times, once the profile loading is initiated and
+ * the next when loading is finished.
+ *
+ * This class maintains 2 cache instances. One for the profiles and the other for views. Separate cache instances are
+ * used here so that the eviction policy and the stat usage can be monitored separately.
+ *
+ * If the profile gets evicted, the views generated for that profile are then scheduled to be removed.
+ * see {@link #doCleanupOnEviction(RemovalNotification)}.
  *
  * Created by gaurav.ashok on 17/07/17.
  */
 class LocalProfileCache {
     private static final Logger logger = LoggerFactory.getLogger(LocalProfileCache.class);
 
+    /**
+     * A unique id generator. Whenever a new profile is inserted into the cache, it is assigned a unique id. Can be
+     * thought of as a unique instance id.
+     */
     private final AtomicInteger uidGenerator;
     private final Cache<AggregatedProfileNamingStrategy, CacheableProfile> profileCache;
     private final Cache<String, Cacheable<ProfileView>> viewCache;
@@ -81,6 +92,12 @@ class LocalProfileCache {
 
     void put(AggregatedProfileNamingStrategy key, Future<AggregatedProfileInfo> profileFuture) {
         profileCache.put(key, new CacheableProfile(key, uidGenerator.incrementAndGet(), profileFuture));
+    }
+
+    void remove(AggregatedProfileNamingStrategy key) {
+        CacheableProfile p = profileCache.getIfPresent(key);
+        profileCache.invalidate(p);
+        p.onEviction();
     }
 
     Pair<Future<AggregatedProfileInfo>, Cacheable<ProfileView>> getView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
@@ -132,8 +149,13 @@ class LocalProfileCache {
      */
     private class CacheableProfile implements Cacheable<AggregatedProfileInfo> {
         /**
-         * Unique id to tie the generated {@code viewKey} to this particular profile. So that the views generated
+         * Unique id to tie the generated {@code cachedViews} to this particular profile. So that the views generated
          * from this profile are not reused alongside the different instance of the same profile.
+         *
+         * Since the 2 caches are not kept in sync on each operation, its possible that the profile gets reloaded
+         * between the very same profile's earlier eviction and corresponding views cleanup. In such a case, because of
+         * the uid, the views related to new loaded profile will be recreated. The older views will be deleted once the
+         * eviction handler gets the chance to run.
          */
         final int uid;
 

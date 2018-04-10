@@ -65,13 +65,6 @@ public interface ProfileStoreAPI {
                                                                           ZonedDateTime startTime, int durationInSeconds);
 
     /**
-     * Returns a {@link Future} of {@link AggregatedProfileInfo} for the provided filename.
-     *
-     * @param filename  name of the profile.
-     */
-    Future<AggregatedProfileInfo> load(AggregatedProfileNamingStrategy filename);
-
-    /**
      * Returns {@link AggregationWindowSummary} for the provided filename in a future
      *
      * @param filename  name of the profile.

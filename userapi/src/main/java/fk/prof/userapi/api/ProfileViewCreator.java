@@ -1,9 +1,5 @@
 package fk.prof.userapi.api;
 
-import com.codahale.metrics.Timer;
-import fk.prof.metrics.MetricName;
-import fk.prof.metrics.ProcessGroupTag;
-import fk.prof.metrics.Util;
 import fk.prof.userapi.cache.Cacheable;
 import fk.prof.userapi.model.AggregatedOnCpuSamples;
 import fk.prof.userapi.model.AggregatedProfileInfo;
@@ -29,18 +25,12 @@ public class ProfileViewCreator {
     }
 
     private CallTreeView buildCallTreeView(AggregatedProfileInfo profile, String traceName) {
-        ProcessGroupTag pgTag = new ProcessGroupTag(profile.getAppId(), profile.getClusterId(), profile.getProcId());
-        try (Timer.Context ctx = Util.timer(MetricName.ProfileView_CallTree_Creation_Prefix.get(), pgTag.toString()).time()) {
-            AggregatedOnCpuSamples samplesData = (AggregatedOnCpuSamples) profile.getAggregatedSamples(traceName).getAggregatedSamples();
-            return new CallTreeView(samplesData.getCallTree());
-        }
+        AggregatedOnCpuSamples samplesData = (AggregatedOnCpuSamples) profile.getAggregatedSamples(traceName).getAggregatedSamples();
+        return new CallTreeView(samplesData.getCallTree());
     }
 
     private CalleesTreeView buildCalleesTreeView(AggregatedProfileInfo profile, String traceName) {
-        ProcessGroupTag pgTag = new ProcessGroupTag(profile.getAppId(), profile.getClusterId(), profile.getProcId());
-        try (Timer.Context ctx = Util.timer(MetricName.ProfileView_CalleeTree_Creation_Prefix.get(), pgTag.toString()).time()) {
-            AggregatedOnCpuSamples samplesData = (AggregatedOnCpuSamples) profile.getAggregatedSamples(traceName).getAggregatedSamples();
-            return new CalleesTreeView(samplesData.getCallTree(), samplesData.getCallTree().getHotMethodNodeIds());
-        }
+        AggregatedOnCpuSamples samplesData = (AggregatedOnCpuSamples) profile.getAggregatedSamples(traceName).getAggregatedSamples();
+        return new CalleesTreeView(samplesData.getCallTree(), samplesData.getCallTree().getHotMethodNodeIds());
     }
 }
