@@ -40,7 +40,7 @@ public class MockBackendServer {
     public static void main(String[] args) {
 
         if(args.length < 4) {
-            logger.info("Help: backend_server <local_ip> delay duration [io:threashold_ms|cpu:freq]");
+            logger.info("Help: backend_server <local_ip> delay duration [io:threshold_ms|cpu:freq]");
             return;
         }
 

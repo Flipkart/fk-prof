@@ -1,6 +1,5 @@
 package fk.prof.bciagent.tracer;
 
-import com.google.common.annotations.VisibleForTesting;
 import fk.prof.bciagent.FdAccessor;
 
 import java.io.FileDescriptor;
@@ -28,7 +27,7 @@ public class IOTracer {
 
     private FileOpTracer fTracer;
 
-    @VisibleForTesting
+    // visible for testing. Not introducing dependency on google guave for the annotation.
     public IOTracer(SocketOpTracer sTracer, FileOpTracer fTracer) {
         Objects.requireNonNull(sTracer);
         Objects.requireNonNull(fTracer);
