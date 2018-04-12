@@ -26,9 +26,9 @@ public class DropwizardResource {
 
     private Random rndm = new Random(121);
 
-    public DropwizardResource(String ip, int port, UserDAO userDAO) {
-        this.ip = ip;
-        this.port = port;
+    public DropwizardResource(String driverIp, int driverPort, UserDAO userDAO) {
+        this.ip = driverIp;
+        this.port = driverPort;
         this.userDAO = userDAO;
     }
 
@@ -41,26 +41,37 @@ public class DropwizardResource {
 
         long start = System.currentTimeMillis();
 
+        Object httpResp, sqlResp;
+
         // http
-        HttpResponse<String> response =  Unirest.get(clientUri("data"))
-            .header("accept", "application/json")
-            .queryString("sz", dataSz())
-            .queryString("delay", delay())
-            .asString();
+        try {
+            httpResp = Unirest.get(clientUri("/driver/data"))
+                .header("accept", "application/json")
+                .queryString("sz", dataSz())
+                .queryString("delay", delay())
+                .asString().getBody();
+        } catch (Exception e) {
+            httpResp = e.getMessage();
+        }
         // http end
 
         // sql
-        User u = userDAO.getById(id);
-        if(u == null) {
-            u = new User(id, 1);
-        } else {
-            u.setAccessId(u.getAccessId() + 1);
+        try {
+            User u = userDAO.getById(id);
+            if (u == null) {
+                u = new User(id, 1);
+            } else {
+                u.setAccessId(u.getAccessId() + 1);
+            }
+            userDAO.createOrUpdate(u);
+            sqlResp = u;
+        } catch (Exception e) {
+            sqlResp = e.getMessage();
         }
-        userDAO.createOrUpdate(u);
         // sql end
 
-        srvrResponse.put("data", response.getBody());
-        srvrResponse.put("user", u);
+        srvrResponse.put("data", httpResp);
+        srvrResponse.put("user", sqlResp);
 
         long end = System.currentTimeMillis();
         srvrResponse.put("time", end - start);

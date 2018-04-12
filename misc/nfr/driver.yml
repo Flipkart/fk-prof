@@ -37,11 +37,25 @@ server:
   minThreads: 4
   applicationConnectors:
     - type: http
-      port: 8080
+      port: 8082
   adminConnectors:
     - type: http
-      port: 8081
+      port: 8182
 
-client_ip: 127.0.0.1
-client_port: 9090
-driver: false
+driver_ip: 127.0.0.1
+driver_port: 8082
+
+app_ip: 127.0.0.1
+app_port: 8081
+
+driver: true
+
+httpClient:
+  timeout: 1000ms
+  connectionTimeout: 1000ms
+  timeToLive: 1h
+  cookiesEnabled: false
+  maxConnections: 32
+  maxConnectionsPerRoute: 32
+  keepAlive: 1000ms
+  retries: 0

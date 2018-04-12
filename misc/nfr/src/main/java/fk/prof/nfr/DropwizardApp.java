@@ -1,11 +1,16 @@
 package fk.prof.nfr;
 
+import fk.prof.nfr.driver.Driver;
 import fk.prof.nfr.driver.Resource;
 import io.dropwizard.Application;
+import io.dropwizard.client.HttpClientBuilder;
 import io.dropwizard.db.PooledDataSourceFactory;
 import io.dropwizard.hibernate.HibernateBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import org.apache.http.client.HttpClient;
+
+import java.util.concurrent.Executors;
 
 public class DropwizardApp extends Application<DropwizardConfig> {
 
@@ -22,17 +27,22 @@ public class DropwizardApp extends Application<DropwizardConfig> {
     }
 
     @Override
-    public void run(DropwizardConfig dropwizardConfig, Environment environment) throws Exception {
+    public void run(DropwizardConfig config, Environment environment) throws Exception {
         // app in test
-        if(!dropwizardConfig.isDriver()) {
+        if(!config.isDriver()) {
             final UserDAO dao = new UserDAO(hibernate.getSessionFactory());
             environment.jersey().register(
                 new DropwizardResource(
-                    dropwizardConfig.getClientIp(), dropwizardConfig.getClientPort(), dao));
+                    config.getDriverIp(), config.getDriverPort(), dao));
         } else {
             // driver app
             environment.jersey().register(new Resource());
 
+            final HttpClient httpClient = new HttpClientBuilder(environment).using(config.getHttpClientConfiguration())
+                .build(getName());
+            final Driver driverApp = new Driver(httpClient, config.getAppIp(), config.getAppPort());
+
+            Executors.newSingleThreadExecutor().submit(driverApp);
         }
     }
 
