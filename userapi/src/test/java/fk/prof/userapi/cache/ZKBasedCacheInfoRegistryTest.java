@@ -75,7 +75,7 @@ public class ZKBasedCacheInfoRegistryTest {
     @Before
     public void beforeTest() throws Exception {
         zkBasedCacheInfoRegistry = new ZKBasedCacheInfoRegistry(curatorClient, "127.0.0.1", 8080, loadedProfiles);
-        zkBasedCacheInfoRegistry.init();
+        zkBasedCacheInfoRegistry.onInit();
     }
 
     @After

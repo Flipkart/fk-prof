@@ -29,8 +29,6 @@ import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.impl.CompositeFutureImpl;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
@@ -50,17 +48,17 @@ import static fk.prof.userapi.util.HttpResponseUtil.setResponse;
  * Created by rohit.patiyal on 18/01/17.
  */
 public class HttpVerticle extends AbstractVerticle {
-    private static Logger logger = LoggerFactory.getLogger(HttpVerticle.class);
     private static int VERSION = 1;
 
-    private String baseDir;
+    private final String baseDir;
     private final int maxListProfilesDurationInSecs;
-    private Configuration.HttpConfig httpConfig;
     private final Configuration.BackendConfig backendConfig;
-    private ProfileStoreAPI profileStoreAPI;
+    private final Configuration.HttpConfig httpConfig;
+    private final Configuration.HttpClientConfig httpClientConfig;
+    private final ProfileStoreAPI profileStoreAPI;
+    private final Integer maxDepthForTreeExpand;
+
     private ProfHttpClient httpClient;
-    private Configuration.HttpClientConfig httpClientConfig;
-    private Integer maxDepthForTreeExpand;
 
     public HttpVerticle(Configuration config, ProfileStoreAPI profileStoreAPI) {
         this.httpConfig = config.getHttpConfig();
@@ -68,7 +66,7 @@ public class HttpVerticle extends AbstractVerticle {
         this.httpClientConfig = config.getHttpClientConfig();
         this.profileStoreAPI = profileStoreAPI;
         this.baseDir = config.getProfilesBaseDir();
-        this.maxListProfilesDurationInSecs = config.getMaxListProfilesDurationInDays()*24*60*60;
+        this.maxListProfilesDurationInSecs = config.getProfileListDurationDays()*24*60*60;
         this.maxDepthForTreeExpand = config.getMaxDepthExpansion();
     }
 
@@ -103,7 +101,6 @@ public class HttpVerticle extends AbstractVerticle {
 
     @Override
     public void start(Future<Void> startFuture) throws Exception {
-        httpConfig = config().mapTo(Configuration.HttpConfig.class);
         httpClient = ProfHttpClient.newBuilder().setConfig(httpClientConfig).build(vertx);
 
         Router router = configureRouter();
@@ -120,26 +117,22 @@ public class HttpVerticle extends AbstractVerticle {
 
     private void getAppIds(RoutingContext routingContext) {
         final String prefix = routingContext.request().getParam("prefix");
-        Future<Set<String>> future = Future.future();
-        profileStoreAPI.getAppIdsWithPrefix(future.setHandler(result -> setResponse(result, routingContext)),
-            baseDir, prefix);
+        profileStoreAPI.getAppIdsWithPrefix(baseDir, prefix).setHandler(result -> setResponse(result, routingContext));
     }
 
     private void getClusterIds(RoutingContext routingContext) {
         final String appId = routingContext.request().getParam("appId");
         final String prefix = routingContext.request().getParam("prefix");
-        Future<Set<String>> future = Future.future();
-        profileStoreAPI.getClusterIdsWithPrefix(future.setHandler(result -> setResponse(result, routingContext)),
-            baseDir, appId, prefix);
+        profileStoreAPI.getClusterIdsWithPrefix(baseDir, appId, prefix)
+            .setHandler(result -> setResponse(result, routingContext));
     }
 
     private void getProcName(RoutingContext routingContext) {
         final String appId = routingContext.request().getParam("appId");
         final String clusterId = routingContext.request().getParam("clusterId");
         final String prefix = routingContext.request().getParam("prefix");
-        Future<Set<String>> future = Future.future();
-        profileStoreAPI.getProcNamesWithPrefix(future.setHandler(result -> setResponse(result, routingContext)),
-            baseDir, appId, clusterId, prefix);
+        profileStoreAPI.getProcNamesWithPrefix(baseDir, appId, clusterId, prefix)
+            .setHandler(result -> setResponse(result, routingContext));
     }
 
     private void getProfiles(RoutingContext routingContext) {
@@ -162,8 +155,8 @@ public class HttpVerticle extends AbstractVerticle {
             return;
         }
 
-        Future<List<AggregatedProfileNamingStrategy>> foundProfiles = Future.future();
-        foundProfiles.setHandler(result -> {
+        profileStoreAPI.getProfilesInTimeWindow(baseDir, appId, clusterId, procName, startTime, duration)
+            .setHandler(result -> {
             if(result.failed()) {
                 setResponse(result, routingContext);
                 return;
@@ -171,10 +164,7 @@ public class HttpVerticle extends AbstractVerticle {
 
             List<Future> profileSummaries = new ArrayList<>();
             for (AggregatedProfileNamingStrategy filename : result.result()) {
-                Future<AggregationWindowSummary> summary = Future.future();
-
-                profileStoreAPI.loadSummary(summary, filename);
-                profileSummaries.add(summary);
+                profileSummaries.add(profileStoreAPI.loadSummary(filename));
             }
 
             CompositeFuture.join(profileSummaries).setHandler(summaryResult -> {
@@ -212,9 +202,6 @@ public class HttpVerticle extends AbstractVerticle {
                 setResponse(Future.succeededFuture(response), routingContext, true);
             });
         });
-
-        profileStoreAPI.getProfilesInTimeWindow(foundProfiles,
-            baseDir, appId, clusterId, procName, startTime, duration);
     }
 
     private void getCallersViewForCpuSampling(RoutingContext routingContext) {
@@ -241,7 +228,11 @@ public class HttpVerticle extends AbstractVerticle {
         startTime = HttpRequestUtil.extractTypedParam(req, "start", ZonedDateTime.class);
         duration = HttpRequestUtil.extractTypedParam(req, "duration", Integer.class);
         forceExpand = MoreObjects.firstNonNull(HttpRequestUtil.extractTypedParam(req, "forceExpand", Boolean.class, false), false);
-        maxDepth = Math.min(maxDepthForTreeExpand, MoreObjects.firstNonNull(HttpRequestUtil.extractTypedParam(req, "maxDepth", Integer.class, false), maxDepthForTreeExpand));
+        maxDepth = Math.min(
+            maxDepthForTreeExpand,
+            MoreObjects.firstNonNull(
+                HttpRequestUtil.extractTypedParam(req, "maxDepth", Integer.class, false),
+                maxDepthForTreeExpand));
         nodeIds = routingContext.getBodyAsJsonArray().getList();
       }
       catch (IllegalArgumentException e) {
@@ -253,14 +244,20 @@ public class HttpVerticle extends AbstractVerticle {
         return;
       }
 
-      AggregatedProfileNamingStrategy profileName = new AggregatedProfileNamingStrategy(baseDir, VERSION, appId, clusterId, procId, startTime, duration, AggregatedProfileModel.WorkType.cpu_sample_work);
+      AggregatedProfileNamingStrategy profileName =
+          new AggregatedProfileNamingStrategy(baseDir, VERSION, appId, clusterId, procId, startTime, duration,
+              AggregatedProfileModel.WorkType.cpu_sample_work);
 
       getTreeViewForCpuSampling(routingContext, profileName, traceName, nodeIds, forceExpand, maxDepth, profileViewType);
     }
 
-    private <T extends TreeView<IndexedTreeNode<AggregatedProfileModel.FrameNode>>>void getTreeViewForCpuSampling(RoutingContext routingContext, AggregatedProfileNamingStrategy profileName, String traceName,
-                                                                                                                  List<Integer> nodeIds, boolean forceExpand, int maxDepth, ProfileViewType profileViewType) {
-      Future<Pair<AggregatedSamplesPerTraceCtx, T>> treeViewPair = profileStoreAPI.getProfileView(profileName, traceName, profileViewType);
+    private <T extends TreeView<IndexedTreeNode<AggregatedProfileModel.FrameNode>>>
+    void getTreeViewForCpuSampling(RoutingContext routingContext, AggregatedProfileNamingStrategy profileName,
+                                   String traceName, List<Integer> nodeIds, boolean forceExpand, int maxDepth,
+                                   ProfileViewType profileViewType) {
+
+      Future<Pair<AggregatedSamplesPerTraceCtx, T>> treeViewPair =
+          profileStoreAPI.getProfileView(profileName, traceName, profileViewType);
 
       treeViewPair.setHandler(ar -> {
         if(ar.failed()) {
@@ -274,7 +271,9 @@ public class HttpVerticle extends AbstractVerticle {
             originIds = treeView.getRoots();
           }
 
-          List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> subTree = treeView.getSubTrees(originIds, maxDepth, forceExpand);
+          List<IndexedTreeNode<AggregatedProfileModel.FrameNode>> subTree =
+              treeView.getSubTrees(originIds, maxDepth, forceExpand);
+
           Map<Integer, String> methodLookup = new HashMap<>();
 
           subTree.forEach(e -> e.visit((i, node) -> methodLookup.put(node.getData().getMethodId(), samplesPerTraceCtx.getMethodLookup().get(node.getData().getMethodId()))));

@@ -17,6 +17,7 @@
   "profile.retention.duration.min": 30,
   "profileView.retention.duration.min": 10,
   "profile.load.timeout": 1000,
+  "profile.list.duration.days": 7,
   "storage": {
     "s3": {
       "endpoint": "http://127.0.0.1:13031",
@@ -43,9 +44,10 @@
     "compression": true
   },
   "aggregatedProfiles.baseDir": "profiles",
-  "vertx.workerpool.io": {
-    "size": 20
-  },
+  "maxDepthExpansion": 8,
+  "maxProfilesToCache": 50,
+  "maxProfileViewsToCache": 100,
+  "maxProfileSummaryCacheWeight": 1000,
   "vertx.workerpool.blocking": {
     "size": 50
   }

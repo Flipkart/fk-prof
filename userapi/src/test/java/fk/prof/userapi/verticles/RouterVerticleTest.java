@@ -40,8 +40,6 @@ import static fk.prof.userapi.http.UserapiApiPathConstants.PROFILES_PREFIX;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.spy;
 
 /**
  * Tests for {@link HttpVerticle} using mocked behaviour of ProfileStoreAPIImpl
@@ -109,17 +107,17 @@ public class RouterVerticleTest {
         final Async async = testContext.async();
         String pPrefixSet = "(^$|a|ap|app|app1)";
         doAnswer(invocation -> {
-                    Future<Set<String>> future = invocation.getArgument(0);
-                    CompletableFuture.supplyAsync(() -> {
-                        try {
-                            Thread.sleep(MORE_THAN_TIMEOUT);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        return Sets.newSet(P_APP_ID);
-                    }).whenComplete((result, error) -> completeFuture(result, error, future));
-            return null;
-        }).when(profileDiscoveryAPI).getAppIdsWithPrefix(any(), any(), ArgumentMatchers.matches(pPrefixSet));
+            Future<Set<String>> future = Future.future();
+            CompletableFuture.supplyAsync(() -> {
+                try {
+                    Thread.sleep(MORE_THAN_TIMEOUT);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return Sets.newSet(P_APP_ID);
+            }).whenComplete((result, error) -> completeFuture(result, error, future));
+            return future;
+        }).when(profileDiscoveryAPI).getAppIdsWithPrefix(any(), ArgumentMatchers.matches(pPrefixSet));
 
         client.getNow(port, "localhost", META_PREFIX + PROFILES_PREFIX + "/apps?prefix=a", httpClientResponse -> {
             testContext.assertEquals(httpClientResponse.statusCode(), HttpResponseStatus.SERVICE_UNAVAILABLE.code());
@@ -136,15 +134,15 @@ public class RouterVerticleTest {
         String pPrefixSet = "(^$|a|ap|app|app1)";
         String npPrefixSet = "(f|fo|foo)";
         doAnswer(invocation -> {
-            Future<Set<String>> future = invocation.getArgument(0);
+            Future<Set<String>> future = Future.future();
             CompletableFuture.supplyAsync(() -> Sets.newSet(P_APP_ID)).whenComplete((res, error) -> completeFuture(res, error, future));
-            return null;
-        }).when(profileDiscoveryAPI).getAppIdsWithPrefix(any(), any(), ArgumentMatchers.matches(pPrefixSet));
+            return future;
+        }).when(profileDiscoveryAPI).getAppIdsWithPrefix(any(), ArgumentMatchers.matches(pPrefixSet));
         doAnswer(invocation -> {
-            Future<Set<String>> future = invocation.getArgument(0);
+            Future<Set<String>> future = Future.future();
             CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, future));
-            return null;
-        }).when(profileDiscoveryAPI).getAppIdsWithPrefix(any(), any(), ArgumentMatchers.matches(npPrefixSet));
+            return future;
+        }).when(profileDiscoveryAPI).getAppIdsWithPrefix(any(), ArgumentMatchers.matches(npPrefixSet));
 
         Future<Void> pCorrectPrefix = Future.future();
         Future<Void> pIncorrectPrefix = Future.future();
@@ -194,21 +192,25 @@ public class RouterVerticleTest {
         String pPrefixSet = "(^$|c|cl|clu|clus|clust|cluste|cluster|cluster1)";
         String npPrefixSet = "(b|ba|bar)";
         doAnswer(invocation -> {
-            CompletableFuture.supplyAsync(() -> Sets.newSet(P_CLUSTER_ID)).whenComplete((res, error) -> completeFuture(res, error, invocation.getArgument(0)));
-            return null;
-        }).when(profileDiscoveryAPI).getClusterIdsWithPrefix(any(), any(), eq(P_APP_ID), ArgumentMatchers.matches(pPrefixSet));
+            Future f = Future.future();
+            CompletableFuture.supplyAsync(() -> Sets.newSet(P_CLUSTER_ID)).whenComplete((res, error) -> completeFuture(res, error, f));
+            return f;
+        }).when(profileDiscoveryAPI).getClusterIdsWithPrefix(any(), eq(P_APP_ID), ArgumentMatchers.matches(pPrefixSet));
         doAnswer(invocation -> {
-            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, invocation.getArgument(0)));
-            return null;
-        }).when(profileDiscoveryAPI).getClusterIdsWithPrefix(any(), any(), eq(P_APP_ID), ArgumentMatchers.matches(npPrefixSet));
+            Future f = Future.future();
+            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, f));
+            return f;
+        }).when(profileDiscoveryAPI).getClusterIdsWithPrefix(any(), eq(P_APP_ID), ArgumentMatchers.matches(npPrefixSet));
         doAnswer(invocation -> {
-            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, invocation.getArgument(0)));
-            return null;
-        }).when(profileDiscoveryAPI).getClusterIdsWithPrefix(any(), any(), eq(NP_APP_ID), ArgumentMatchers.matches(pPrefixSet));
+            Future f = Future.future();
+            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, f));
+            return f;
+        }).when(profileDiscoveryAPI).getClusterIdsWithPrefix(any(), eq(NP_APP_ID), ArgumentMatchers.matches(pPrefixSet));
         doAnswer(invocation -> {
-            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, invocation.getArgument(0)));
-            return null;
-        }).when(profileDiscoveryAPI).getClusterIdsWithPrefix(any(), any(), eq(NP_APP_ID), ArgumentMatchers.matches(npPrefixSet));
+            Future f = Future.future();
+            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, f));
+            return f;
+        }).when(profileDiscoveryAPI).getClusterIdsWithPrefix(any(), eq(NP_APP_ID), ArgumentMatchers.matches(npPrefixSet));
 
         Future<Void> pAndCorrectPrefix = Future.future();
         Future<Void> pAndIncorrectPrefix = Future.future();
@@ -278,21 +280,25 @@ public class RouterVerticleTest {
         String npPrefixSet = "(m|ma|mai|main)";
 
         doAnswer(invocation -> {
-            CompletableFuture.supplyAsync(() -> Sets.newSet(P_PROC)).whenComplete((res, error) -> completeFuture(res, error, invocation.getArgument(0)));
-            return null;
-        }).when(profileDiscoveryAPI).getProcNamesWithPrefix(any(), any(), eq(P_APP_ID), eq(P_CLUSTER_ID), ArgumentMatchers.matches(pPrefixSet));
+            Future f = Future.future();
+            CompletableFuture.supplyAsync(() -> Sets.newSet(P_PROC)).whenComplete((res, error) -> completeFuture(res, error, f));
+            return f;
+        }).when(profileDiscoveryAPI).getProcNamesWithPrefix(any(), eq(P_APP_ID), eq(P_CLUSTER_ID), ArgumentMatchers.matches(pPrefixSet));
         doAnswer(invocation -> {
-            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, invocation.getArgument(0)));
-            return null;
-        }).when(profileDiscoveryAPI).getProcNamesWithPrefix(any(), any(), eq(P_APP_ID), eq(P_CLUSTER_ID), ArgumentMatchers.matches(npPrefixSet));
+            Future f = Future.future();
+            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, f));
+            return f;
+        }).when(profileDiscoveryAPI).getProcNamesWithPrefix(any(), eq(P_APP_ID), eq(P_CLUSTER_ID), ArgumentMatchers.matches(npPrefixSet));
         doAnswer(invocation -> {
-            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, invocation.getArgument(0)));
-            return null;
-        }).when(profileDiscoveryAPI).getProcNamesWithPrefix(any(), any(), eq(NP_APP_ID), eq(NP_CLUSTER_ID), ArgumentMatchers.matches(pPrefixSet));
+            Future f = Future.future();
+            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, f));
+            return f;
+        }).when(profileDiscoveryAPI).getProcNamesWithPrefix(any(), eq(NP_APP_ID), eq(NP_CLUSTER_ID), ArgumentMatchers.matches(pPrefixSet));
         doAnswer(invocation -> {
-            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, invocation.getArgument(0)));
-            return null;
-        }).when(profileDiscoveryAPI).getProcNamesWithPrefix(any(), any(), eq(NP_APP_ID), eq(NP_CLUSTER_ID), ArgumentMatchers.matches(npPrefixSet));
+            Future f = Future.future();
+            CompletableFuture.supplyAsync(Sets::<String>newSet).whenComplete((res, error) -> completeFuture(res, error, f));
+            return f;
+        }).when(profileDiscoveryAPI).getProcNamesWithPrefix(any(), eq(NP_APP_ID), eq(NP_CLUSTER_ID), ArgumentMatchers.matches(npPrefixSet));
 
         Future<Void> pAndCorrectPrefix = Future.future();
         Future<Void> pAndIncorrectPrefix = Future.future();
@@ -373,18 +379,20 @@ public class RouterVerticleTest {
         String encodedSummary = Json.encode(dummySummary);
 
         doAnswer(invocation -> {
-            CompletableFuture.supplyAsync(() -> Arrays.asList(pProfile)).whenComplete((res, error) -> completeFuture(res, error, invocation.getArgument(0)));
-            return null;
-        }).when(profileDiscoveryAPI).getProfilesInTimeWindow(any(), any(), eq(P_APP_ID), eq(P_CLUSTER_ID), eq(P_PROC), eq(P_TIME_STAMP), eq(DURATION));
+            Future f = Future.future();
+            CompletableFuture.supplyAsync(() -> Arrays.asList(pProfile)).whenComplete((res, error) -> completeFuture(res, error, f));
+            return f;
+        }).when(profileDiscoveryAPI).getProfilesInTimeWindow(any(), eq(P_APP_ID), eq(P_CLUSTER_ID), eq(P_PROC), eq(P_TIME_STAMP), eq(DURATION));
         doAnswer(invocation -> {
-            CompletableFuture.supplyAsync(() -> Collections.EMPTY_LIST).whenComplete((res, error) -> completeFuture(res, error, invocation.getArgument(0)));
-            return null;
-        }).when(profileDiscoveryAPI).getProfilesInTimeWindow(any(), any(), eq(P_APP_ID), eq(P_CLUSTER_ID), eq(P_PROC), eq(NP_TIME_STAMP), eq(DURATION));
+            Future f = Future.future();
+            CompletableFuture.supplyAsync(() -> Collections.EMPTY_LIST).whenComplete((res, error) -> completeFuture(res, error, f));
+            return f;
+        }).when(profileDiscoveryAPI).getProfilesInTimeWindow(any(), eq(P_APP_ID), eq(P_CLUSTER_ID), eq(P_PROC), eq(NP_TIME_STAMP), eq(DURATION));
         doAnswer(invocation -> {
-            Future<AggregationWindowSummary> summary = invocation.getArgument(0);
+            Future<AggregationWindowSummary> summary = Future.future();
             summary.complete(dummySummary);
-            return null;
-        }).when(profileDiscoveryAPI).loadSummary(any(), eq(pProfile));
+            return summary;
+        }).when(profileDiscoveryAPI).loadSummary(eq(pProfile));
 
         Future<Void> pAndCorrectPrefix = Future.future();
         Future<Void> pAndIncorrectPrefix = Future.future();
@@ -432,16 +440,17 @@ public class RouterVerticleTest {
 
         // found the file
         doAnswer(invocation -> {
-            CompletableFuture.supplyAsync(() -> Arrays.asList(pProfile)).whenComplete((res, error) -> completeFuture(res, error, invocation.getArgument(0)));
-            return null;
-        }).when(profileDiscoveryAPI).getProfilesInTimeWindow(any(), any(), eq(P_APP_ID), eq(P_CLUSTER_ID), eq(P_PROC), eq(P_TIME_STAMP), eq(DURATION));
+            Future f = Future.future();
+            CompletableFuture.supplyAsync(() -> Arrays.asList(pProfile)).whenComplete((res, error) -> completeFuture(res, error, f));
+            return f;
+        }).when(profileDiscoveryAPI).getProfilesInTimeWindow(any(), eq(P_APP_ID), eq(P_CLUSTER_ID), eq(P_PROC), eq(P_TIME_STAMP), eq(DURATION));
 
         // but throw timeout exception when loading it
         doAnswer(invocation -> {
-            Future<AggregationWindowSummary> summary = invocation.getArgument(0);
+            Future<AggregationWindowSummary> summary = Future.future();
             summary.fail(new TimeoutException(errorMsg));
-            return null;
-        }).when(profileDiscoveryAPI).loadSummary(any(), eq(pProfile));
+            return summary;
+        }).when(profileDiscoveryAPI).loadSummary(eq(pProfile));
 
         // make the request
         Future<Void> f1 = Future.future();

@@ -5,7 +5,6 @@ import fk.prof.aggregation.model.AggregationWindowStorage;
 import fk.prof.aggregation.model.FinalizedAggregationWindow;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.storage.AsyncStorage;
-import io.vertx.core.Future;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -42,16 +41,12 @@ public class AggregationWindowSerDeTest {
         storage.store(window);
 
         // try fetch
-        AggregatedProfileLoader loader = new AggregatedProfileLoader(asyncStorage);
+        StorageBackedProfileLoader loader = new StorageBackedProfileLoader(asyncStorage);
 
-        Future f1 =  Future.future();
         AggregatedProfileNamingStrategy file1 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, 1800, AggregatedProfileModel.WorkType.cpu_sample_work);
-        loader.load(f1, file1);
-        Assert.assertTrue("aggregated profiles were not loaded", f1.succeeded());
+        Assert.assertTrue("aggregated profiles were not loaded", loader.load(file1) != null);
 
-        Future f2 =  Future.future();
         AggregatedProfileNamingStrategy file2 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, 1800);
-        loader.loadSummary(f2, file2);
-        Assert.assertTrue("aggregation summary were not loaded", f2.succeeded());
+        Assert.assertTrue("aggregation summary were not loaded", loader.loadSummary(file2) != null);
     }
 }

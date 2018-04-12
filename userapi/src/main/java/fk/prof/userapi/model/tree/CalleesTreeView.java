@@ -15,8 +15,8 @@ import java.util.stream.Collectors;
  */
 public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Cacheable<ProfileView> {
 
-    private Tree<FrameNode> callTree;
-    private List<Integer> hotMethodNodeIds;
+    private final Tree<FrameNode> callTree;
+    private final List<Integer> hotMethodNodeIds;
 
     public CalleesTreeView(Tree<FrameNode> callTree, List<Integer> hotMethodNodeIds) {
         this.callTree = callTree;
@@ -41,9 +41,9 @@ public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Ca
      * which will remain constant in the expand method
      */
     private class Expander {
-        List<Integer> ids;
-        int maxDepth;
-        boolean forceExpand;
+        final List<Integer> ids;
+        final int maxDepth;
+        final boolean forceExpand;
 
         Expander(List<Integer> ids, int maxDepth, boolean forceExpand) {
             this.ids = ids;
@@ -52,10 +52,13 @@ public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Ca
         }
 
         List<IndexedTreeNode<FrameNode>> expand() {
-            Map<String, List<IndexedTreeNode<FrameNode>>> idxGroupedByMethodIdLineNum = ids.stream()
+            return ids.stream()
                 .map(e -> new IndexedTreeNode<>(e, callTree.getNode(e)))
-                .collect(Collectors.groupingBy((IndexedTreeNode<FrameNode> e) -> String.valueOf(e.getData().getMethodId()) + ":" + String.valueOf(e.getData().getLineNo())));
-            return idxGroupedByMethodIdLineNum.values().stream().peek(this::expand).flatMap(List::stream).collect(Collectors.toList());
+                .collect(Collectors.groupingBy((IndexedTreeNode<FrameNode> e) -> fnKey(e.getData())))
+                .values().stream()
+                .peek(this::expand)
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
         }
 
         void expand(List<IndexedTreeNode<FrameNode>> nodes) {
@@ -66,7 +69,7 @@ public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Ca
             for(int d = 0; d < maxDepth; ++d) {
                 methodIdLineNumSet.clear();
 
-                for(int i = 0; i < nodes.size(); ++i) {
+                for(int i = 0; i < callers.size(); ++i) {
                     int callerId = callTree.getParent(callers.get(i).getIdx());
                     // if parent node exist, add it as a caller to the current caller, and update the current caller
                     if(callerId > 0) {
@@ -75,14 +78,23 @@ public class CalleesTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Ca
                         callers.get(i).setChildren(Collections.singletonList(caller));
                         callers.set(i, caller);
                         // add the methodid to set
-                        methodIdLineNumSet.add(String.valueOf(fn.getMethodId())+":"+String.valueOf(fn.getLineNo()));
+                        methodIdLineNumSet.add(fnKey(fn));
                     }
                 }
                 // if there are > 1 distinct caller, stop expansion
                 if(!forceExpand && methodIdLineNumSet.size() > 1) {
                     return;
                 }
+
+                // break if no callers found.
+                if(methodIdLineNumSet.size() == 0) {
+                    break;
+                }
             }
+        }
+
+        String fnKey(FrameNode fn) {
+            return String.valueOf(fn.getMethodId()) + ":" + String.valueOf(fn.getLineNo());
         }
     }
 }

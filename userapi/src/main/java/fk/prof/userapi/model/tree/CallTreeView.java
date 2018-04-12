@@ -14,14 +14,17 @@ import java.util.*;
  */
 public class CallTreeView implements TreeView<IndexedTreeNode<FrameNode>>, Cacheable<ProfileView> {
 
-    private Tree<FrameNode> tree;
+    private final Tree<FrameNode> tree;
 
     public CallTreeView(Tree<FrameNode> tree) {
         this.tree = tree;
     }
 
     public List<Integer> getRoots() {
-        return Collections.singletonList(0);
+        if(tree.size() > 0) {
+            return Collections.singletonList(0);
+        }
+        return Collections.emptyList();
     }
 
     public List<IndexedTreeNode<FrameNode>> getSubTrees(List<Integer> ids, int maxDepth, boolean forceExpand) {

@@ -1,7 +1,7 @@
 package fk.prof.userapi.model;
 
 /**
- * Interface for a tree of type T
+ * Interface for a tree of type T. This tree is indexable by an integer.
  * Created by gaurav.ashok on 01/06/17.
  */
 public interface Tree<T> {
