@@ -22,8 +22,7 @@ void sleep_for_millis(uint period) {
 #endif
 }
 
-Processor::Processor(jvmtiEnv *_jvmti, Processes &&_processes)
-    : jvmti(_jvmti), running(false), processes(_processes), processing_pending(false) {
+Processor::Processor(jvmtiEnv *_jvmti) : jvmti(_jvmti), running(false), processing_pending(false) {
 }
 
 constexpr Time::msec Process::run_itvl_ignore;
@@ -52,11 +51,15 @@ void Processor::run() {
 
     // Find the process with the least positive run_itvl. This will be our wait
     // period for the condition variable.
-    auto it = std::min_element(processes.begin(), processes.end(), [](Process *a, Process *b) {
-        return a->run_itvl().count() < b->run_itvl().count();
-    });
+    auto sleep_itvl = std::accumulate(std::begin(processes), std::end(processes), Time::msec::max(),
+                                      [](Time::msec min, Process *p) {
+                                          auto itvl = p->run_itvl();
+                                          if (itvl.count() > 0) {
+                                              return std::min(min, itvl);
+                                          }
+                                          return min;
+                                      });
 
-    auto sleep_itvl = (*it)->run_itvl();
     logger->info("chosen run itvl_time: {}", sleep_itvl.count());
 
     while (true) {
@@ -67,9 +70,9 @@ void Processor::run() {
         processing_pending.store(false);
         auto after = Time::now();
         auto run_duration = std::chrono::duration_cast<Time::msec>(after - before);
-        
+
         SPDLOG_DEBUG(logger, "run_duration: {}ms", run_duration.count());
-        
+
         if (!running.load(std::memory_order_relaxed)) {
             break;
         }
@@ -79,14 +82,13 @@ void Processor::run() {
             if (sleep_itvl == Process::run_itvl_ignore) {
                 cv.wait(lock, [this]() { return processing_pending.load(); });
             } else {
-                auto new_sleep_itvl =
-                    sleep_itvl - run_duration;
+                auto new_sleep_itvl = sleep_itvl - run_duration;
                 if (new_sleep_itvl.count() > 0) {
                     cv.wait_for(lock, new_sleep_itvl,
                                 [this]() { return processing_pending.load(); });
                 }
             }
-            
+
             SPDLOG_TRACE(logger, "processing thd woke up");
         }
     }
@@ -100,6 +102,10 @@ void Processor::run() {
 void callback_to_run_processor(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg) {
     Processor *processor = static_cast<Processor *>(arg);
     processor->run();
+}
+
+void Processor::add_process(Process *process) {
+    processes.emplace_back(process);
 }
 
 void Processor::start(JNIEnv *jniEnv) {

@@ -10,16 +10,16 @@
 /**
  * @brief Abstract class to send a notification
  */
-class Notifier {
+class Notifiable {
 public:
     virtual void notify() = 0;
-    virtual ~Notifier() {
+    virtual ~Notifiable() {
     }
 };
 
 class Process {
 public:
-    static constexpr Time::msec run_itvl_ignore = Time::msec::min();
+    static constexpr Time::msec run_itvl_ignore = Time::msec::max();
 
     Process() {
     }
@@ -44,11 +44,13 @@ public:
 
 typedef std::vector<Process *> Processes;
 
-class Processor : public Notifier {
+class Processor : public Notifiable {
 public:
-    explicit Processor(jvmtiEnv *_jvmti, Processes &&_tasks);
+    explicit Processor(jvmtiEnv *_jvmti);
 
     virtual ~Processor();
+
+    void add_process(Process *process);
 
     void start(JNIEnv *jniEnv);
 

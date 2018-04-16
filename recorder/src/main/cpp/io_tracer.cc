@@ -50,7 +50,7 @@ IOTracerJavaState &getIOTracerJavaState() {
 }
 
 IOTracer::IOTracer(JavaVM *_jvm, jvmtiEnv *_jvmti_env, ThreadMap &_thread_map, FdMap &_fd_map,
-                   std::shared_ptr<Notifier> _processor_notifier,
+                   std::shared_ptr<Notifiable> _processor_notifier,
                    iotrace::Queue::Listener &_serializer, std::int64_t _latency_threshold_ns,
                    std::uint32_t _max_stack_depth)
     : jvm(_jvm), jvmti_env(_jvmti_env), thread_map(_thread_map), fd_map(_fd_map),

@@ -38,7 +38,10 @@ TEST(Processor___multiple_periodic_processes) {
     TestProcess *p1 = new TestProcess(events, Time::msec(250), 1), *p2 = new TestProcess(events, Time::msec(500), 2),
              *p3 = new TestProcess(events, Time::msec(1000), 3);
 
-    Processor processor(nullptr, Processes{p2, p1, p3});
+    Processor processor(nullptr);
+    for(auto p : Processes{p2, p1, p3}) {
+        processor.add_process(p);
+    }
 
     processor.start(nullptr);
     auto thd = std::thread([&]() { processor.run(); });
@@ -61,17 +64,15 @@ TEST(Processor___mix_processes) {
     TestProcess *p1 = new TestProcess(events, Time::msec(500), 1), *p2 = new TestProcess(events, Time::msec(100), 2),
              *p3 = new TestProcess(events, Process::run_itvl_ignore, 3);
 
-    Processor processor(nullptr, Processes{p2, p1, p3});
+    Processor processor(nullptr);
+    for(auto p : Processes{p2, p1, p3}) {
+        processor.add_process(p);
+    }
 
     processor.start(nullptr);
     auto thd = std::thread([&]() { processor.run(); });
 
-    int ctr = 5;
-    while(ctr > 0) {
-        std::this_thread::sleep_for(Time::msec(100));
-        processor.notify();
-        ctr--;
-    }
+    std::this_thread::sleep_for(Time::msec(500));
     processor.stop();
     thd.join();
 

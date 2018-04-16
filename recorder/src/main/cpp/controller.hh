@@ -97,17 +97,17 @@ private:
 
     bool capable(const recording::Work& w);
     void prep(const recording::Work& w);
-    void issue(const recording::Work& w, Processes& processes, JNIEnv* env);
+    Process* issue(const recording::Work& w, JNIEnv* env);
     void retire(const recording::Work& w);
 
     bool capable(const recording::CpuSampleWork& csw);
     void prep(const recording::CpuSampleWork& csw);
-    void issue(const recording::CpuSampleWork& csw, Processes& processes, JNIEnv* env);
+    Process* issue(const recording::CpuSampleWork& csw, JNIEnv* env);
     void retire(const recording::CpuSampleWork& csw);
     
     bool capable(const recording::IOTraceWork& csw);
     void prep(const recording::IOTraceWork& csw);
-    void issue(const recording::IOTraceWork& csw, Processes& processes, JNIEnv* env);
+    Process* issue(const recording::IOTraceWork& csw, JNIEnv* env);
     void retire(const recording::IOTraceWork& csw);
     
     void reset_flush_ctr() {

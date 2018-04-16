@@ -512,13 +512,13 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                         serializer.reset(new ProfileSerializingWriter(jvmti, *writer.get(), SiteResolver::method_info, SiteResolver::line_no, get_ctx_reg(), sft, tts, cfg.noctx_cov_pct));
 
                         JNIEnv *env = getJNIEnv(jvm);
-                        Processes processes;
+                        processor.reset(new Processor(jvmti));
+                        
                         for (auto i = 0; i < w.work_size(); i++) {
                             auto work = w.work(i);
-                            issue(work, processes, env);
+                            processor->add_process(issue(work, env));
                         }
 
-                        processor.reset(new Processor(jvmti, std::move(processes)));
                         processor->start(env);
                     }
 
@@ -619,24 +619,26 @@ void Controller::prep(const recording::Work& work) {
     }
 }
 
-void Controller::issue(const recording::Work& work, Processes& processes, JNIEnv* env) {
+Process* Controller::issue(const recording::Work& work, JNIEnv* env) {
     auto w_type = work.w_type();
+    Process* p = nullptr;
     switch(w_type) {
         case recording::WorkType::cpu_sample_work:
             if (work.has_cpu_sample()) {
-                issue(work.cpu_sample(), processes, env);
+                p = issue(work.cpu_sample(), env);
                 s_v_work_cpu_sampling.update(1);
             }
-            return;
+            break;
         case recording::WorkType::io_trace_work:
             if(work.has_io_trace()) {
-                issue(work.io_trace(), processes, env);
+                p = issue(work.io_trace(), env);
                 // TODO: gauge for current running io_trace work
             }
-            return;
+            break;
         default:
             assert(false);
     }
+    return p;
 }
 
 void Controller::retire(const recording::Work& work) {
@@ -699,14 +701,14 @@ public:
     }
 };
 
-void Controller::issue(const recording::CpuSampleWork& csw, Processes& processes, JNIEnv* env) {
+Process* Controller::issue(const recording::CpuSampleWork& csw, JNIEnv* env) {
     auto freq = csw.frequency();
     logger->info("Starting cpu-sampling at {} Hz and for upto {} frames", freq, tts.cpu_samples_max_stack_sz);
     
     GlobalCtx::recording.cpu_profiler.reset(new Profiler(jvm, jvmti, thread_map, *serializer, tts.cpu_samples_max_stack_sz, freq, get_prob_pct(), cfg.noctx_cov_pct, cfg.capture_native_bt, cfg.capture_unknown_thd_bt));
     ReadsafePtr<Profiler> p(GlobalCtx::recording.cpu_profiler);
     p->start(env);
-    processes.push_back(new ProcessWrapper<Profiler>(GlobalCtx::recording.cpu_profiler));
+    return new ProcessWrapper<Profiler>(GlobalCtx::recording.cpu_profiler);
 }
 
 void Controller::retire(const recording::CpuSampleWork& csw) {
@@ -723,7 +725,7 @@ void Controller::prep(const recording::IOTraceWork& w) {
     tts.io_trace_max_stack_sz = Profiler::calculate_max_stack_depth(w.max_frames());
 }
 
-void Controller::issue(const recording::IOTraceWork& w, Processes& processes, JNIEnv* env) {
+Process* Controller::issue(const recording::IOTraceWork& w, JNIEnv* env) {
     std::uint64_t latency_threshold = w.latency_threshold_ms() * NANOS_IN_MILLIS;
     
     logger->info("Starting io-tracing with threashold {} ms and for upto {} frames", w.latency_threshold_ms(), tts.io_trace_max_stack_sz);
@@ -736,7 +738,7 @@ void Controller::issue(const recording::IOTraceWork& w, Processes& processes, JN
     // enable tracing
     p->start(env);
     
-    processes.push_back(new ProcessWrapper<IOTracer>(GlobalCtx::recording.io_tracer));
+    return new ProcessWrapper<IOTracer>(GlobalCtx::recording.io_tracer);
 }
 
 void Controller::retire(const recording::IOTraceWork& csw) {
