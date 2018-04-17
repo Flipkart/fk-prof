@@ -22,15 +22,17 @@ void sleep_for_millis(uint period) {
 #endif
 }
 
+struct Processor_Thd_Args {
+    Processor *processor;
+    Processes processes;
+};
+
 Processor::Processor(jvmtiEnv *_jvmti) : jvmti(_jvmti), running(false), processing_pending(false) {
 }
 
 constexpr Time::msec Process::run_itvl_ignore;
 
 Processor::~Processor() {
-    for (auto &p : processes) {
-        delete p;
-    }
 }
 
 void Processor::notify() {
@@ -47,12 +49,12 @@ void Processor::notify() {
     cv.notify_one();
 }
 
-void Processor::run() {
-
+void Processor::run(Processes &processes) {
+    SPDLOG_TRACE(logger, "processor run started. processes count: {}", processes.size());
     // Find the process with the least positive run_itvl. This will be our wait
     // period for the condition variable.
     auto sleep_itvl = std::accumulate(std::begin(processes), std::end(processes), Time::msec::max(),
-                                      [](Time::msec min, Process *p) {
+                                      [](Time::msec min, ProcessPtr p) {
                                           auto itvl = p->run_itvl();
                                           if (itvl.count() > 0) {
                                               return std::min(min, itvl);
@@ -99,19 +101,15 @@ void Processor::run() {
     }
 }
 
-void callback_to_run_processor(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg) {
-    Processor *processor = static_cast<Processor *>(arg);
-    processor->run();
+void callback_to_run_processor(jvmtiEnv *jvmti_env, JNIEnv *jni_env, Processor_Thd_Args arg) {
+    arg.processor->run(arg.processes);
 }
 
-void Processor::add_process(Process *process) {
-    processes.emplace_back(process);
-}
-
-void Processor::start(JNIEnv *jniEnv) {
+void Processor::start(JNIEnv *jniEnv, Processes processes) {
     running.store(true, std::memory_order_relaxed);
-    thd_proc =
-        start_new_thd(jniEnv, jvmti, "Fk-Prof Processing Thread", callback_to_run_processor, this);
+    thd_proc = start_new_thd<Processor_Thd_Args>(
+        jniEnv, jvmti, "Fk-Prof Processing Thread", callback_to_run_processor,
+        Processor_Thd_Args{.processor = this, .processes = processes});
 }
 
 void Processor::stop() {
@@ -119,6 +117,7 @@ void Processor::stop() {
     // wake up the processing thd. It might be sleeping.
     notify();
     await_thd_death(thd_proc);
+    // release the processes
     thd_proc.reset();
 }
 

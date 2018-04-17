@@ -27,7 +27,7 @@ static PerfCtx::Registry ctx_reg;
 static ProbPct prob_pct;
 static medida::reporting::UdpReporter* metrics_reporter;
 static MetricFormatter::SyslogTsdbFormatter *formatter;
-static ThdProcP metrics_thd;
+static ThdProcP<void *> metrics_thd;
 std::atomic<bool> abort_metrics_poll;
 
 // This has to be here, or the VM turns off class loading events.
@@ -86,7 +86,7 @@ void JNICALL OnVMInit(jvmtiEnv *jvmti, JNIEnv *jniEnv, jthread thread) {
         CreateJMethodIDsForClass(jvmti, klass);
     }
 
-    metrics_thd = start_new_thd(jniEnv, jvmti, "Fk-Prof Metrics Reporter", metrics_poller, nullptr);
+    metrics_thd = start_new_thd<void *>(jniEnv, jvmti, "Fk-Prof Metrics Reporter", metrics_poller, nullptr);
     
     // load IOTRace class and initialize the local iotrace object.
     getIOTracerJavaState().onVMInit(jvmti, jniEnv);

@@ -42,7 +42,10 @@ public:
     };
 };
 
-typedef std::vector<Process *> Processes;
+typedef std::shared_ptr<Process> ProcessPtr;
+
+struct Processor_Thd_Args;
+typedef std::vector<std::shared_ptr<Process>> Processes;
 
 class Processor : public Notifiable {
 public:
@@ -50,11 +53,9 @@ public:
 
     virtual ~Processor();
 
-    void add_process(Process *process);
+    void start(JNIEnv *jniEnv, Processes processes);
 
-    void start(JNIEnv *jniEnv);
-
-    void run();
+    void run(Processes &processes);
 
     void stop();
 
@@ -67,9 +68,7 @@ private:
 
     std::atomic_bool running;
 
-    Processes processes;
-
-    ThdProcP thd_proc;
+    ThdProcP<Processor_Thd_Args> thd_proc;
 
     /* Required for notifying the processor thd */
     std::condition_variable cv;

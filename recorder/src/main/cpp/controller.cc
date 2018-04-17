@@ -5,9 +5,8 @@
 #include "blocking_ring_buffer.hh"
 #include "io_tracer.hh"
 
-void controllerRunnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg) {
-    auto control = static_cast<Controller*>(arg);
-    control->run();
+void controllerRunnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, Controller *controller) {
+    controller->run();
 }
 
 void write_system_prop(jvmtiEnv* env, const char* name, std::stringstream& ss) {
@@ -358,7 +357,8 @@ void Controller::accept_work(Buff& poll_response_buff, const std::string& host, 
     }
 }
 
-void http_raw_writer_runnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg);
+class HttpRawProfileWriter;
+void http_raw_writer_runnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, HttpRawProfileWriter *rpw);
 
 typedef std::tuple<BlockingRingBuffer*, metrics::Timer*, metrics::Hist*> ProfileDataReadCtx;
 
@@ -400,7 +400,7 @@ private:
 
     std::uint32_t tx_timeout;
 
-    ThdProcP thd_proc;
+    ThdProcP<HttpRawProfileWriter *> thd_proc;
 
     metrics::Timer& s_t_rpc;
     metrics::Ctr& s_c_rpc_failures;
@@ -465,9 +465,8 @@ public:
     }
 };
 
-void http_raw_writer_runnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg) {
+void http_raw_writer_runnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, HttpRawProfileWriter *rpw) {
     logger->trace("HTTP raw-writer thread target entered");
-    auto rpw = static_cast<HttpRawProfileWriter*>(arg);
     rpw->run();
 }
 
@@ -514,12 +513,13 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                         JNIEnv *env = getJNIEnv(jvm);
                         processor.reset(new Processor(jvmti));
                         
+                        Processes processes;
                         for (auto i = 0; i < w.work_size(); i++) {
                             auto work = w.work(i);
-                            processor->add_process(issue(work, env));
+                            processes.emplace_back(issue(work, env));
                         }
 
-                        processor->start(env);
+                        processor->start(env, processes);
                     }
 
                     start_tm = Time::now();
@@ -619,9 +619,9 @@ void Controller::prep(const recording::Work& work) {
     }
 }
 
-Process* Controller::issue(const recording::Work& work, JNIEnv* env) {
+ProcessPtr Controller::issue(const recording::Work& work, JNIEnv* env) {
     auto w_type = work.w_type();
-    Process* p = nullptr;
+    ProcessPtr p;
     switch(w_type) {
         case recording::WorkType::cpu_sample_work:
             if (work.has_cpu_sample()) {
@@ -701,14 +701,14 @@ public:
     }
 };
 
-Process* Controller::issue(const recording::CpuSampleWork& csw, JNIEnv* env) {
+ProcessPtr Controller::issue(const recording::CpuSampleWork& csw, JNIEnv* env) {
     auto freq = csw.frequency();
     logger->info("Starting cpu-sampling at {} Hz and for upto {} frames", freq, tts.cpu_samples_max_stack_sz);
     
     GlobalCtx::recording.cpu_profiler.reset(new Profiler(jvm, jvmti, thread_map, *serializer, tts.cpu_samples_max_stack_sz, freq, get_prob_pct(), cfg.noctx_cov_pct, cfg.capture_native_bt, cfg.capture_unknown_thd_bt));
     ReadsafePtr<Profiler> p(GlobalCtx::recording.cpu_profiler);
     p->start(env);
-    return new ProcessWrapper<Profiler>(GlobalCtx::recording.cpu_profiler);
+    return std::make_shared<ProcessWrapper<Profiler>>(GlobalCtx::recording.cpu_profiler);
 }
 
 void Controller::retire(const recording::CpuSampleWork& csw) {
@@ -725,7 +725,7 @@ void Controller::prep(const recording::IOTraceWork& w) {
     tts.io_trace_max_stack_sz = Profiler::calculate_max_stack_depth(w.max_frames());
 }
 
-Process* Controller::issue(const recording::IOTraceWork& w, JNIEnv* env) {
+ProcessPtr Controller::issue(const recording::IOTraceWork& w, JNIEnv* env) {
     std::uint64_t latency_threshold = w.latency_threshold_ms() * NANOS_IN_MILLIS;
     
     logger->info("Starting io-tracing with threashold {} ms and for upto {} frames", w.latency_threshold_ms(), tts.io_trace_max_stack_sz);
@@ -738,7 +738,7 @@ Process* Controller::issue(const recording::IOTraceWork& w, JNIEnv* env) {
     // enable tracing
     p->start(env);
     
-    return new ProcessWrapper<IOTracer>(GlobalCtx::recording.io_tracer);
+    return std::make_shared<ProcessWrapper<IOTracer>>(GlobalCtx::recording.io_tracer);
 }
 
 void Controller::retire(const recording::IOTraceWork& csw) {

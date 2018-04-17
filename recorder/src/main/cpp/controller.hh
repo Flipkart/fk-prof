@@ -38,7 +38,7 @@ public:
 
     bool is_running() const;
 
-    friend void controllerRunnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg);
+    friend void controllerRunnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, Controller *controller);
 
 private:
     JavaVM *jvm;
@@ -46,7 +46,7 @@ private:
     ThreadMap& thread_map;
     ConfigurationOptions& cfg;
     std::atomic_bool keep_running;
-    ThdProcP thd_proc;
+    ThdProcP<Controller *> thd_proc;
     Buff buff;
     std::shared_ptr<ProfileWriter> writer;
     std::shared_ptr<ProfileSerializingWriter> serializer;
@@ -97,17 +97,17 @@ private:
 
     bool capable(const recording::Work& w);
     void prep(const recording::Work& w);
-    Process* issue(const recording::Work& w, JNIEnv* env);
+    ProcessPtr issue(const recording::Work& w, JNIEnv* env);
     void retire(const recording::Work& w);
 
     bool capable(const recording::CpuSampleWork& csw);
     void prep(const recording::CpuSampleWork& csw);
-    Process* issue(const recording::CpuSampleWork& csw, JNIEnv* env);
+    ProcessPtr issue(const recording::CpuSampleWork& csw, JNIEnv* env);
     void retire(const recording::CpuSampleWork& csw);
     
     bool capable(const recording::IOTraceWork& csw);
     void prep(const recording::IOTraceWork& csw);
-    Process* issue(const recording::IOTraceWork& csw, JNIEnv* env);
+    ProcessPtr issue(const recording::IOTraceWork& csw, JNIEnv* env);
     void retire(const recording::IOTraceWork& csw);
     
     void reset_flush_ctr() {

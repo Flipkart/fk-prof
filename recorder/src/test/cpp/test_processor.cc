@@ -15,7 +15,8 @@ public:
     Time::msec itvl;
     int id;
 
-    TestProcess(std::vector<int> &_vec, Time::msec _itvl, int _id) : vec(_vec), itvl(_itvl), id(_id) {
+    TestProcess(std::vector<int> &_vec, Time::msec _itvl, int _id)
+        : vec(_vec), itvl(_itvl), id(_id) {
     }
 
     void run() override {
@@ -35,16 +36,15 @@ TEST(Processor___multiple_periodic_processes) {
     TestEnv _;
 
     std::vector<int> events;
-    TestProcess *p1 = new TestProcess(events, Time::msec(250), 1), *p2 = new TestProcess(events, Time::msec(500), 2),
-             *p3 = new TestProcess(events, Time::msec(1000), 3);
+    ProcessPtr p1 = std::make_shared<TestProcess>(events, Time::msec(250), 1),
+               p2 = std::make_shared<TestProcess>(events, Time::msec(500), 2),
+               p3 = std::make_shared<TestProcess>(events, Time::msec(1000), 3);
 
     Processor processor(nullptr);
-    for(auto p : Processes{p2, p1, p3}) {
-        processor.add_process(p);
-    }
+    Processes processes = Processes{p2, p1, p3};
 
-    processor.start(nullptr);
-    auto thd = std::thread([&]() { processor.run(); });
+    processor.start(nullptr, {});
+    auto thd = std::thread([&]() { processor.run(processes); });
 
     std::this_thread::sleep_for(Time::sec(1));
 
@@ -52,7 +52,7 @@ TEST(Processor___multiple_periodic_processes) {
 
     thd.join();
 
-    //five times{2, 1, 3}, then stop marker {-2, -1, -3}
+    // five times{2, 1, 3}, then stop marker {-2, -1, -3}
     std::vector<int> expected{2, 1, 3, 2, 1, 3, 2, 1, 3, 2, 1, 3, 2, 1, 3, -2, -1, -3};
     CHECK_ARRAY_EQUAL(expected, events, 18);
 }
@@ -61,22 +61,21 @@ TEST(Processor___mix_processes) {
     TestEnv _;
 
     std::vector<int> events;
-    TestProcess *p1 = new TestProcess(events, Time::msec(500), 1), *p2 = new TestProcess(events, Time::msec(100), 2),
-             *p3 = new TestProcess(events, Process::run_itvl_ignore, 3);
+    ProcessPtr p1 = std::make_shared<TestProcess>(events, Time::msec(500), 1),
+               p2 = std::make_shared<TestProcess>(events, Time::msec(100), 2),
+               p3 = std::make_shared<TestProcess>(events, Process::run_itvl_ignore, 3);
 
     Processor processor(nullptr);
-    for(auto p : Processes{p2, p1, p3}) {
-        processor.add_process(p);
-    }
+    Processes processes = Processes{p2, p1, p3};
 
-    processor.start(nullptr);
-    auto thd = std::thread([&]() { processor.run(); });
+    processor.start(nullptr, {});
+    auto thd = std::thread([&]() { processor.run(processes); });
 
     std::this_thread::sleep_for(Time::msec(500));
     processor.stop();
     thd.join();
 
-    //six times{2, 1, 3}, then stop marker {-2, -1, -3}
+    // six times{2, 1, 3}, then stop marker {-2, -1, -3}
     std::vector<int> expected{2, 1, 3, 2, 1, 3, 2, 1, 3, 2, 1, 3, 2, 1, 3, 2, 1, 3, -2, -1, -3};
     CHECK_ARRAY_EQUAL(expected, events, 21);
 }

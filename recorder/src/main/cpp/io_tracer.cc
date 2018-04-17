@@ -55,7 +55,7 @@ IOTracer::IOTracer(JavaVM *_jvm, jvmtiEnv *_jvmti_env, ThreadMap &_thread_map, F
                    std::uint32_t _max_stack_depth)
     : jvm(_jvm), jvmti_env(_jvmti_env), thread_map(_thread_map), fd_map(_fd_map),
       processor_notifier(_processor_notifier), latency_threshold_ns(_latency_threshold_ns),
-      max_stack_depth(_max_stack_depth), evt_queue(_serializer, _max_stack_depth) {
+      max_stack_depth(_max_stack_depth), evt_queue(_serializer, _max_stack_depth), running(false) {
     fd_map.putFileInfo(0, "stdin");
     fd_map.putFileInfo(1, "stdout");
     fd_map.putFileInfo(2, "stderr");
@@ -65,13 +65,14 @@ IOTracer::~IOTracer() {
 }
 
 bool IOTracer::start(JNIEnv *jni_env) {
-    if (running) {
+    if (running.load()) {
         logger->warn("IOTracer.start when it is already running");
         return true;
     }
 
     getIOTracerJavaState().setLatencyThreshold(jni_env, latency_threshold_ns);
-    running = true;
+    running.store(true);
+    SPDLOG_TRACE(logger, "IOTracer started");
     return true;
 }
 
@@ -79,7 +80,8 @@ void IOTracer::stop() {
     JNIEnv *jni_env = getJNIEnv(jvm);
     getIOTracerJavaState().setLatencyThreshold(jni_env,
                                                IOTracerJavaState::default_latency_threshold);
-    running = false;
+    running.store(false);
+    SPDLOG_TRACE(logger, "IOTracer stopped");
 }
 
 void IOTracer::run() {

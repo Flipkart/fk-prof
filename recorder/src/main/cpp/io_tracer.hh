@@ -110,7 +110,7 @@ private:
 
     iotrace::Queue evt_queue;
 
-    bool running;
+    std::atomic_bool running;
 };
 
 IOTracerJavaState &getIOTracerJavaState();
