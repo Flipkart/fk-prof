@@ -7,8 +7,8 @@ void IOTracerJavaState::onVMInit(jvmtiEnv *jvmti, JNIEnv *jni_env) {
         return;
 
     jclass local_ref = jni_env->FindClass("fk/prof/bciagent/tracer/IOTracer");
-    JNI_EXCEPTION_CHECK(jni_env,
-                        "fk.prof.bciagent.tracer.IOTracer class not found. io tracing will be disabled");
+    JNI_EXCEPTION_CHECK(
+        jni_env, "fk.prof.bciagent.tracer.IOTracer class not found. io tracing will be disabled");
 
     io_trace_class = reinterpret_cast<jclass>(jni_env->NewGlobalRef(local_ref));
     jni_env->DeleteLocalRef(local_ref);
@@ -85,8 +85,14 @@ void IOTracer::stop() {
 }
 
 void IOTracer::run() {
-    while (evt_queue.pop())
-        ;
+    SPDLOG_DEBUG(logger, "IOTracer now processing events. q sz: {}", evt_queue.size());
+    uint32_t cnt = 0;
+    while (cnt < (Capacity / 2) && evt_queue.pop()) {
+        ++cnt;
+    };
+    SPDLOG_DEBUG(logger,
+                 "IOTracer finished processing upto cap/2 events. processed: {}. q sz: {}, ", cnt,
+                 evt_queue.size());
 }
 
 void IOTracer::recordFileRead(JNIEnv *jni_env, fd_t fd, std::uint64_t ts, std::uint64_t latency_ns,
@@ -142,6 +148,10 @@ void IOTracer::recordSocketWrite(JNIEnv *jni_env, fd_t fd, std::uint64_t ts,
 }
 
 void IOTracer::record(JNIEnv *jni_env, blocking::BlockingEvt &evt) {
+    if (!running.load(std::memory_order_relaxed)) {
+        return;
+    }
+
     jvmtiFrameInfo frames[max_stack_depth];
     jint frame_count;
 
@@ -167,7 +177,7 @@ void IOTracer::record(JNIEnv *jni_env, blocking::BlockingEvt &evt) {
 
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024FileOpTracer__1open(
     JNIEnv *jni_env, jobject, jint fd, jstring path, jlong ts, jlong latency) {
-    
+
     const char *path_str = jni_env->GetStringUTFChars(path, nullptr);
     getFdMap().putFileInfo(fd, path_str);
     jni_env->ReleaseStringUTFChars(path, path_str);
@@ -191,7 +201,7 @@ JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024SocketOpTracer
 
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024FileOpTracer__1read(
     JNIEnv *jni_env, jobject, jint fd, jlong count, jlong ts, jlong latency) {
-    
+
     ReadsafePtr<IOTracer> tracer(GlobalCtx::recording.io_tracer);
     if (tracer.available()) {
         tracer->recordFileRead(jni_env, fd, ts, latency, count);
@@ -200,7 +210,7 @@ JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024FileOpTracer__
 
 JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024FileOpTracer__1write(
     JNIEnv *jni_env, jobject, jint fd, jlong count, jlong ts, jlong latency) {
-    
+
     ReadsafePtr<IOTracer> tracer(GlobalCtx::recording.io_tracer);
     if (tracer.available()) {
         tracer->recordFileWrite(jni_env, fd, ts, latency, count);

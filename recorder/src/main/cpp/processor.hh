@@ -44,7 +44,6 @@ public:
 
 typedef std::shared_ptr<Process> ProcessPtr;
 
-struct Processor_Thd_Args;
 typedef std::vector<std::shared_ptr<Process>> Processes;
 
 class Processor : public Notifiable {
@@ -53,9 +52,9 @@ public:
 
     virtual ~Processor();
 
-    void start(JNIEnv *jniEnv, Processes processes);
+    void start(JNIEnv *jniEnv, Processes _processes);
 
-    void run(Processes &processes);
+    void run();
 
     void stop();
 
@@ -68,12 +67,16 @@ private:
 
     std::atomic_bool running;
 
-    ThdProcP<Processor_Thd_Args> thd_proc;
+    Processes processes;
+
+    ThdProcP<Processor *> thd_proc;
 
     /* Required for notifying the processor thd */
     std::condition_variable cv;
 
     std::mutex mutex;
+
+    std::mutex processes_mutex;
 
     /* Flag for condition variable.
      * True means that some process thd wants the processing thd to call run().

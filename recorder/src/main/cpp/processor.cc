@@ -22,17 +22,13 @@ void sleep_for_millis(uint period) {
 #endif
 }
 
-struct Processor_Thd_Args {
-    Processor *processor;
-    Processes processes;
-};
-
 Processor::Processor(jvmtiEnv *_jvmti) : jvmti(_jvmti), running(false), processing_pending(false) {
 }
 
 constexpr Time::msec Process::run_itvl_ignore;
 
 Processor::~Processor() {
+    assert(!running.load());
 }
 
 void Processor::notify() {
@@ -49,7 +45,7 @@ void Processor::notify() {
     cv.notify_one();
 }
 
-void Processor::run(Processes &processes) {
+void Processor::run() {
     SPDLOG_TRACE(logger, "processor run started. processes count: {}", processes.size());
     // Find the process with the least positive run_itvl. This will be our wait
     // period for the condition variable.
@@ -66,9 +62,14 @@ void Processor::run(Processes &processes) {
 
     while (true) {
         auto before = Time::now();
-        for (auto &p : processes) {
-            p->run();
+
+        {
+            std::lock_guard<decltype(processes_mutex)> lock(processes_mutex);
+            for (auto &p : processes) {
+                p->run();
+            }
         }
+
         processing_pending.store(false);
         auto after = Time::now();
         auto run_duration = std::chrono::duration_cast<Time::msec>(after - before);
@@ -94,30 +95,40 @@ void Processor::run(Processes &processes) {
             SPDLOG_TRACE(logger, "processing thd woke up");
         }
     }
-
-    SPDLOG_TRACE(logger, "stopping all process");
-    for (auto &p : processes) {
-        p->stop();
-    }
 }
 
-void callback_to_run_processor(jvmtiEnv *jvmti_env, JNIEnv *jni_env, Processor_Thd_Args arg) {
-    arg.processor->run(arg.processes);
+void callback_to_run_processor(jvmtiEnv *jvmti_env, JNIEnv *jni_env, Processor *processor) {
+    processor->run();
 }
 
-void Processor::start(JNIEnv *jniEnv, Processes processes) {
-    running.store(true, std::memory_order_relaxed);
-    thd_proc = start_new_thd<Processor_Thd_Args>(
-        jniEnv, jvmti, "Fk-Prof Processing Thread", callback_to_run_processor,
-        Processor_Thd_Args{.processor = this, .processes = processes});
+void Processor::start(JNIEnv *jniEnv, Processes _processes) {
+    assert(!running.load());
+    processes = _processes;
+    running.store(true);
+    thd_proc = start_new_thd<Processor *>(jniEnv, jvmti, "Fk-Prof Processing Thread",
+                                          callback_to_run_processor, this);
 }
 
 void Processor::stop() {
-    running.store(false, std::memory_order_relaxed);
+    SPDLOG_TRACE(logger, "stopping all process");
+    {
+        std::lock_guard<decltype(processes_mutex)> lock(processes_mutex);
+        for (auto &p : processes) {
+            p->stop();
+        }
+    }
+
+    running.store(false);
     // wake up the processing thd. It might be sleeping.
     notify();
     await_thd_death(thd_proc);
+
     // release the processes
+    {
+        std::lock_guard<decltype(processes_mutex)> lock(processes_mutex);
+        processes.clear();
+    }
+
     thd_proc.reset();
 }
 
