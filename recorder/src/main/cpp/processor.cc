@@ -63,12 +63,7 @@ void Processor::run() {
     while (true) {
         auto before = Time::now();
 
-        {
-            std::lock_guard<decltype(processes_mutex)> lock(processes_mutex);
-            for (auto &p : processes) {
-                p->run();
-            }
-        }
+        run_processes();
 
         processing_pending.store(false);
         auto after = Time::now();
@@ -94,6 +89,17 @@ void Processor::run() {
 
             SPDLOG_TRACE(logger, "processing thd woke up");
         }
+    }
+
+    // run processes again. as there could have been some work added between our last run and the
+    // moment we exited the loop.
+    run_processes();
+}
+
+void Processor::run_processes() {
+    std::lock_guard<decltype(processes_mutex)> lock(processes_mutex);
+    for (auto &p : processes) {
+        p->run();
     }
 }
 

@@ -87,7 +87,7 @@ void IOTracer::stop() {
 void IOTracer::run() {
     SPDLOG_DEBUG(logger, "IOTracer now processing events. q sz: {}", evt_queue.size());
     uint32_t cnt = 0;
-    while (cnt < (Capacity / 2) && evt_queue.pop()) {
+    while (cnt < Capacity && evt_queue.pop()) {
         ++cnt;
     };
     SPDLOG_DEBUG(logger,
