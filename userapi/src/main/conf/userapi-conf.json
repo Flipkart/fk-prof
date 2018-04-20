@@ -43,9 +43,10 @@
     "compression": true
   },
   "aggregatedProfiles.baseDir": "profiles",
-  "vertx.workerpool.io": {
-    "size": 20
-  },
+  "maxDepthExpansion": 8,
+  "maxProfilesToCache": 50,
+  "maxProfileViewsToCache": 100,
+  "maxProfileSummaryCacheWeight": 1000,
   "vertx.workerpool.blocking": {
     "size": 50
   }
