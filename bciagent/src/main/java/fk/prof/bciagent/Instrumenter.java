@@ -65,7 +65,7 @@ public class Instrumenter {
       String jStr = "";
       jStr += code_sockStream_saveFDToLocalVar();
       jStr += "long " + elapsedLocalVar + " = " + expr_elapsedNanos() + ";";
-      jStr += socketTracer + ".read(" + fdLocalVar + ", (long)($_), " + elapsedLocalVar + ", " + elapsedLocalVar + " > ((long)$4) * 1000000);";
+      jStr += socketTracer + ".read(" + fdLocalVar + ", (long)($_), " + elapsedLocalVar + ", ($4 > 0 ?" + elapsedLocalVar + " > ((long)$4) * 1000000 : false));";
 
       m.insertAfter(jStr, true);
     }

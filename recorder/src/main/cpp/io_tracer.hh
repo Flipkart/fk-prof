@@ -74,6 +74,8 @@ public:
     void run() override;
 
     void stop() override;
+    
+    bool isRunning();
 
     void recordSocketRead(JNIEnv *jni_env, fd_t fd, std::uint64_t ts, std::uint64_t latency_ns,
                           int count, bool timeout);

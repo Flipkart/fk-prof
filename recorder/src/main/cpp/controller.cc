@@ -56,7 +56,7 @@ Controller::Controller(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap& _thread_map, C
 }
 
 void Controller::start() {
-    keep_running.store(true, std::memory_order_relaxed);
+    keep_running.store(true);
     thd_proc = start_new_thd(jvm, jvmti, "Fk-Prof Controller Thread", controllerRunnable, this);
 }
 
@@ -66,7 +66,7 @@ void Controller::stop() {
             //This is necessary because it wakes up the scheduler.poll and makes keep_running == false
             //  We can either schedule something or we'd need additional stop-control in scheduler.
             //  This hack (in a good way) simplifies scheduler.
-            keep_running.store(false, std::memory_order_relaxed);
+            keep_running.store(false);
         }, "Stop Controller Task");
     await_thd_death(thd_proc);
     thd_proc.reset();
@@ -300,7 +300,7 @@ void Controller::run() {
     scheduler.schedule(Time::now(), assoc_cb);
 
     // work, work work...
-    while (keep_running.load(std::memory_order_relaxed) && scheduler.poll());
+    while (is_running() && scheduler.poll());
 }
 
 void Controller::with_current_work(std::function<void(Controller::W&, Controller::WSt&, Controller::WRes&, Time::Pt&, Time::Pt&)> proc) {
@@ -497,7 +497,7 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                     if (w.work_size() > 0) {//something actually needs to be done
 
                         std::uint32_t tx_timeout = cfg.slow_tx_tolerance * w.duration();
-                        std::shared_ptr<HttpRawProfileWriter> raw_writer(new HttpRawProfileWriter(jvm, jvmti, host, port, raw_writer_ring, cancel_work, tx_timeout));
+                        auto raw_writer = std::make_shared<HttpRawProfileWriter>(jvm, jvmti, host, port, raw_writer_ring, cancel_work, tx_timeout);
                         writer.reset(new ProfileWriter(raw_writer, buff));
                         recording::RecordingHeader rh;
                         populate_recording_header(rh, w, controller_id, controller_version);

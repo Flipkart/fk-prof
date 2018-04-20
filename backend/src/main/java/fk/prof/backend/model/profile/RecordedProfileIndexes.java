@@ -17,6 +17,10 @@ public class RecordedProfileIndexes {
     return methodLookup.get(methodId);
   }
 
+  public Recording.FDInfo getFdInfo(int fdId) {
+    return fdLookup.get(fdId);
+  }
+
   public String getTrace(int traceId) {
     return traceLookup.get(traceId);
   }

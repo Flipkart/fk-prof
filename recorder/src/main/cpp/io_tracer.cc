@@ -84,6 +84,10 @@ void IOTracer::stop() {
     SPDLOG_TRACE(logger, "IOTracer stopped");
 }
 
+bool IOTracer::isRunning() {
+    return running.load(std::memory_order_relaxed);
+}
+
 void IOTracer::run() {
     SPDLOG_DEBUG(logger, "IOTracer now processing events. q sz: {}", evt_queue.size());
     uint32_t cnt = 0;
@@ -148,10 +152,6 @@ void IOTracer::recordSocketWrite(JNIEnv *jni_env, fd_t fd, std::uint64_t ts,
 }
 
 void IOTracer::record(JNIEnv *jni_env, blocking::BlockingEvt &evt) {
-    if (!running.load(std::memory_order_relaxed)) {
-        return;
-    }
-
     jvmtiFrameInfo frames[max_stack_depth];
     jint frame_count;
 
@@ -203,7 +203,7 @@ JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024FileOpTracer__
     JNIEnv *jni_env, jobject, jint fd, jlong count, jlong ts, jlong latency) {
 
     ReadsafePtr<IOTracer> tracer(GlobalCtx::recording.io_tracer);
-    if (tracer.available()) {
+    if (tracer.available() && tracer->isRunning()) {
         tracer->recordFileRead(jni_env, fd, ts, latency, count);
     }
 }
@@ -212,7 +212,7 @@ JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024FileOpTracer__
     JNIEnv *jni_env, jobject, jint fd, jlong count, jlong ts, jlong latency) {
 
     ReadsafePtr<IOTracer> tracer(GlobalCtx::recording.io_tracer);
-    if (tracer.available()) {
+    if (tracer.available() && tracer->isRunning()) {
         tracer->recordFileWrite(jni_env, fd, ts, latency, count);
     }
 }
@@ -221,7 +221,7 @@ JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024SocketOpTracer
     JNIEnv *jni_env, jobject, jint fd, jlong count, jlong ts, jlong latency, jboolean timeout) {
 
     ReadsafePtr<IOTracer> tracer(GlobalCtx::recording.io_tracer);
-    if (tracer.available()) {
+    if (tracer.available() && tracer->isRunning()) {
         tracer->recordSocketRead(jni_env, fd, ts, latency, count, timeout);
     }
 }
@@ -230,7 +230,7 @@ JNIEXPORT void JNICALL Java_fk_prof_bciagent_tracer_IOTracer_00024SocketOpTracer
     JNIEnv *jni_env, jobject, jint fd, jlong count, jlong ts, jlong latency) {
 
     ReadsafePtr<IOTracer> tracer(GlobalCtx::recording.io_tracer);
-    if (tracer.available()) {
+    if (tracer.available() && tracer->isRunning()) {
         tracer->recordSocketWrite(jni_env, fd, ts, latency, count);
     }
 }
