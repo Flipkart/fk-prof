@@ -33,8 +33,8 @@ bool bci_agent_loaded_without_fail() {
 }
 
 Controller::Controller(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap& _thread_map, ConfigurationOptions& _cfg) :
-    jvm(_jvm), jvmti(_jvmti), thread_map(_thread_map), cfg(_cfg), keep_running(false), writer(nullptr),
-    serializer(nullptr), processor(nullptr), raw_writer_ring(_cfg.tx_ring_sz),
+    jvm(_jvm), jvmti(_jvmti), thread_map(_thread_map), cfg(_cfg), keep_running(false), raw_writer_ring(_cfg.tx_ring_sz),
+    writer(nullptr), serializer(nullptr), processor(nullptr),
 
     s_t_poll_rpc(get_metrics_registry().new_timer({METRICS_DOMAIN, METRICS_TYPE_RPC, "poll"})),
     s_c_poll_rpc_failures(get_metrics_registry().new_counter({METRICS_DOMAIN, METRICS_TYPE_RPC, "poll", "failures"})),
@@ -43,6 +43,7 @@ Controller::Controller(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap& _thread_map, C
     s_c_associate_rpc_failures(get_metrics_registry().new_counter({METRICS_DOMAIN, METRICS_TYPE_RPC, "associate", "failures"})),
 
     s_v_work_cpu_sampling(get_metrics_registry().new_value({METRICS_DOMAIN, METRICS_TYPE_STATE, "working", "cpu_sampling"})),
+    s_v_work_io_tracer(get_metrics_registry().new_value({METRICS_DOMAIN, METRICS_TYPE_STATE, "working", "io_tracer"})),
 
     s_c_work_success(get_metrics_registry().new_counter({METRICS_DOMAIN, "work", "retire", "success"})),
     s_c_work_failure(get_metrics_registry().new_counter({METRICS_DOMAIN, "work", "retire", "failure"})),
@@ -420,7 +421,11 @@ public:
         s_h_req_chunk_sz(get_metrics_registry().new_histogram({METRICS_DOMAIN, METRICS_TYPE_SZ, "profile", "chunk"})) {
 
         ring.reset();
+        
         thd_proc = start_new_thd(jvm, jvmti, "Fk-Prof Profiler Writer Thread", http_raw_writer_runnable, this);
+        if(!is_started(thd_proc)) {
+            throw ThreadSpawnFailure("Fk-Prof Profiler Writer Thread failed to start");
+        }
     }
     virtual ~HttpRawProfileWriter() {
         logger->trace("HTTP RawProfileWriter destructor called");
@@ -494,41 +499,49 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                             }, Util::to_s("Cancel Ongoing Work: ", work_id));
                     };
 
-                    if (w.work_size() > 0) {//something actually needs to be done
+                    recording::RecordingHeader rh;
+                    populate_recording_header(rh, w, controller_id, controller_version);
+                    
+                    try {
+                        if (w.work_size() > 0) {//something actually needs to be done
 
-                        std::uint32_t tx_timeout = cfg.slow_tx_tolerance * w.duration();
-                        auto raw_writer = std::make_shared<HttpRawProfileWriter>(jvm, jvmti, host, port, raw_writer_ring, cancel_work, tx_timeout);
-                        writer.reset(new ProfileWriter(raw_writer, buff));
-                        recording::RecordingHeader rh;
-                        populate_recording_header(rh, w, controller_id, controller_version);
-                        writer->write_header(rh);
+                            std::uint32_t tx_timeout = cfg.slow_tx_tolerance * w.duration();
+                            auto raw_writer = std::make_shared<HttpRawProfileWriter>(jvm, jvmti, host, port, raw_writer_ring, cancel_work, tx_timeout);
+                            writer.reset(new ProfileWriter(raw_writer, buff));
+                            
+                            for (auto i = 0; i < w.work_size(); i++) {
+                                auto work = w.work(i);
+                                prep(work);
+                            }
 
-                        for (auto i = 0; i < w.work_size(); i++) {
-                            auto work = w.work(i);
-                            prep(work);
+                            serializer.reset(new ProfileSerializingWriter(jvmti, *writer.get(), SiteResolver::method_info, SiteResolver::line_no, get_ctx_reg(), sft, tts, cfg.noctx_cov_pct));
+
+                            JNIEnv *env = getJNIEnv(jvm);
+                            processor.reset(new Processor(jvmti));
+
+                            Processes processes;
+                            for (auto i = 0; i < w.work_size(); i++) {
+                                auto work = w.work(i);
+                                processes.emplace_back(issue(work, env));
+                            }
+
+                            processor->start(env, processes);
+                            
+                            writer->write_header(rh);
                         }
 
-                        serializer.reset(new ProfileSerializingWriter(jvmti, *writer.get(), SiteResolver::method_info, SiteResolver::line_no, get_ctx_reg(), sft, tts, cfg.noctx_cov_pct));
-
-                        JNIEnv *env = getJNIEnv(jvm);
-                        processor.reset(new Processor(jvmti));
-                        
-                        Processes processes;
-                        for (auto i = 0; i < w.work_size(); i++) {
-                            auto work = w.work(i);
-                            processes.emplace_back(issue(work, env));
-                        }
-
-                        processor->start(env, processes);
+                        start_tm = Time::now();
+                        auto stop_at = start_tm + Time::sec(w.duration());
+                        scheduler.schedule(stop_at, [&, work_id]() {
+                                retire_work(work_id);
+                            }, Util::to_s("Retiring Work: ", work_id));
+                        logger->info("Issuing work-id {} (sz: {}), it is slated for retire in {} seconds", w.work_id(), w.work_size(), w.duration());
+                        wst = recording::WorkResponse::running;
                     }
-
-                    start_tm = Time::now();
-                    auto stop_at = start_tm + Time::sec(w.duration());
-                    scheduler.schedule(stop_at, [&, work_id]() {
-                            retire_work(work_id);
-                        }, Util::to_s("Retiring Work: ", work_id));
-                    logger->info("Issuing work-id {} (sz: {}), it is slated for retire in {} seconds", w.work_id(), w.work_size(), w.duration());
-                    wst = recording::WorkResponse::running;
+                    catch (std::exception& e) {
+                        logger->error("Exception while issuing work: {}", e.what());
+                        cancel_work();
+                    }
                 });
         }, "Issue Work");
 }
@@ -545,8 +558,10 @@ void Controller::retire_work(const std::uint64_t work_id) {
             }
 
             if (w.work_size() > 0) {//something actually was being done
-                processor->stop();
-                processor.reset();
+                if(processor) {
+                    processor->stop();
+                    processor.reset();
+                }
 
                 logger->info("Will now retire work {}", work_id);
 
@@ -555,8 +570,8 @@ void Controller::retire_work(const std::uint64_t work_id) {
                     retire(work);
                 }
 
-                serializer.reset();
-                writer.reset();
+                if(serializer) serializer.reset();
+                if(writer) writer.reset();
             }
 
             logger->info("Retiring work-id {}, status before retire {}", w.work_id(), wres);
@@ -632,7 +647,7 @@ ProcessPtr Controller::issue(const recording::Work& work, JNIEnv* env) {
         case recording::WorkType::io_trace_work:
             if(work.has_io_trace()) {
                 p = issue(work.io_trace(), env);
-                // TODO: gauge for current running io_trace work
+                s_v_work_io_tracer.update(1);
             }
             break;
         default:
@@ -653,7 +668,7 @@ void Controller::retire(const recording::Work& work) {
         case recording::WorkType::io_trace_work:
             if(work.has_io_trace()) {
                 retire(work.io_trace());
-                // TODO: update gauge to 0 for io_trace
+                s_v_work_io_tracer.update(0);
             }
             return;
         default:

@@ -43,10 +43,13 @@ TEST(Processor___multiple_periodic_processes) {
     Processor processor(nullptr);
     Processes processes = Processes{p2, p1, p3};
 
-    processor.start(nullptr, processes);
+    try {
+        processor.start(nullptr, processes);
+    } catch(std::exception& e) {}
+
     auto thd = std::thread([&]() { processor.run(); });
 
-    std::this_thread::sleep_for(Time::sec(1));
+    std::this_thread::sleep_for(Time::msec(1050));
 
     processor.stop();
 
@@ -68,10 +71,13 @@ TEST(Processor___mix_processes) {
     Processor processor(nullptr);
     Processes processes = Processes{p2, p1, p3};
 
-    processor.start(nullptr, processes);
+    try {
+        processor.start(nullptr, processes);
+    } catch(std::exception& e) {}
+    
     auto thd = std::thread([&]() { processor.run(); });
 
-    std::this_thread::sleep_for(Time::msec(500));
+    std::this_thread::sleep_for(Time::msec(550));
     processor.stop();
     thd.join();
 

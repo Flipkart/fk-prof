@@ -130,6 +130,11 @@ ThdProcP<Arg_t> start_new_thd(JNIEnv *env, jvmtiEnv *jvmti, const char *thd_name
 }
 
 template <typename Arg_t>
+bool is_started(ThdProcP<Arg_t> &thd) {
+    return thd && (thd->state != State::stopped);
+}
+
+template <typename Arg_t>
 ThdProcP<Arg_t> start_new_thd(JavaVM *jvm, jvmtiEnv *jvmti, const char *thd_name,
                               jvmtiStartFunction_t<Arg_t> run_fn, Arg_t &&arg) {
     JNIEnv *env = getJNIEnv(jvm);

@@ -52,7 +52,7 @@ public:
 
     virtual ~Processor();
 
-    void start(JNIEnv *jniEnv, Processes _processes);
+    void start(JNIEnv *jniEnv, Processes _processes) throw(ThreadSpawnFailure);
 
     void run();
 
@@ -82,7 +82,7 @@ private:
      * True means that some process thd wants the processing thd to call run().
      */
     std::atomic_bool processing_pending;
-    
+
     void run_processes();
 
     DISALLOW_COPY_AND_ASSIGN(Processor);

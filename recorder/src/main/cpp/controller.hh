@@ -48,12 +48,12 @@ private:
     std::atomic_bool keep_running;
     ThdProcP<Controller *> thd_proc;
     Buff buff;
+    BlockingRingBuffer raw_writer_ring;
     std::shared_ptr<ProfileWriter> writer;
     std::shared_ptr<ProfileSerializingWriter> serializer;
     std::shared_ptr<Processor> processor;
     std::function<void()> cancel_work;
-    BlockingRingBuffer raw_writer_ring;
-
+    
     Scheduler scheduler;
     
     std::recursive_mutex current_work_mtx;
@@ -78,6 +78,7 @@ private:
     metrics::Ctr& s_c_associate_rpc_failures;
 
     metrics::Value& s_v_work_cpu_sampling;
+    metrics::Value& s_v_work_io_tracer;
 
     metrics::Ctr& s_c_work_success;
     metrics::Ctr& s_c_work_failure;

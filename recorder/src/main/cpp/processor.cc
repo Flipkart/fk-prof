@@ -107,12 +107,15 @@ void callback_to_run_processor(jvmtiEnv *jvmti_env, JNIEnv *jni_env, Processor *
     processor->run();
 }
 
-void Processor::start(JNIEnv *jniEnv, Processes _processes) {
+void Processor::start(JNIEnv *jniEnv, Processes _processes) throw(ThreadSpawnFailure) {
     assert(!running.load());
     processes = _processes;
     running.store(true);
     thd_proc = start_new_thd<Processor *>(jniEnv, jvmti, "Fk-Prof Processing Thread",
                                           callback_to_run_processor, this);
+    if (!is_started(thd_proc)) {
+        throw ThreadSpawnFailure("Fk-Prof Processing Thread failed to start");
+    }
 }
 
 void Processor::stop() {

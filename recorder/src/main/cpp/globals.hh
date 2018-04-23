@@ -106,6 +106,25 @@ private:
     DISALLOW_IMPLICIT_CONSTRUCTORS(JvmtiScopedPtr);
 };
 
+class ThreadSpawnFailure : public std::exception {
+public:
+    explicit ThreadSpawnFailure(const char *const message) : msg(message) {
+    }
+
+    explicit ThreadSpawnFailure(const std::string &message) : msg(message) {
+    }
+
+    virtual ~ThreadSpawnFailure() throw() {
+    }
+
+    virtual const char *what() const throw() {
+        return msg.c_str();
+    }
+
+protected:
+    std::string msg;
+};
+
 // Accessors for getting the Jvm function for AsyncGetCallTrace.
 class Accessors {
 public:

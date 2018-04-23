@@ -167,6 +167,7 @@ void IOTracer::record(JNIEnv *jni_env, blocking::BlockingEvt &evt) {
     } else {
         evt_queue.push(iotrace::InMsg(evt, thd_info, frames, frame_count, default_context));
     }
+    // TODO count dropped events.
 
     if (evt_queue.size() > Capacity / 2) {
         processor_notifier->notify();
