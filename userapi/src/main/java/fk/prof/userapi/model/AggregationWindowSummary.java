@@ -4,7 +4,6 @@ import fk.prof.aggregation.proto.AggregatedProfileModel;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 

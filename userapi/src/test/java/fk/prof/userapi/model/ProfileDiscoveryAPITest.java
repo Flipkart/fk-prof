@@ -6,11 +6,10 @@ import fk.prof.userapi.Configuration;
 import fk.prof.userapi.UserapiConfigManager;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
+import fk.prof.userapi.api.StorageBackedProfileLoader;
+import fk.prof.userapi.cache.ClusteredProfileCache;
 import fk.prof.userapi.model.json.ProtoSerializers;
-import io.vertx.core.AsyncResult;
-import io.vertx.core.CompositeFuture;
-import io.vertx.core.Future;
-import io.vertx.core.Vertx;
+import io.vertx.core.*;
 import io.vertx.core.json.Json;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
@@ -85,7 +84,10 @@ public class ProfileDiscoveryAPITest {
         vertx = Vertx.vertx();
         asyncStorage = mock(AsyncStorage.class);
         config = UserapiConfigManager.loadConfig(ParseProfileTest.class.getClassLoader().getResource("userapi-conf.json").getFile());
-        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, 30, config.getProfileLoadTimeout(), config.getVertxWorkerPoolSize());
+        WorkerExecutor executor = vertx.createSharedWorkerExecutor(
+            config.getBlockingWorkerPool().getName(), config.getBlockingWorkerPool().getSize());
+        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, new StorageBackedProfileLoader(asyncStorage),
+            mock(ClusteredProfileCache.class), executor, config);
 
         when(asyncStorage.listAsync(anyString(), anyBoolean())).thenAnswer(invocation -> {
             String path1 = invocation.getArgument(0);
@@ -107,11 +109,10 @@ public class ProfileDiscoveryAPITest {
 
         List<Future> futures = new ArrayList<>();
         for (Map.Entry<String, Collection<Object>> entry : appIdTestPairs.entrySet()) {
-            Future<Set<String>> f = Future.future();
-            futures.add(f);
-
-            f.setHandler(res -> context.assertEquals(entry.getValue(), res.result()));
-            profileDiscoveryAPI.getAppIdsWithPrefix(f, BASE_DIR, entry.getKey());
+            futures.add(
+                profileDiscoveryAPI
+                    .getAppIdsWithPrefix(BASE_DIR, entry.getKey())
+                    .setHandler(res -> context.assertEquals(entry.getValue(), res.result())));
         }
 
         CompositeFuture f = CompositeFuture.all(futures);
@@ -135,11 +136,10 @@ public class ProfileDiscoveryAPITest {
 
         List<Future> futures = new ArrayList<>();
         for (Map.Entry<List<String>, Collection<?>> entry : appIdTestPairs.entrySet()) {
-            Future<Set<String>> f = Future.future();
-            futures.add(f);
-
-            f.setHandler(res -> context.assertEquals(entry.getValue(), res.result()));
-            profileDiscoveryAPI.getClusterIdsWithPrefix(f, BASE_DIR, entry.getKey().get(0), entry.getKey().get(1));
+            futures.add(
+                profileDiscoveryAPI
+                    .getClusterIdsWithPrefix(BASE_DIR, entry.getKey().get(0), entry.getKey().get(1))
+                    .setHandler(res -> context.assertEquals(entry.getValue(), res.result())));
         }
 
         CompositeFuture f = CompositeFuture.all(futures);
@@ -161,13 +161,10 @@ public class ProfileDiscoveryAPITest {
 
         List<Future> futures = new ArrayList<>();
         for (Map.Entry<List<String>, Collection<?>> entry : appIdTestPairs.entrySet()) {
-            Future<Set<String>> f = Future.future();
-            futures.add(f);
-
-            f.setHandler(res -> {
-                context.assertEquals(entry.getValue(), res.result());
-            });
-            profileDiscoveryAPI.getProcNamesWithPrefix(f, BASE_DIR, entry.getKey().get(0), entry.getKey().get(1), entry.getKey().get(2));
+            futures.add(
+                profileDiscoveryAPI
+                    .getProcNamesWithPrefix(BASE_DIR, entry.getKey().get(0), entry.getKey().get(1), entry.getKey().get(2))
+                    .setHandler(res -> context.assertEquals(entry.getValue(), res.result())));
         }
 
         CompositeFuture f = CompositeFuture.all(futures);
@@ -177,10 +174,6 @@ public class ProfileDiscoveryAPITest {
     @Test(timeout = 10000)
     public void testGetProfilesInTimeWindow(TestContext context) throws Exception {
         Async async = context.async();
-        FilteredProfiles profile1 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("monitor_contention_work"));
-        FilteredProfiles profile2 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1800), Sets.newSet("monitor_wait_work"));
-        FilteredProfiles profile3 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("thread_sample_work", "cpu_sample_work"));
-
         Map<List<Object>, Collection<?>> appIdTestPairs = new HashMap<List<Object>, Collection<?>>() {
             {
                 put(Arrays.asList("app1", "cluster1", "process1", ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), 1600),
@@ -194,12 +187,12 @@ public class ProfileDiscoveryAPITest {
 
         List<Future> futures = new ArrayList<>();
         for (Map.Entry<List<Object>, Collection<?>> entry : appIdTestPairs.entrySet()) {
-            Future<List<AggregatedProfileNamingStrategy>> f = Future.future();
-            futures.add(f);
-
-            f.setHandler(res -> context.assertEquals(entry.getValue(), Sets.newSet(res.result().toArray())));
-            profileDiscoveryAPI.getProfilesInTimeWindow(f, BASE_DIR,
-                    (String)entry.getKey().get(0), (String)entry.getKey().get(1), (String)entry.getKey().get(2), (ZonedDateTime)entry.getKey().get(3), (Integer)entry.getKey().get(4));
+            futures.add(
+                profileDiscoveryAPI
+                    .getProfilesInTimeWindow(BASE_DIR, (String)entry.getKey().get(0), (String)entry.getKey().get(1),
+                        (String)entry.getKey().get(2), (ZonedDateTime)entry.getKey().get(3),
+                        (Integer)entry.getKey().get(4))
+                    .setHandler(res -> context.assertEquals(entry.getValue(), Sets.newSet(res.result().toArray()))));
         }
 
         CompositeFuture f = CompositeFuture.all(futures);

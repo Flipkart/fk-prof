@@ -1,4 +1,5 @@
 {
+  "ip.address": "127.0.0.1",
   "userapiHttpOptions": {
     "config": {
       "verticle.count": 1,
@@ -6,7 +7,15 @@
       "req.timeout": 10000
     }
   },
+  "curatorOptions": {
+    "connection.url": "",
+    "namespace": "fkprof-userapi",
+    "connection.timeout.ms": 5000,
+    "session.timeout.ms": 50000,
+    "max.retries": 3
+  },
   "profile.retention.duration.min": 30,
+  "profileView.retention.duration.min": 10,
   "profile.load.timeout": 10000,
   "storage": {
     "s3": {
@@ -34,5 +43,11 @@
     "compression": true
   },
   "aggregatedProfiles.baseDir": "profiles",
-  "vertx.worker.pool.size": 50
+  "maxDepthExpansion": 8,
+  "maxProfilesToCache": 50,
+  "maxProfileViewsToCache": 100,
+  "maxProfileSummaryCacheWeight": 1000,
+  "vertx.workerpool.blocking": {
+    "size": 50
+  }
 }

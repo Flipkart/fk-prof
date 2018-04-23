@@ -2,7 +2,9 @@ package fk.prof.userapi;
 
 import com.google.common.base.Preconditions;
 import com.google.common.io.Files;
+import fk.prof.metrics.Util;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.logging.LoggerFactory;
 
 import javax.validation.ConstraintViolation;
 import javax.validation.Validation;
@@ -21,7 +23,6 @@ public class UserapiConfigManager {
 
     private static Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
-    private static final String LOGFACTORY_SYSTEM_PROPERTY_KEY = "vertx.logger-delegate-factory-class-name";
     private static final String LOGFACTORY_SYSTEM_PROPERTY_DEFAULT_VALUE = "io.vertx.core.logging.SLF4JLogDelegateFactory";
 
     public static final String METRIC_REGISTRY = "userapi-metric-registry";
@@ -41,8 +42,9 @@ public class UserapiConfigManager {
 
     public static void setDefaultSystemProperties() {
         Properties properties = System.getProperties();
-        properties.putIfAbsent(UserapiConfigManager.LOGFACTORY_SYSTEM_PROPERTY_KEY, UserapiConfigManager.LOGFACTORY_SYSTEM_PROPERTY_DEFAULT_VALUE);
+        properties.putIfAbsent(LoggerFactory.LOGGER_DELEGATE_FACTORY_CLASS_NAME, UserapiConfigManager.LOGFACTORY_SYSTEM_PROPERTY_DEFAULT_VALUE);
         properties.putIfAbsent("vertx.metrics.options.enabled", true);
+        properties.putIfAbsent(Util.METRIC_REGISTRY_PROPERTY, METRIC_REGISTRY);
     }
 
     public static <T> void validateConfig(T config) {

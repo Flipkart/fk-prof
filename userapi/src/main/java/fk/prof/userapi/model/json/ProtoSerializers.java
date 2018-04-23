@@ -47,6 +47,38 @@ public class ProtoSerializers {
         }
     }
 
+    public static class CpuSampleFrameNodeWithStackSampleSerializer extends StdSerializer<AggregatedProfileModel.FrameNode> {
+
+        public CpuSampleFrameNodeWithStackSampleSerializer() {
+            super(AggregatedProfileModel.FrameNode.class);
+        }
+
+        @Override
+        public void serialize(AggregatedProfileModel.FrameNode value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeStartArray();
+            gen.writeNumber(value.getMethodId());
+            gen.writeNumber(value.getLineNo());
+            gen.writeNumber(value.getCpuSamplingProps().getOnStackSamples());
+            gen.writeEndArray();
+        }
+    }
+
+    public static class CpuSampleFrameNodeWithCpuSampleSerializer extends StdSerializer<AggregatedProfileModel.FrameNode> {
+
+        public CpuSampleFrameNodeWithCpuSampleSerializer() {
+            super(AggregatedProfileModel.FrameNode.class);
+        }
+
+        @Override
+        public void serialize(AggregatedProfileModel.FrameNode value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeStartArray();
+            gen.writeNumber(value.getMethodId());
+            gen.writeNumber(value.getLineNo());
+            gen.writeNumber(value.getCpuSamplingProps().getOnCpuSamples());
+            gen.writeEndArray();
+        }
+    }
+
     static class TraceCtxDetailsSerializer extends StdSerializer<AggregatedProfileModel.TraceCtxDetail> {
 
         public TraceCtxDetailsSerializer() {

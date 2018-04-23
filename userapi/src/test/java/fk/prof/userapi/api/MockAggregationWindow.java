@@ -1,30 +1,50 @@
 package fk.prof.userapi.api;
 
+import com.codahale.metrics.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.CodedOutputStream;
 import fk.prof.aggregation.model.*;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.state.AggregationState;
+import fk.prof.storage.AsyncStorage;
+import fk.prof.storage.ObjectNotFoundException;
+import fk.prof.storage.buffer.ByteBufferPoolFactory;
 import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Utility class to generate mock aggregation files
  * Created by gaurav.ashok on 27/03/17.
  */
 public class MockAggregationWindow {
+
+    public static AggregationWindowStorage buildMockAggregationWindowStorage(AsyncStorage asyncStorage) {
+        GenericObjectPoolConfig poolConfig = new GenericObjectPoolConfig();
+        poolConfig.setMaxTotal(10);
+        poolConfig.setMaxIdle(10);
+
+        GenericObjectPool bufferPool = new GenericObjectPool<>(new ByteBufferPoolFactory(10_000_000, false), poolConfig);
+
+        MetricRegistry mockMetricRegistry = mock(MetricRegistry.class);
+        com.codahale.metrics.Timer mockTimer = mock(com.codahale.metrics.Timer.class);
+        when(mockMetricRegistry.timer(any())).thenReturn(mockTimer);
+
+        return new AggregationWindowStorage("profiles", asyncStorage, bufferPool, mockMetricRegistry);
+    }
 
     public static FinalizedAggregationWindow buildAggregationWindow(String time, Supplier<String> stackTraces, int durationInSeconds) throws Exception {
 
@@ -49,8 +69,6 @@ public class MockAggregationWindow {
 
         List<List<String>> stackTraces = new ObjectMapper().readValue(stacktraces.get(), List.class);
 
-        Random random = new Random();
-
         int frameCounts = 0;
         int stackTracesCount = 0;
         for(List<String> st : stackTraces) {
@@ -64,7 +82,7 @@ public class MockAggregationWindow {
             String methodName;
             for(String method : st) {
                 if(method.split(":").length == 1){
-                    lineNo = random.nextInt(5);
+                    lineNo = 0;                                             // some default line no.
                     methodName = method;
                 }else{
                     lineNo = Integer.parseInt(method.split(":")[1]);
@@ -160,6 +178,43 @@ public class MockAggregationWindow {
                 .setFormatVersion(1)
                 .setWorkType(AggregatedProfileModel.WorkType.cpu_sample_work)
                 .build();
+    }
+
+    public static class HashMapBasedStorage implements AsyncStorage {
+
+        Map<String, byte[]> data = new HashMap<>();
+
+        @Override
+        public CompletableFuture<Void> storeAsync(String path, InputStream content, long length) {
+            try {
+                byte[] bytes = new byte[(int)length];
+                int readBytes = content.read(bytes, 0, (int)length);
+                assert readBytes == length : "couldn't read " + length + " bytes for storing";
+                data.put(path, bytes);
+                content.close();
+            }
+            catch(IOException e) {
+                throw new RuntimeException(e);
+            }
+            return CompletableFuture.completedFuture(null);
+        }
+
+        @Override
+        public CompletableFuture<InputStream> fetchAsync(String path) {
+            if(data.containsKey(path)) {
+                return CompletableFuture.completedFuture(new ByteArrayInputStream(data.get(path)));
+            }
+            else {
+                return CompletableFuture.supplyAsync(() -> {
+                    throw new ObjectNotFoundException(path);
+                });
+            }
+        }
+
+        @Override
+        public CompletableFuture<Set<String>> listAsync(String prefixPath, boolean recursive) {
+            throw new UnsupportedOperationException("list operation not supported");
+        }
     }
 
     // TODO: Remove after perf test. Below 2 methods show different ways to serialize proto objects.

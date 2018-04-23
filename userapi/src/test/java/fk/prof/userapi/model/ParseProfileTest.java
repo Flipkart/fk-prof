@@ -8,22 +8,28 @@ import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.ObjectNotFoundException;
 import fk.prof.storage.S3AsyncStorage;
 import fk.prof.userapi.Configuration;
-import fk.prof.userapi.Deserializer;
 import fk.prof.userapi.UserapiConfigManager;
+import fk.prof.userapi.api.ProfileViewCreator;
+import fk.prof.userapi.api.StorageBackedProfileLoader;
 import fk.prof.userapi.api.ProfileStoreAPI;
 import fk.prof.userapi.api.ProfileStoreAPIImpl;
+import fk.prof.userapi.cache.ClusteredProfileCache;
+import fk.prof.userapi.cache.ClusteredProfileCacheTest;
+import fk.prof.userapi.cache.ProfileLoadInProgressException;
 import fk.prof.userapi.model.json.ProtoSerializers;
-import io.vertx.core.CompositeFuture;
-import io.vertx.core.Future;
+import fk.prof.userapi.model.tree.CallTree;
+import fk.prof.userapi.util.ProtoUtil;
 import io.vertx.core.Vertx;
+import io.vertx.core.WorkerExecutor;
 import io.vertx.core.json.Json;
 import io.vertx.ext.unit.Async;
 import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.curator.test.TestingServer;
+import org.junit.*;
 import org.junit.runner.RunWith;
 
 import java.io.*;
@@ -31,6 +37,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.Adler32;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.GZIPOutputStream;
@@ -49,27 +56,59 @@ public class ParseProfileTest {
 
     final String traceName1 = "print-trace-1";
     final String traceName2 = "doSome-trace-2";
-    private Configuration config;
+    private static Configuration config;
+    private static TestingServer zookeeper;
+    private static CuratorFramework curatorClient;
+    private WorkerExecutor executor;
+
+    private static final int zkPort = 2191;
+
+    static {
+        UserapiConfigManager.setDefaultSystemProperties();
+    }
 
     @Test
     public void testReadWriteForVariant() throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Serializer.writeVariantInt32(Integer.MAX_VALUE + 10000, out);
-        int read = Deserializer.readVariantInt32(new ByteArrayInputStream(out.toByteArray()));
+        int read = ProtoUtil.readVariantInt32(new ByteArrayInputStream(out.toByteArray()));
         assert read == Integer.MAX_VALUE + 10000;
     }
 
     @BeforeClass
-    public static void setup() {
+    public static void setup() throws Exception {
         ProtoSerializers.registerSerializers(Json.mapper);
+        config = UserapiConfigManager.loadConfig(ParseProfileTest.class.getClassLoader().getResource("userapi-conf.json").getFile());
+
+        zookeeper = new TestingServer(zkPort, true);
+
+        Configuration.CuratorConfig curatorConfig = config.getCuratorConfig();
+        curatorClient = CuratorFrameworkFactory.builder()
+            .connectString("127.0.0.1:" + zkPort)
+            .retryPolicy(new ExponentialBackoffRetry(1000, curatorConfig.getMaxRetries()))
+            .connectionTimeoutMs(curatorConfig.getConnectionTimeoutMs())
+            .sessionTimeoutMs(curatorConfig.getSessionTimeoutMs())
+            .namespace(curatorConfig.getNamespace())
+            .build();
+
+        curatorClient.start();
+        curatorClient.blockUntilConnected(config.getCuratorConfig().getConnectionTimeoutMs(), TimeUnit.MILLISECONDS);
+    }
+
+    @AfterClass
+    public static void afterClass() throws IOException {
+        zookeeper.close();
     }
 
     @Before
     public void testSetUp(TestContext context) throws Exception{
         vertx = Vertx.vertx();
         asyncStorage = mock(AsyncStorage.class);
-        config = UserapiConfigManager.loadConfig(ParseProfileTest.class.getClassLoader().getResource("userapi-conf.json").getFile());
-        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, 30, config.getProfileLoadTimeout(), config.getVertxWorkerPoolSize());
+        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, new StorageBackedProfileLoader(asyncStorage),
+            mock(ClusteredProfileCache.class),
+            vertx.createSharedWorkerExecutor(
+                config.getBlockingWorkerPool().getName(), config.getBlockingWorkerPool().getSize()),
+            config);
     }
 
     @After
@@ -78,11 +117,12 @@ public class ParseProfileTest {
     }
 
     @Test(timeout = 10000)
-    public void testAggregatedProfileStoreS3Impl(TestContext context) throws Exception {
+    public void testAggregatedProfileViewStoreS3Impl(TestContext context) throws Exception {
         Async async = context.async();
 
         S3AsyncStorage storage = mock(S3AsyncStorage.class);
-        String fileName = AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader()).getFileName(0);
+        AggregatedProfileNamingStrategy profileName = AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader());
+        String fileName = profileName.getFileName(0);
         InputStream s3InputStream = buildDefaultS3DataStream();
 
         // for above filename return the inputStream
@@ -92,39 +132,54 @@ public class ParseProfileTest {
             throw new ObjectNotFoundException("not found");
         }));
 
-        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, storage, 30, config.getProfileLoadTimeout(), config.getVertxWorkerPoolSize());
+        executor = vertx.createSharedWorkerExecutor(config.getBlockingWorkerPool().getName(), 3);
+        ClusteredProfileCacheTest.cleanUpZookeeper(curatorClient);
 
-        Future<AggregatedProfileInfo> future1 = Future.future();
-        Future<AggregatedProfileInfo> future2 = Future.future();
+        StorageBackedProfileLoader loader = new StorageBackedProfileLoader(storage);
+        ClusteredProfileCache cache = new ClusteredProfileCache(curatorClient, loader, new ProfileViewCreator(),
+            executor, config);
 
-        CompositeFuture cfuture = CompositeFuture.all(future1, future2);
-        cfuture.setHandler(result -> {
-            try {
+        cache.onClusterJoin().setHandler(ar -> async.complete());
+        async.await(2000);
+
+        Async async1 = context.async();
+        profileDiscoveryAPI = new ProfileStoreAPIImpl(vertx, asyncStorage, new StorageBackedProfileLoader(asyncStorage),
+            cache,
+            vertx.createSharedWorkerExecutor(
+                config.getBlockingWorkerPool().getName(), config.getBlockingWorkerPool().getSize()),
+            config);
+
+        profileDiscoveryAPI
+            .getProfileView(AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader()), traceName1,
+                ProfileViewType.CALLEES)
+            .setHandler(result -> {
+                try {
+                    if(!result.failed() || !(result.cause() instanceof ProfileLoadInProgressException)) {
+                        context.fail();
+                    }
+                } finally {
+                    async1.complete();
+                }
+            });
+
+        async1.await(2000);
+        // wait some to let it load
+        Thread.sleep(2000);
+
+        Async async2 = context.async();
+        profileDiscoveryAPI
+            .getProfileView(AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader()), traceName1,
+                ProfileViewType.CALLEES)
+            .setHandler(result -> {
                 if (result.failed()) {
                     context.fail(result.cause());
-                } else {
-                    // match the response
-                    AggregatedProfileInfo firstResult = result.result().resultAt(0);
-                    AggregatedProfileInfo secondResult = result.result().resultAt(1);
-                    testEquality(context, buildDefaultProfileInfo(), firstResult);
-                    // both results are actually the same cached object
-                    context.assertTrue(firstResult == secondResult);
-
-                    // gzip buffer size is 512 and our content size is ~470 bytes, so fetchAsync will be called 2 times.
-                    verify(storage, times(2)).fetchAsync(any());
-                    verifyNoMoreInteractions(storage);
                 }
-            }
-            catch (Exception e) {
-                context.fail(e);
-            }
-            finally {
-                async.complete();
-            }
-        });
+                async2.complete();
+            });
+        async2.await(2000);
 
-        profileDiscoveryAPI.load(future1, AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader()));
-        profileDiscoveryAPI.load(future2, AggregatedProfileNamingStrategy.fromHeader("profiles", buildHeader()));
+        verify(storage, times(2)).fetchAsync(any());
+        verifyNoMoreInteractions(storage);
     }
 
     private void testEquality(TestContext context, AggregatedProfileInfo expected, AggregatedProfileInfo actual) {
@@ -136,31 +191,29 @@ public class ParseProfileTest {
         context.assertEquals(expected.getAggregatedSamples(traceName1).getMethodLookup(), actual.getAggregatedSamples(traceName1).getMethodLookup());
         context.assertEquals(expected.getAggregatedSamples(traceName2).getMethodLookup(), actual.getAggregatedSamples(traceName2).getMethodLookup());
 
-        if(expected.getAggregatedSamples(traceName1).getAggregatedSamples() instanceof AggregatedCpuSamplesData) {
-            testEquality(context, (AggregatedCpuSamplesData)expected.getAggregatedSamples(traceName1).getAggregatedSamples(),
-                    (AggregatedCpuSamplesData)actual.getAggregatedSamples(traceName1).getAggregatedSamples());
+        if(expected.getAggregatedSamples(traceName1).getAggregatedSamples() instanceof AggregatedOnCpuSamples) {
+            testEquality(context, (AggregatedOnCpuSamples)expected.getAggregatedSamples(traceName1).getAggregatedSamples(),
+                    (AggregatedOnCpuSamples)actual.getAggregatedSamples(traceName1).getAggregatedSamples());
 
-            testEquality(context, (AggregatedCpuSamplesData)expected.getAggregatedSamples(traceName2).getAggregatedSamples(),
-                    (AggregatedCpuSamplesData)actual.getAggregatedSamples(traceName2).getAggregatedSamples());
+            testEquality(context, (AggregatedOnCpuSamples)expected.getAggregatedSamples(traceName2).getAggregatedSamples(),
+                    (AggregatedOnCpuSamples)actual.getAggregatedSamples(traceName2).getAggregatedSamples());
         }
         else {
             context.fail("Unexpected type of AggregatedSamples in profileInfo");
         }
     }
 
-    private void testEquality(TestContext context, AggregatedCpuSamplesData expected, AggregatedCpuSamplesData actual) {
-        Iterator<AggregatedProfileModel.FrameNode> expectedFN = expected.getFrameNodes().iterator();
-        Iterator<AggregatedProfileModel.FrameNode> actualFN = actual.getFrameNodes().iterator();
+    private void testEquality(TestContext context, AggregatedOnCpuSamples expected, AggregatedOnCpuSamples actual) {
+        CallTree expectedCallTree = expected.getCallTree();
+        CallTree actualCallTree = actual.getCallTree();
+        testTreeEquality(context, expectedCallTree, actualCallTree, 0);
+    }
 
-        while(expectedFN.hasNext() && actualFN.hasNext()) {
-            context.assertEquals(expectedFN.next(), actualFN.next());
-        }
-
-        if(expectedFN.hasNext() && !actualFN.hasNext()) {
-            context.fail("expected more FrameNodes in the actual list");
-        }
-        else if(!expectedFN.hasNext() && actualFN.hasNext()) {
-            context.fail("found more frameNodes than expected in the actual list");
+    private <T> void testTreeEquality(TestContext context, Tree<T> expected, Tree<T> actual, int idx) {
+        context.assertEquals(expected.getNode(idx), actual.getNode(idx));
+        testListEquality(context, expected.getChildren(idx), actual.getChildren(idx), "children for node at id: " + idx + " are not same");
+        for(Integer i : expected.getChildren(idx)) {
+            testTreeEquality(context, expected, actual, i);
         }
     }
 
@@ -185,9 +238,9 @@ public class ParseProfileTest {
         List<AggregatedProfileModel.FrameNodeList> frameNodes = buildFrameNodes();
         Map<String, AggregatedSamplesPerTraceCtx> samples = new HashMap<>();
         // first 2 elements belong to trace1
-        samples.put(traceName1, new AggregatedSamplesPerTraceCtx(buildMethodLookup(), new AggregatedCpuSamplesData(new StacktraceTreeIterable(frameNodes.subList(0,2)))));
+        samples.put(traceName1, new AggregatedSamplesPerTraceCtx(buildMethodLookup(), new AggregatedOnCpuSamples(new CallTree(reduce(frameNodes.subList(0,2))))));
         // next 2 elements belong to trace 2
-        samples.put(traceName2, new AggregatedSamplesPerTraceCtx(buildMethodLookup(), new AggregatedCpuSamplesData(new StacktraceTreeIterable(frameNodes.subList(2,4)))));
+        samples.put(traceName2, new AggregatedSamplesPerTraceCtx(buildMethodLookup(), new AggregatedOnCpuSamples(new CallTree(reduce(frameNodes.subList(2,4))))));
 
         return new AggregatedProfileInfo(buildHeader(), buildTraceName(traceName1, traceName2), buildTraceCtxList(), buildProfilesSummary(), samples);
     }
@@ -287,6 +340,12 @@ public class ParseProfileTest {
                 .setTraceCtxIdx(1)
                 .build());
 
+        return list;
+    }
+
+    private List<AggregatedProfileModel.FrameNode> reduce(List<AggregatedProfileModel.FrameNodeList> nodes) {
+        List<AggregatedProfileModel.FrameNode> list = new ArrayList<>();
+        nodes.forEach(e -> list.addAll(e.getFrameNodesList()));
         return list;
     }
 

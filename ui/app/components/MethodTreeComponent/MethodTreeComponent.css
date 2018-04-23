@@ -18,8 +18,7 @@
 
 input:focus {
   border-radius: 0px;
-  outline-width: 1px;
-  outline-color: rgb(63,81,181);
+  outline: rgb(63, 81, 181) 1px;
 }
 
 .GridRow {

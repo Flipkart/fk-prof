@@ -4,8 +4,6 @@ import fk.prof.aggregation.proto.AggregatedProfileModel;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -38,6 +36,18 @@ public class AggregatedProfileInfo {
 
     public int getDuration() {
         return header.getWindowDuration();
+    }
+
+    public String getAppId() {
+        return header.getAppId();
+    }
+
+    public String getClusterId() {
+        return header.getClusterId();
+    }
+
+    public String getProcId() {
+        return header.getProcId();
     }
 
     public Iterable<String> getTraces() {

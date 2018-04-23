@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="DEBUG">
+  <Appenders>
+    <Console name="console" target="SYSTEM_OUT">
+      <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight{%-5p} [%t] %blue{%c{4}} - %m%n"/>
+    </Console>
+  </Appenders>
+  <Loggers>
+    <AsyncRoot level="info">
+      <AppenderRef ref="console"/>
+    </AsyncRoot>
+    <AsyncLogger name="fk" level="debug" />
+  </Loggers>
+</Configuration>

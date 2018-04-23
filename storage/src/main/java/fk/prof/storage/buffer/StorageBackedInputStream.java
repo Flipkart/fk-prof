@@ -3,7 +3,6 @@ package fk.prof.storage.buffer;
 import fk.prof.storage.AsyncStorage;
 import fk.prof.storage.FileNamingStrategy;
 import fk.prof.storage.ObjectNotFoundException;
-import fk.prof.storage.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,9 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Exchanger;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 /**
  * InputStream implementation which is backed by a {@link AsyncStorage} to fetch content

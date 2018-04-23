@@ -1,16 +1,16 @@
 package fk.prof.userapi.api;
 
-
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.io.BaseEncoding;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
 import fk.prof.storage.AsyncStorage;
-import fk.prof.userapi.model.AggregatedProfileInfo;
-import fk.prof.userapi.model.AggregationWindowSummary;
+import fk.prof.userapi.Configuration;
+import fk.prof.userapi.cache.ClusteredProfileCache;
+import fk.prof.userapi.model.ProfileView;
+import fk.prof.userapi.model.*;
+import fk.prof.userapi.util.Pair;
 import io.vertx.core.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
 import java.time.LocalDate;
@@ -18,55 +18,53 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
- * Interacts with the {@link AsyncStorage} based on invocations from controller
+ * Interacts with the {@link AsyncStorage} and the {@link ClusteredProfileCache} based on invocations from controller.
  * Created by rohit.patiyal on 19/01/17.
  */
 public class ProfileStoreAPIImpl implements ProfileStoreAPI {
-    private static Logger LOGGER = LoggerFactory.getLogger(ProfileStoreAPIImpl.class);
 
     private static final String DELIMITER = "/";
-    private static final String WORKER_POOL_NAME = "aggregation.loader.pool";
     private static final String VERSION = "v0001";
-    private final int profileLoadTimeout;
 
-    private Vertx vertx;
-    private AsyncStorage asyncStorage;
-    private AggregatedProfileLoader profileLoader;
+    private final AsyncStorage asyncStorage;
+    private final ProfileLoader profileLoader;
 
-    private WorkerExecutor workerExecutor;
+    private final WorkerExecutor workerExecutor;
+    private final Vertx vertx;
+    private final int loadTimeout;
 
-    private Cache<String, AggregatedProfileInfo> cache;
-    private Cache<String, AggregationWindowSummary> summaryCache;
+    private final Cache<String, AggregationWindowSummary> summaryCache;
 
-    /* stores all requested futures that are waiting on file to be loaded from S3. If a file loadFromInputStream
+    private final ClusteredProfileCache profileCache;
+
+    /* stores all requested futures that are waiting on file to be loaded from S3. If a file loading
     * is in progress, this map will contain its corresponding key */
-    private Map<String, FuturesList<Object>> futuresForLoadingFiles;
+    private final ConcurrentHashMap<String, FuturesList<AggregationWindowSummary>> filesBeingLoaded;
 
-    public ProfileStoreAPIImpl(Vertx vertx, AsyncStorage asyncStorage, int maxIdleRetentionInMin, Integer profileLoadTimeout, Integer workerPoolSize) {
-        this.vertx = vertx;
+    public ProfileStoreAPIImpl(Vertx vertx, AsyncStorage asyncStorage, ProfileLoader profileLoader,
+                               ClusteredProfileCache profileCache, WorkerExecutor workerExecutor,
+                               Configuration config) {
         this.asyncStorage = asyncStorage;
-        this.profileLoader = new AggregatedProfileLoader(this.asyncStorage);
-        this.profileLoadTimeout = profileLoadTimeout;
+        this.profileLoader = profileLoader;
 
-        this.workerExecutor = vertx.createSharedWorkerExecutor(WORKER_POOL_NAME, workerPoolSize);
-
-        this.cache = CacheBuilder.newBuilder()
-                .maximumSize(50)
-                .expireAfterAccess(maxIdleRetentionInMin, TimeUnit.MINUTES)
-                .build();
+        this.vertx = vertx;
+        this.workerExecutor = workerExecutor;
+        this.loadTimeout = config.getProfileLoadTimeout();
 
         this.summaryCache = CacheBuilder.newBuilder()
-                .maximumSize(500)
-                .expireAfterAccess(maxIdleRetentionInMin, TimeUnit.MINUTES)
-                .build();
+            .weigher((k,v) -> 1)
+            .maximumWeight(config.getMaxProfileSummaryCacheWeight())
+            .expireAfterAccess(config.getProfileRetentionDurationMin(), TimeUnit.MINUTES)
+            .build();
 
-        this.futuresForLoadingFiles = new HashMap<>();
+        this.profileCache = profileCache;
+        this.filesBeingLoaded = new ConcurrentHashMap<>();
     }
 
     private String getLastFromCommonPrefix(String commonPrefix) {
@@ -75,44 +73,51 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
     }
 
     @Override
-    public void getAppIdsWithPrefix(Future<Set<String>> appIds, String baseDir, String appIdPrefix) {
+    public Future<Set<String>> getAppIdsWithPrefix(String baseDir, String appIdPrefix) {
         /* TODO: move this prefix creation to {@link AggregatedProfileNamingStrategy} */
         String filterPrefix = (appIdPrefix == null) ? "" : appIdPrefix;
-        getListingAtLevelWithPrefix(appIds, baseDir + DELIMITER + VERSION + DELIMITER, filterPrefix, true);
+        return getListingAtLevelWithPrefix(baseDir + DELIMITER + VERSION + DELIMITER, filterPrefix, true);
     }
 
-    private void getListingAtLevelWithPrefix(Future<Set<String>> listings, String level, String objPrefix, boolean encoded) {
-        CompletableFuture<Set<String>> commonPrefixesFuture = asyncStorage.listAsync(level, false);
-        commonPrefixesFuture.thenApply(commonPrefixes -> {
-            Set<String> objs = new HashSet<>();
-            for (String commonPrefix : commonPrefixes) {
-                String objName = getLastFromCommonPrefix(commonPrefix);
-                objName = encoded ? decode(objName) : objName;
+    private Future<Set<String>> getListingAtLevelWithPrefix(String level, String objPrefix, boolean encoded) {
+        Future<Set<String>> listings = Future.future();
 
-                if (objName.startsWith(objPrefix)) {
-                    objs.add(objName);
+        asyncStorage.listAsync(level, false)
+            .thenApply(commonPrefixes -> {
+                Set<String> objs = new HashSet<>();
+                for (String commonPrefix : commonPrefixes) {
+                    String objName = getLastFromCommonPrefix(commonPrefix);
+                    objName = encoded ? decode(objName) : objName;
+
+                    if (objName.startsWith(objPrefix)) {
+                        objs.add(objName);
+                    }
                 }
-            }
-            return objs;
-        }).whenComplete((result, error) -> completeFuture(result, error, listings));
+                return objs;
+            }).whenComplete((result, error) -> completeFuture(result, error, listings));
+
+        return listings;
     }
 
     @Override
-    public void getClusterIdsWithPrefix(Future<Set<String>> clusterIds, String baseDir, String appId, String clusterIdPrefix) {
+    public Future<Set<String>> getClusterIdsWithPrefix(String baseDir, String appId, String clusterIdPrefix) {
         String filterPrefix = (clusterIdPrefix == null) ? "" : clusterIdPrefix;
-        getListingAtLevelWithPrefix(clusterIds, baseDir + DELIMITER + VERSION + DELIMITER + encode(appId) + DELIMITER,
+        return getListingAtLevelWithPrefix(baseDir + DELIMITER + VERSION + DELIMITER + encode(appId) + DELIMITER,
                 filterPrefix, true);
     }
 
     @Override
-    public void getProcNamesWithPrefix(Future<Set<String>> procNames, String baseDir, String appId, String clusterId, String procPrefix) {
+    public Future<Set<String>> getProcNamesWithPrefix(String baseDir, String appId, String clusterId, String procPrefix) {
         String filterPrefix = (procPrefix == null) ? "" : procPrefix;
-        getListingAtLevelWithPrefix(procNames, baseDir + DELIMITER + VERSION + DELIMITER + encode(appId) + DELIMITER + encode(clusterId) + DELIMITER,
+        return getListingAtLevelWithPrefix(baseDir + DELIMITER + VERSION + DELIMITER + encode(appId) + DELIMITER + encode(clusterId) + DELIMITER,
                 filterPrefix, true);
     }
 
     @Override
-    public void getProfilesInTimeWindow(Future<List<AggregatedProfileNamingStrategy>> profiles, String baseDir, String appId, String clusterId, String proc, ZonedDateTime startTime, int durationInSeconds) {
+    public Future<List<AggregatedProfileNamingStrategy>> getProfilesInTimeWindow(String baseDir, String appId,
+                                                                                 String clusterId, String proc,
+                                                                                 ZonedDateTime startTime,
+                                                                                 int durationInSeconds) {
         LocalDate startDate = ZonedDateTime.ofInstant(startTime.toInstant(), ZoneId.of("UTC")).toLocalDate();
         LocalDate endDate = ZonedDateTime.ofInstant(startTime.plusSeconds(durationInSeconds).toInstant(), ZoneId.of("UTC")).toLocalDate();
         LocalDate currentDate = startDate;
@@ -135,101 +140,106 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
             currentDate = currentDate.plus(1, ChronoUnit.DAYS);
         }
 
+        Future<List<AggregatedProfileNamingStrategy>> profiles = Future.future();
         CompositeFuture.all(allResults).setHandler(ar -> {
             if (ar.succeeded()) {
                 List<List<AggregatedProfileNamingStrategy>> allProfiles = ar.result().list();
-                List<AggregatedProfileNamingStrategy> flattenedProfiles = allProfiles.stream().reduce(new ArrayList<>(), (list1, list2) -> {
-                    list1.addAll(list2);
-                    return list1;
-                });
-                flattenedProfiles.sort(Comparator.comparing(agg -> agg.startTime));
-                profiles.complete(flattenedProfiles);
+                profiles.complete(
+                    allProfiles.stream()
+                        .flatMap(List::stream)
+                        .sorted(Comparator.comparing(agg -> agg.startTime))
+                        .collect(Collectors.toList()));
             } else {
                 profiles.fail(ar.cause());
             }
         });
+
+        return profiles;
     }
 
-    @Override
-    synchronized public void load(Future<AggregatedProfileInfo> future, AggregatedProfileNamingStrategy filename) {
+    public Future<AggregationWindowSummary> loadSummary(AggregatedProfileNamingStrategy filename) {
         String fileNameKey = filename.getFileName(0);
-
-        AggregatedProfileInfo cachedProfileInfo = cache.getIfPresent(fileNameKey);
-        if (cachedProfileInfo == null) {
-            boolean fileLoadInProgress = futuresForLoadingFiles.containsKey(fileNameKey);
-            // save the future, so that it can be notified when the loading visit finishes
-            saveRequestedFuture(fileNameKey, future);
-            // set the timeout for this future
-            vertx.setTimer(profileLoadTimeout, timerId -> timeoutRequestedFuture(fileNameKey, future));
-
-            if (!fileLoadInProgress) {
-                workerExecutor.executeBlocking((Future<AggregatedProfileInfo> f) -> profileLoader.load(f, filename),
-                        true,
-                        result -> completeAggregatedProfileLoading(cache, result, fileNameKey));
-            }
-        } else {
-            future.complete(cachedProfileInfo);
+        if(!filename.isSummaryFile) {
+            return Future.failedFuture(new IllegalArgumentException(fileNameKey + " is not a summaryFile"));
         }
-    }
-
-    @Override
-    synchronized public void loadSummary(Future<AggregationWindowSummary> future, AggregatedProfileNamingStrategy filename) {
-
-        if (!filename.isSummaryFile) {
-            future.fail(new IllegalArgumentException(filename.getFileName(0) + " is not a summaryFile"));
-            return;
-        }
-
-        String fileNameKey = filename.getFileName(0);
 
         AggregationWindowSummary cachedProfileInfo = summaryCache.getIfPresent(fileNameKey);
-        if (cachedProfileInfo == null) {
-            boolean fileLoadInProgress = futuresForLoadingFiles.containsKey(fileNameKey);
-            // save the future, so that it can be notified when the loading visit finishes
-            saveRequestedFuture(fileNameKey, future);
-            // set the timeout for this future
-            vertx.setTimer(profileLoadTimeout, timerId -> timeoutRequestedFuture(fileNameKey, future));
+        if(cachedProfileInfo == null) {
+            return loadAndCacheSummary(filename);
+        }
 
-            if (!fileLoadInProgress) {
-                workerExecutor.executeBlocking((Future<AggregationWindowSummary> f) -> profileLoader.loadSummary(f, filename),
-                        true,
-                        result -> completeAggregatedProfileLoading(summaryCache, result, fileNameKey));
+        return Future.succeededFuture(cachedProfileInfo);
+    }
+
+    @Override
+    public <T extends ProfileView> Future<Pair<AggregatedSamplesPerTraceCtx, T>>
+    getProfileView(AggregatedProfileNamingStrategy profileName, String traceName, ProfileViewType profileViewType) {
+        return profileCache.getProfileView(profileName, traceName, profileViewType);
+    }
+
+    /**
+     * Loads aggregated profile summary and caches the result for subsequent loads
+     * @param filename
+     * @return AggregationWindowSummary Future
+     */
+    private Future<AggregationWindowSummary> loadAndCacheSummary(AggregatedProfileNamingStrategy filename) {
+        String cacheKey = filename.getFileName(0);
+        Future<AggregationWindowSummary> future = Future.future();
+
+        filesBeingLoaded.compute(cacheKey, (k,v) -> {
+            AggregationWindowSummary summary = summaryCache.getIfPresent(cacheKey);
+            // able to get the value, just complete it
+            if(summary != null) {
+                future.complete(summary);
+                return v;
             }
-        } else {
-            future.complete(cachedProfileInfo);
-        }
+
+            boolean firstRequest = (v == null || v.size() == 0);
+            FuturesList<AggregationWindowSummary> futuresList = (v == null ? new FuturesList<>() : v);
+            futuresList.addFuture(future);
+
+            vertx.setTimer(loadTimeout, timerId -> {
+                futuresList.removeFuture(future);
+                timeoutFuture(filename, future);
+            });
+
+            if(firstRequest) {
+                startLoadingSummary(filename).setHandler(ar -> finishLoadingSummary(cacheKey, futuresList, ar));
+            }
+
+            return futuresList;
+        });
+
+        return future;
     }
 
-
-    synchronized private <T> void saveRequestedFuture(String filename, Future<T> future) {
-        FuturesList futures = futuresForLoadingFiles.get(filename);
-        if (futures == null) {
-            futures = new FuturesList();
-            futuresForLoadingFiles.put(filename, futures);
-        }
-        futures.addFuture(future);
+    private Future<AggregationWindowSummary> startLoadingSummary(AggregatedProfileNamingStrategy filename) {
+        Future<AggregationWindowSummary> future = Future.future();
+        workerExecutor.executeBlocking((Future<AggregationWindowSummary> f) -> {
+                try {
+                    f.complete(profileLoader.loadSummary(filename));
+                } catch (Exception e) {
+                    f.fail(e);
+                }
+            },
+            future);
+        return future;
     }
 
-    synchronized private <T> void timeoutRequestedFuture(String filename, Future<T> future) {
+    private void finishLoadingSummary(String cacheKey, FuturesList<AggregationWindowSummary> futures,
+                                      AsyncResult<AggregationWindowSummary> result) {
+        if(result.succeeded()) {
+            summaryCache.put(cacheKey, result.result());
+        }
+        futures.complete(result);
+    }
+
+    private void timeoutFuture(AggregatedProfileNamingStrategy filename, Future<AggregationWindowSummary> future) {
         if (future.isComplete()) {
             return;
         }
-        FuturesList futures = futuresForLoadingFiles.get(filename);
-        futures.removeFuture(future);
 
         future.fail(new TimeoutException("timeout while waiting for file to loadFromInputStream from store: " + filename));
-    }
-
-    synchronized private <T> void completeAggregatedProfileLoading(Cache<String, T> cache, AsyncResult<T> result, String filename) {
-        if (result.succeeded()) {
-            cache.put(filename, result.result());
-        }
-
-        // complete all dependent futures
-        FuturesList futures = futuresForLoadingFiles.get(filename);
-        futures.complete(result);
-
-        futuresForLoadingFiles.remove(filename);
     }
 
     private <T> void completeFuture(T result, Throwable error, Future<T> future) {
@@ -248,62 +258,34 @@ public class ProfileStoreAPIImpl implements ProfileStoreAPI {
         return new String(BaseEncoding.base32().decode(str), Charset.forName("utf-8"));
     }
 
-    private static Pair<ZonedDateTime, ZonedDateTime> getInterval(AggregatedProfileNamingStrategy fileName) {
-        return new Pair(fileName.startTime, fileName.startTime.plusSeconds(fileName.duration));
-    }
-
-    private static class Pair<T, U> {
-        public T first;
-        public U second;
-
-        Pair(T first, U second) {
-            this.first = first;
-            this.second = second;
-        }
-
-        @Override
-        public int hashCode() {
-            int hash = 59;
-            if (first != null) {
-                hash = 31 * hash + first.hashCode();
-            }
-            if (second != null) {
-                hash = 31 * hash + second.hashCode();
-            }
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object that) {
-            if (that == null || !(that instanceof Pair)) {
-                return false;
-            }
-
-            return Objects.equals(this.first, ((Pair) that).first) && Objects.equals(this.second, ((Pair) that).second);
-        }
-    }
-
     private static class FuturesList<T> {
         List<Future<T>> futures = new ArrayList<>(2);
 
-        synchronized public void addFuture(Future<T> future) {
+        synchronized void addFuture(Future<T> future) {
             if (!exists(future)) {
                 futures.add(future);
             }
         }
 
-        synchronized public void removeFuture(Future<T> future) {
+        synchronized void removeFuture(Future<T> future) {
             futures.removeIf(f -> f == future);
         }
 
-        synchronized public void complete(AsyncResult<T> result) {
-            if (result.succeeded()) {
-                futures.forEach(f -> f.complete(result.result()));
-            } else {
-                futures.forEach(f -> f.fail(result.cause()));
-            }
+        synchronized void complete(AsyncResult<T> result) {
+            futures.forEach(f -> {
+                if (result.succeeded()) {
+                    f.complete(result.result());
+                }
+                else {
+                    f.fail(result.cause());
+                }
+            });
 
             futures.clear();
+        }
+
+        synchronized int size() {
+            return futures.size();
         }
 
         private boolean exists(Future<T> future) {

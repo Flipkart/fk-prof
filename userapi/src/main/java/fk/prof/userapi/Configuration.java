@@ -16,20 +16,26 @@ import java.util.Map;
  */
 public class Configuration {
 
+    private static final String blockingWorkerPoolName = "workerpool.blocking";
+
+    @NotNull
+    @JsonProperty("ip.address")
+    private String ipAddress;
+
     @JsonProperty("vertxOptions")
     private VertxOptions vertxOptions = new VertxOptions();
 
     @JsonProperty("profile.retention.duration.min")
     private Integer profileRetentionDurationMin = 30;
 
-    @JsonProperty("max.list_profiles.duration.days")
-    private Integer maxListProfilesDurationInDays = 7;
+    @JsonProperty("profileView.retention.duration.min")
+    private Integer profileViewRetentionDurationMin = 10;
+
+    @JsonProperty("profile.list.duration.days")
+    private Integer profileListDurationDays = 7;
 
     @JsonProperty("profile.load.timeout")
     private Integer profileLoadTimeout = 10000;
-
-    @JsonProperty("vertx.worker.pool.size")
-    private Integer vertxWorkerPoolSize;
 
     @NotNull
     @JsonProperty("userapiHttpOptions")
@@ -40,6 +46,15 @@ public class Configuration {
     @JsonProperty("http.client")
     private HttpClientConfig httpClientConfig;
 
+    @NotNull
+    @Valid
+    @JsonProperty("curatorOptions")
+    private CuratorConfig curatorConfig;
+
+    @NotNull
+    @Valid
+    @JsonProperty("vertx.workerpool.blocking")
+    private VertxWorkerPoolConfig blockingWorkerPool;
 
     @NotNull
     @Valid
@@ -60,6 +75,29 @@ public class Configuration {
     @JsonProperty("aggregatedProfiles.baseDir")
     private String profilesBaseDir;
 
+    @NotNull
+    @JsonProperty("maxDepthExpansion")
+    private Integer maxDepthExpansion = 8;
+
+    @NotNull
+    @JsonProperty("maxProfilesToCache")
+    private Integer maxProfilesToCache = 50;
+
+    @NotNull
+    @JsonProperty("maxProfileViewsToCache")
+    private Integer maxProfileViewsToCache = 100;
+
+    @JsonProperty("maxProfileSummaryCacheWeight")
+    private Integer maxProfileSummaryCacheWeight = 1000;
+
+    public Integer getMaxProfileSummaryCacheWeight() {
+        return maxProfileSummaryCacheWeight;
+    }
+
+    public String getIpAddress() {
+        return ipAddress;
+    }
+
     public VertxOptions getVertxOptions() {
         return vertxOptions;
     }
@@ -68,16 +106,16 @@ public class Configuration {
         return profileRetentionDurationMin;
     }
 
-    public Integer getMaxListProfilesDurationInDays() {
-        return maxListProfilesDurationInDays;
+    public Integer getProfileViewRetentionDurationMin() {
+        return profileViewRetentionDurationMin;
+    }
+
+    public Integer getProfileListDurationDays() {
+        return profileListDurationDays;
     }
 
     public Integer getProfileLoadTimeout() {
         return profileLoadTimeout;
-    }
-
-    public Integer getVertxWorkerPoolSize() {
-        return vertxWorkerPoolSize;
     }
 
     public DeploymentOptions getHttpVerticleConfig() {
@@ -103,6 +141,31 @@ public class Configuration {
 
     public String getProfilesBaseDir() {
         return profilesBaseDir;
+    }
+
+    public CuratorConfig getCuratorConfig() {
+        return curatorConfig;
+    }
+
+    public Integer getMaxDepthExpansion() {
+        return maxDepthExpansion;
+    }
+
+    public Integer getMaxProfilesToCache() {
+        return maxProfilesToCache;
+    }
+
+    public Integer getMaxProfileViewsToCache() {
+        return maxProfileViewsToCache;
+    }
+
+    public VertxWorkerPoolConfig getBlockingWorkerPool() {
+        return blockingWorkerPool;
+    }
+
+    private void setBlockingWorkerPool(VertxWorkerPoolConfig blockingWorkerPool) {
+        this.blockingWorkerPool = blockingWorkerPool;
+        this.blockingWorkerPool.setName(blockingWorkerPoolName);
     }
 
     private void setVertxOptions(Map<String, Object> vertxOptionsMap) {
@@ -137,6 +200,48 @@ public class Configuration {
 
         public Long getRequestTimeout() {
             return requestTimeout;
+        }
+    }
+
+    public static class CuratorConfig {
+        @NotNull
+        @JsonProperty("connection.url")
+        private String connectionUrl;
+
+        @NotNull
+        @JsonProperty("namespace")
+        private String namespace;
+
+        @NotNull
+        @JsonProperty("connection.timeout.ms")
+        private Integer connectionTimeoutMs;
+
+        @NotNull
+        @JsonProperty("session.timeout.ms")
+        private Integer sessionTimeoutMs;
+
+        @NotNull
+        @JsonProperty("max.retries")
+        private Integer maxRetries;
+
+        public String getConnectionUrl() {
+            return connectionUrl;
+        }
+
+        public String getNamespace() {
+            return namespace;
+        }
+
+        public Integer getConnectionTimeoutMs() {
+            return connectionTimeoutMs;
+        }
+
+        public Integer getSessionTimeoutMs() {
+            return sessionTimeoutMs;
+        }
+
+        public Integer getMaxRetries() {
+            return maxRetries;
         }
     }
 
@@ -278,6 +383,28 @@ public class Configuration {
 
         public Integer getQueueMaxSize() {
             return queueMaxSize;
+        }
+    }
+
+    public static class VertxWorkerPoolConfig {
+        @NotNull
+        private String name;
+
+        @NotNull
+        @JsonProperty("size")
+        private Integer size;
+
+        public String getName() {
+            return name;
+        }
+
+        // name does not come from external config file
+        void setName(String name) {
+            this.name = name;
+        }
+
+        public Integer getSize() {
+            return size;
         }
     }
 

@@ -12,7 +12,6 @@ import fk.prof.aggregation.model.AggregationWindowSerializer;
 import fk.prof.aggregation.model.AggregationWindowSummarySerializer;
 import fk.prof.aggregation.model.FinalizedAggregationWindow;
 import fk.prof.aggregation.proto.AggregatedProfileModel;
-import io.vertx.core.Future;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -58,21 +57,16 @@ public class S3Util {
         System.out.println("summary size: " + boutSummary.size());
 
         // check for validity
-        AggregatedProfileLoader loader = new AggregatedProfileLoader(null);
-        Future f1 =  Future.future();
+        StorageBackedProfileLoader loader = new StorageBackedProfileLoader(null);
         AggregatedProfileNamingStrategy file1 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, durationInSeconds, AggregatedProfileModel.WorkType.cpu_sample_work);
-        loader.loadFromInputStream(f1, file1, new GZIPInputStream(new ByteArrayInputStream(boutWS.toByteArray())));
-        assert f1.succeeded();
+        loader.loadFromInputStream(file1, new GZIPInputStream(new ByteArrayInputStream(boutWS.toByteArray())));
 
-        Future f2 =  Future.future();
         AggregatedProfileNamingStrategy file2 = new AggregatedProfileNamingStrategy("profiles", 1, "app1", "cluster1", "proc1", startimeZ, durationInSeconds);
-        loader.loadSummaryFromInputStream(f2, file2, new GZIPInputStream(new ByteArrayInputStream(boutSummary.toByteArray())));
-        assert f2.succeeded();
+        loader.loadSummaryFromInputStream(new GZIPInputStream(new ByteArrayInputStream(boutSummary.toByteArray())));
 
         // assert false : "shortcut to doom";
 
         // write to s3
-        // TODO remove the credentials from here.
         String accessKey = "<put access key here>";
         String secretKey = "<put secret key here>";
         ClientConfiguration clientConfig = new ClientConfiguration();

@@ -67,7 +67,6 @@ public class S3AsyncStorage implements AsyncStorage {
             try {
                 return client.getObject(objectPath.bucket, objectPath.fileName).getObjectContent();
             } catch (AmazonServiceException svcEx) {
-                LOGGER.error("S3 getObject failed: {}", path, svcEx);
                 throw mapServiceException(svcEx);
             } catch (AmazonClientException clientEx) {
                 LOGGER.error("S3 getObject failed: {}", path, clientEx);

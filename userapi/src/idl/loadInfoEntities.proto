@@ -1,0 +1,12 @@
+syntax = "proto2";
+option java_package = "fk.prof.userapi.proto";
+option java_outer_classname = "LoadInfoEntities";
+
+message NodeLoadInfo {
+    required uint32 profilesLoaded = 1;
+}
+
+message ProfileResidencyInfo {
+    required string ip = 1;
+    required uint32 port = 2;
+}
