@@ -232,6 +232,8 @@ class ZKBasedCacheInfoRegistry implements CacheInfoRegistry {
 
     private void zkStateChangeListener(CuratorFramework client, org.apache.curator.framework.state.ConnectionState newState) {
         switch (newState) {
+            case CONNECTED:
+                connectionState.set(ConnectionState.Connected);
             case RECONNECTED:
                 try {
                     if(recentlyZkConnectionLost.get()) {
