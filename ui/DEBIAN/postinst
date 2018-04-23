@@ -37,7 +37,7 @@ if [ "$1" == "configure" ] ; then
     tar -xzf node_modules.tar.gz
 
     echo "Starting $PAC service"
-    NODE_ENV=production PORT={{PORT}} node_modules/forever/bin/forever start server.js
+    NODE_ENV=production PORT={{PORT}} USERAPI_ELB_IP={{USERAPI_ELB_IP}} node_modules/forever/bin/forever start server.js
 fi
 
 exit 0

@@ -1,74 +1,16 @@
 import React, { Component, PropTypes } from 'react';
-import { connect } from 'react-redux';
-import { AutoSizer } from 'react-virtualized';
-import fetchCPUSamplingAction from 'actions/AggregatedProfileDataActions';
-import safeTraverse from 'utils/safeTraverse';
-import Loader from 'components/LoaderComponent';
+
 import MethodTree from 'components/MethodTreeComponent';
+import {  AutoSizer } from 'react-virtualized';
 import Tabs from 'components/Tabs';
 import styles from './CPUSamplingComponent.css';
 
 export class CPUSamplingComponent extends Component {
-  componentDidMount () {
-    const {app, cluster, proc, workType, profileStart, selectedWorkType, profileDuration} = this.props.location.query;
-    const { traceName } = this.props.params;
-    this.props.fetchCPUSampling({
-      app,
-      cluster,
-      proc,
-      workType,
-      selectedWorkType,
-      traceName,
-      query: {
-        start: profileStart,
-        duration: profileDuration
-      },
-    });
-  }
 
-  componentWillReceiveProps (nextProps) {
-    const {app, cluster, proc, workType, profileStart, selectedWorkType, profileDuration} = nextProps.location.query;
-    const didTraceNameChange = this.props.params.traceName !== nextProps.params.traceName;
-    const didProfileChange = profileStart !== this.props.location.query.profileStart || profileDuration !== this.props.location.query.profileDuration;
-    if (didTraceNameChange || didProfileChange) {
-      const { traceName } = nextProps.params;
-      this.props.fetchCPUSampling({
-        app,
-        cluster,
-        proc,
-        workType,
-        selectedWorkType,
-        traceName,
-        query: {
-          start: profileStart,
-          duration: profileDuration
-        },
-      });
-    }
-  }
 
   render () {
     const { app, cluster, proc, fullScreen, profileStart, profileDuration } = this.props.location.query;
     const { traceName } = this.props.params;
-
-    if (!this.props.tree.asyncStatus) return null;
-
-    if (this.props.tree.asyncStatus === 'PENDING') {
-      return (
-        <div>
-          <h4 style={{ textAlign: 'center' }}>Please wait, coming right up!</h4>
-          <Loader />
-        </div>
-      );
-    }
-
-    if (this.props.tree.asyncStatus === 'ERROR') {
-      return (
-        <div className={styles.card}>
-          <h2>Failed to fetch the data. Please refresh or try again later</h2>
-        </div>
-      );
-    }
 
     return (
       <div>
@@ -116,10 +58,8 @@ export class CPUSamplingComponent extends Component {
               <AutoSizer disableHeight>
                 {({ width }) => (
                   <MethodTree
-                    allNodes={safeTraverse(this.props, ['tree', 'data', 'allNodes'])}
-                    nodeIndexes={safeTraverse(this.props, ['tree', 'data', 'terminalNodeIndexes'])}
+                    traceName={this.props.params.traceName}
                     nextNodesAccessorField="parent"
-                    methodLookup={safeTraverse(this.props, ['tree', 'data', 'methodLookup'])}
                     filterKey="cs_hm_filter"
                     containerWidth={width}
                   />
@@ -127,16 +67,14 @@ export class CPUSamplingComponent extends Component {
               </AutoSizer>
             </div>
           </div>
-          <div>
+          <div style={{display: "flex"}}>
             <div>Call Tree</div>
             <div style={{display: "flex", flex: "1 1 auto"}}>
               <AutoSizer disableHeight>
                 {({ width }) => (
                   <MethodTree
-                    allNodes={safeTraverse(this.props, ['tree', 'data', 'allNodes'])}
-                    nodeIndexes={safeTraverse(this.props, ['tree', 'data', 'treeRoot', 'children'])}
+                    traceName={this.props.params.traceName}
                     nextNodesAccessorField="children"
-                    methodLookup={safeTraverse(this.props, ['tree', 'data', 'methodLookup'])}
                     filterKey="cs_ct_filter"
                     containerWidth={width}
                   />
@@ -151,17 +89,8 @@ export class CPUSamplingComponent extends Component {
 }
 
 CPUSamplingComponent.propTypes = {
-  fetchCPUSampling: PropTypes.func,
   params: PropTypes.shape({
     traceName: PropTypes.string.isRequired,
-  }),
-  tree: PropTypes.shape({
-    asyncStatus: PropTypes.string,
-    data: PropTypes.shape({
-      allNodes: PropTypes.array,
-      methodLookup: PropTypes.array,
-      terminalNodeIndexes: PropTypes.array,
-    }),
   }),
   location: PropTypes.shape({
     query: PropTypes.shape({
@@ -176,12 +105,5 @@ CPUSamplingComponent.propTypes = {
   }),
 };
 
-const mapStateToProps = state => ({
-  tree: state.aggregatedProfileData || {},
-});
 
-const mapDispatchToProps = dispatch => ({
-  fetchCPUSampling: params => dispatch(fetchCPUSamplingAction(params)),
-});
-
-export default connect(mapStateToProps, mapDispatchToProps)(CPUSamplingComponent);
+export default CPUSamplingComponent;
