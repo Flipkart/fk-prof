@@ -160,9 +160,7 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
   public void aggregate(Recording.Wse wse, RecordedProfileIndexes indexes) throws AggregationFailure {
     ensureEntityIsWriteable();
     if(workSpecificBuckets.get(wse.getWType()) == null) {
-      //TODO HACK: till recorder is fixed is to not throw exception
-      return;
-      //throw new AggregationFailure(String.format("Recording policy does not specify work type=%s", wse.getWType()));
+      throw new AggregationFailure(String.format("Recording policy does not specify work type=%s", wse.getWType()));
     }
 
     switch (wse.getWType()) {
