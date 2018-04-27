@@ -57,6 +57,10 @@ public class FinalizedAggregationWindow {
     return this.endedAt;
   }
 
+  public Set<WorkEntities.WorkType> getWorkTypes() {
+    return this.workSpecificBuckets.keySet();
+  }
+
   @Override
   public String toString() {
     return "app_id=" + appId +

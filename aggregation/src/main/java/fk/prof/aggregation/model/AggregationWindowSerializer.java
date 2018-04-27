@@ -36,7 +36,7 @@ public class AggregationWindowSerializer implements Serializer {
         Serializer.writeVariantInt32(AGGREGATION_FILE_MAGIC_NUM, cout);
 
         // header
-        Serializer.writeCheckedDelimited(aggregation.buildHeaderProto(VERSION, WorkEntities.WorkType.cpu_sample_work), cout);
+        Serializer.writeCheckedDelimited(aggregation.buildHeaderProto(VERSION, workType), cout);
 
         Profile.TraceCtxNames traceNames = aggregation.buildTraceCtxNamesProto(workType);
         Profile.TraceCtxDetailList traceDetails = aggregation.buildTraceCtxDetailListProto(workType, traceNames);

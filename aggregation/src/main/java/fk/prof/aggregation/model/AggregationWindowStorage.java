@@ -40,13 +40,9 @@ public class AggregationWindowStorage {
     }
 
     public void store(FinalizedAggregationWindow aggregationWindow) throws IOException {
-
-        // right now only cpu_sample data is available. In future data related to other pivots like thread, contentions will be collected and serialized here.
-
-        // cpu_sample
-        store(aggregationWindow, WorkEntities.WorkType.cpu_sample_work);
-        store(aggregationWindow, WorkEntities.WorkType.io_trace_work);
-
+        for(WorkEntities.WorkType workType: aggregationWindow.getWorkTypes()) {
+            store(aggregationWindow, workType);
+        }
         // summary file
         storeSummary(aggregationWindow);
     }

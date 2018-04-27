@@ -51,7 +51,8 @@ public class AggregationWindowSummarySerializer implements Serializer {
         Serializer.writeVariantInt32((int)checksum.getValue(), cout);
 
         // work specific trace summary
-        Serializer.writeCheckedDelimited(aggregation.buildTraceCtxDetailListProto(WorkEntities.WorkType.cpu_sample_work, traceNames), cout);
-        Serializer.writeCheckedDelimited(aggregation.buildTraceCtxDetailListProto(WorkEntities.WorkType.io_trace_work, traceNames), cout);
+        for(WorkEntities.WorkType workType: aggregation.getWorkTypes()) {
+            Serializer.writeCheckedDelimited(aggregation.buildTraceCtxDetailListProto(workType, traceNames), cout);
+        }
     }
 }
