@@ -93,8 +93,8 @@ private:
     PerfCtx::Registry& reg;
 
     recording::RecordingChunk recording;
-    recording::Wse* cpu_samples_accumulator;
-    recording::Wse* io_trace_accumulator;
+    recording::Wse cpu_samples_accumulator;
+    recording::Wse io_trace_accumulator;
     
     std::unordered_map<MthId, MthId> known_methods;
     std::unordered_map<Pc, std::pair<MthId, PcOffset>> known_symbols;
@@ -151,6 +151,8 @@ private:
 
     void populate_fdwrite(recording::IOTrace* const evt, const blocking::FdWriteEvt& write_evt, blocking::EvtType type);
 
+    void prepare_proto();
+    
     void clear_proto();
 
 public:

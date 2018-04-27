@@ -241,7 +241,7 @@ void ProfileSerializingWriter::record(const cpu::Sample &entry) {
         flush();
     ++ser_flush_ctr;
 
-    auto cse = cpu_samples_accumulator->mutable_cpu_sample_entry();
+    auto cse = cpu_samples_accumulator.mutable_cpu_sample_entry();
     auto ss = cse->add_stack_sample();
 
     ss->set_start_offset_micros(0);
@@ -287,7 +287,7 @@ void ProfileSerializingWriter::record(const iotrace::Sample &entry) {
         flush();
     ++ser_flush_ctr;
 
-    auto ioe = io_trace_accumulator->mutable_io_trace_entry();
+    auto ioe = io_trace_accumulator.mutable_io_trace_entry();
     auto evt = ioe->add_traces();
 
     evt->set_ts(entry.evt.ts);
@@ -430,8 +430,11 @@ ProfileSerializingWriter::recordNewMethod(const jmethodID method_id, const char 
 
 void ProfileSerializingWriter::flush() {
     SPDLOG_DEBUG(logger, "flushing proto objects to bytebuffer");
+    
+    prepare_proto();
     w.write_recording(recording);
     clear_proto();
+    
     ser_flush_ctr = 0;
     w.flush();
 }
@@ -445,10 +448,8 @@ ProfileSerializingWriter::ProfileSerializingWriter(jvmtiEnv *_jvmti, ProfileWrit
                                                    const TruncationThresholds &_trunc_thresholds,
                                                    std::uint8_t _noctx_cov_pct)
     : jvmti(_jvmti), w(_w), fir(_fir), lnr(_lnr), reg(_reg),
-      cpu_samples_accumulator(recording.add_wse()), io_trace_accumulator(recording.add_wse()),
       next_mthd_id(0), next_thd_id(3), next_ctx_id(5), next_fd_id(0), sft(_sft), ser_flush_ctr(0),
       trunc_thresholds(_trunc_thresholds),
-
       s_c_new_thd_info(
           get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "thd_rpt", "new"})),
       s_c_new_ctx_info(
@@ -489,13 +490,27 @@ ProfileSerializingWriter::ProfileSerializingWriter(jvmtiEnv *_jvmti, ProfileWrit
 
     report_new_mthd_info("?", "?", "?", "?", BacktraceType::Java);
 }
+          
+void ProfileSerializingWriter::prepare_proto() {
+    if(cpu_samples_accumulator.cpu_sample_entry().stack_sample_size() > 0) {
+        recording.mutable_wse()->AddAllocated(&cpu_samples_accumulator);
+    }
+    if(io_trace_accumulator.io_trace_entry().traces_size() > 0) {
+        recording.mutable_wse()->AddAllocated(&io_trace_accumulator);
+    }
+}
 
 void ProfileSerializingWriter::clear_proto() {
     recording.clear_indexed_data();
-    cpu_samples_accumulator->clear_cpu_sample_entry();
-    cpu_samples_accumulator->set_w_type(recording::WorkType::cpu_sample_work);
-    io_trace_accumulator->clear_io_trace_entry();
-    io_trace_accumulator->set_w_type(recording::WorkType::io_trace_work);
+    // release all the added wse reference.
+    while(recording.wse_size() > 0) {
+        recording.mutable_wse()->ReleaseLast();
+    }
+        
+    cpu_samples_accumulator.clear_cpu_sample_entry();
+    cpu_samples_accumulator.set_w_type(recording::WorkType::cpu_sample_work);
+    io_trace_accumulator.clear_io_trace_entry();
+    io_trace_accumulator.set_w_type(recording::WorkType::io_trace_work);
 }
 
 ProfileSerializingWriter::~ProfileSerializingWriter() {
