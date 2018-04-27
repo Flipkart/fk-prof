@@ -77,7 +77,7 @@ public class IOTracingFrameNode extends StacktraceFrameNode<IOTracingFrameNode> 
   }
 
   protected Profile.FrameNode buildFrameNodeProto() {
-    List<Profile.IOTracingNodeProps> nodeProps = this.props.values().stream()
+    List<Profile.IOTracingNodeProps> nodeProps = this.getProps().values().stream()
         .flatMap(fdEntry -> fdEntry.values().stream())
         .map(IOTracingProps::buildProto)
         .collect(Collectors.toList());

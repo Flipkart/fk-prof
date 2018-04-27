@@ -81,21 +81,30 @@ public class IOTracingProps {
   }
 
   protected static double quantile(final double q, List<Long> values) {
-    if (values.size() == 0) {
+    if ((q > 1) || (q <= 0)) {
+      throw new IllegalArgumentException("Invalid quantile: " + q);
+    }
+    int length = values.size();
+    if (length == 0) {
       return Double.NaN;
     }
-    if (q == 1 || values.size() == 1) {
-      return values.get(values.size() - 1);
-    }
-    double index = q * values.size();
-    if (index < 0.5) {
+    if (length == 1) {
       return values.get(0);
-    } else if (values.size() - index < 0.5) {
-      return values.get(values.size() - 1);
-    } else {
-      index -= 0.5;
-      final int intIndex = (int) index;
-      return values.get(intIndex + 1) * (index - intIndex) + values.get(intIndex) * (intIndex + 1 - index);
     }
+
+    double pos = q * (length + 1);
+    double fpos = Math.floor(pos);
+    int intPos = (int) fpos;
+    double dif = pos - fpos;
+
+    if (pos < 1) {
+      return values.get(0);
+    }
+    if (pos >= (double)length) {
+      return values.get(length - 1);
+    }
+    double lower = values.get(intPos - 1);
+    double upper = values.get(intPos);
+    return lower + dif * (upper - lower);
   }
 }
