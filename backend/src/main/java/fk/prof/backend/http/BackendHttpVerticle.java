@@ -294,7 +294,7 @@ public class BackendHttpVerticle extends AbstractVerticle {
   }
 
   private Backend.LeaderDetail verifyLeaderAvailabilityOrFail(HttpServerResponse response) {
-    if (leaderReadContext.isLeader()) {
+    if (leaderReadContext.isLeader() && !config.getBackendHttpVerticleConfig().shouldAggregateWhenLeader()) {
       ctrLeaderSelfReq.inc();
       response.setStatusCode(400).end("Leader refuses to respond to this request");
       return null;

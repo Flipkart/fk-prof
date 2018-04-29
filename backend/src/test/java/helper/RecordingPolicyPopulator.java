@@ -25,7 +25,7 @@ public class RecordingPolicyPopulator {
     String appId = "a1", cluster = "c1", process = "p1";
     int policyDuration = 60, coveragePct = 100;
 
-    URL resource = RecordingPolicyPopulator.class.getClassLoader().getResource("config.json");
+    URL resource = RecordingPolicyPopulator.class.getClassLoader().getResource("config-e2e.json");
     Path configFilePath = Paths.get(resource.toURI()).toAbsolutePath();
     Configuration configuration = ConfigManager.loadConfig(configFilePath.toAbsolutePath().toString());
     String policyStorePath = "/" + configuration.getPolicyBaseDir();

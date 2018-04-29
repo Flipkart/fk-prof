@@ -27,6 +27,7 @@
     "config": {
       "verticle.count": 2,
       "report.load": true,
+      "leader.aggregation": false,
       "parser": {
         "recordingheader.max.bytes": 1024,
         "wse.max.bytes": 1048576
@@ -43,7 +44,6 @@
   "leaderElectionOptions": {
     "worker": true,
     "config": {
-      "aggregation.enabled": false,
       "leader.watching.path": "/backends",
       "leader.mutex.path": "/leader",
       "kill.behavior": "KILL"

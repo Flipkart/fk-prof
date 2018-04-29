@@ -1,33 +1,33 @@
 {
-  "ip.address": "127.0.0.1",
+  "ip.address": "vmnathost",
   "backend.version": 1,
-  "backend.id": 2,
-  "load.report.interval.secs": 10,
-  "recorder.defunct.threshold.secs": 60,
+  "backend.id": 1,
+  "load.report.interval.secs": 5,
+  "recorder.defunct.threshold.secs": 30,
   "slot.pool.capacity": 100,
   "backend.http.server": {
-    "port": 2492,
-    "idle.timeout.secs": 120
+    "port": 2491,
+    "idleTimeout": 300
   },
   "leader.http.server": {
-    "port": 2497,
-    "idle.timeout.secs": 120
+    "port": 2496,
+    "idleTimeout": 60
   },
   "http.client": {
     "connect.timeout.ms": 5000,
-    "idle.timeout.secs": 120,
-    "max.attempts": 3,
+    "idle.timeout.secs": 10,
+    "max.attempts": 2,
     "keepalive": true,
     "compression": true
   },
   "vertxOptions": {
-    "blockedThreadCheckInterval": 1000000
+    "blockedThreadCheckInterval": 6000000
   },
   "backendHttpOptions": {
     "config": {
       "verticle.count": 2,
       "report.load": true,
-      "leader.aggregation": false,
+      "leader.aggregation": true,
       "parser": {
         "recordingheader.max.bytes": 1024,
         "wse.max.bytes": 1048576
@@ -35,10 +35,10 @@
     }
   },
   "curatorOptions": {
-    "connection.url": "127.0.0.1:2191",
+    "connection.url": "",
     "namespace": "fkprof",
     "connection.timeout.ms": 5000,
-    "session.timeout.ms": 15000,
+    "session.timeout.ms": 5000,
     "max.retries": 3
   },
   "leaderElectionOptions": {
@@ -46,7 +46,7 @@
     "config": {
       "leader.watching.path": "/backends",
       "leader.mutex.path": "/leader",
-      "kill.behavior": "KILL"
+      "kill.behavior": "DO_NOTHING"
     }
   },
   "backendAssociations": {
@@ -56,22 +56,22 @@
   "daemonOptions": {
     "worker": true,
     "config": {
-      "aggregation.window.duration.secs": 60,
-      "aggregation.window.end.tolerance.secs": 10,
-      "policy.refresh.offset.secs": 10,
-      "scheduling.buffer.secs": 5,
-      "work.assignment.max.delay.secs": 60
+      "aggregation.window.duration.secs": 300,
+      "aggregation.window.end.tolerance.secs": 60,
+      "policy.refresh.offset.secs": 60,
+      "scheduling.buffer.secs": 20,
+      "work.assignment.max.delay.secs": 30
     }
   },
   "serializationWorkerPool": {
-    "size": 50,
+    "size": 5,
     "timeout.secs": 20
   },
   "storage": {
     "s3": {
-      "endpoint": "http://127.0.0.1:13031",
-      "access.key": "",
-      "secret.key": "",
+      "endpoint": "http://localhost:4567",
+      "access.key": "foo",
+      "secret.key": "bar",
       "list.objects.timeout.ms": 5000
     },
     "thread.pool": {
@@ -81,10 +81,12 @@
       "queue.maxsize": 50
     }
   },
-  "bufferPoolOptions" : {
+  "bufferPoolOptions": {
     "max.total": 20,
     "max.idle": 20,
     "buffer.size": 10000000
   },
-  "aggregatedProfiles.baseDir": "profiles"
+  "aggregatedProfiles.baseDir": "profiles",
+  "policy.baseDir": "policy",
+  "policy.version": "v0001"
 }

@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class FinalizedAggregationWindow {
   protected final String appId;
@@ -57,8 +58,9 @@ public class FinalizedAggregationWindow {
     return this.endedAt;
   }
 
-  public Set<WorkEntities.WorkType> getWorkTypes() {
-    return this.workSpecificBuckets.keySet();
+  //Order of work types in policy is important as serialization and deserialization of data in summary profile happens in the same order
+  public List<WorkEntities.WorkType> getWorkTypes() {
+    return this.policy.getWorkList().stream().map(WorkEntities.Work::getWType).collect(Collectors.toList());
   }
 
   @Override
