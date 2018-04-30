@@ -20,6 +20,7 @@ public class ProtoSerializers {
         SimpleModule module = new SimpleModule("protobufSerializers", new Version(1, 0, 0, null, null, null));
         module.addSerializer(Profile.FrameNode.class, new FrameNodeSerializer());
         module.addSerializer(Profile.CPUSamplingNodeProps.class, new CpuSampleFrameNodePropsSerializer());
+        module.addSerializer(Profile.IOTracingNodeProps.class, new IOTracingNodePropsSerializer());
         module.addSerializer(Profile.Header.class, new HeaderSerializer());
         module.addSerializer(Profile.RecorderDetails.class, new RecorderDetailsSerializer());
         module.addSerializer(Profile.ProfileWorkInfo.class, new ProfileWorkInfoSerializer());
@@ -42,6 +43,14 @@ public class ProtoSerializers {
             if(value.getCpuSamplingProps() != null) {
                 JsonSerializer cpuSamplesPropsSerializer = serializers.findValueSerializer(Profile.CPUSamplingNodeProps.class);
                 cpuSamplesPropsSerializer.serialize(value.getCpuSamplingProps(), gen, serializers);
+            }
+            if(value.getIoTracingPropsCount() > 0) {
+                gen.writeStartArray();
+                for(Profile.IOTracingNodeProps props: value.getIoTracingPropsList()) {
+                    JsonSerializer ioTracingPropsSerializer = serializers.findValueSerializer(Profile.IOTracingNodeProps.class);
+                    ioTracingPropsSerializer.serialize(props, gen, serializers);
+                }
+                gen.writeEndArray();
             }
             gen.writeEndArray();
         }
@@ -76,6 +85,27 @@ public class ProtoSerializers {
             gen.writeStartArray();
             gen.writeNumber(value.getOnStackSamples());
             gen.writeNumber(value.getOnCpuSamples());
+            gen.writeEndArray();
+        }
+    }
+
+    static class IOTracingNodePropsSerializer extends StdSerializer<Profile.IOTracingNodeProps> {
+
+        public IOTracingNodePropsSerializer() {
+            super(Profile.IOTracingNodeProps.class);
+        }
+
+        @Override
+        public void serialize(Profile.IOTracingNodeProps value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeStartArray();
+            gen.writeNumber(value.getFdIdx());
+            gen.writeString(value.getTraceType().toString());
+            gen.writeNumber(value.getSamples());
+            gen.writeNumber(value.getLatency99());
+            gen.writeNumber(value.getLatency95());
+            gen.writeNumber(value.getMean());
+            gen.writeNumber(value.getBytes());
+            gen.writeBoolean(value.getDropped());
             gen.writeEndArray();
         }
     }

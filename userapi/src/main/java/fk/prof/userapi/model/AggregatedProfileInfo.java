@@ -8,6 +8,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * @author gaurav.ashok
@@ -30,6 +31,10 @@ public class AggregatedProfileInfo {
         this.traceCtxDetailList = traceCtxDetailList;
         this.profiles = profiles;
         this.aggregatedSamples = aggregatedSamples;
+    }
+
+    public Profile.Header getHeader() {
+        return this.header;
     }
 
     public ZonedDateTime getStart() {

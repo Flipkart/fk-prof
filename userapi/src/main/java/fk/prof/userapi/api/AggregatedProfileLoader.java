@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.zip.Adler32;
 import java.util.zip.CheckedInputStream;
 import java.util.zip.Checksum;
@@ -120,28 +121,31 @@ public class AggregatedProfileLoader {
             }
             checksumVerify((int) checksum.getValue(), Deserializer.readVariantInt32(in), "checksum error profileWorkInfo");
 
-            // read method lookup table
-            Profile.MethodLookUp methodLookUp = Deserializer.readCheckedDelimited(Profile.MethodLookUp.parser(), cin, "methodLookup");
-
-            // read work specific samples
+            Profile.MethodLookUp methodLookUp;
             Map<String, AggregatedSamplesPerTraceCtx> samplesPerTrace = new HashMap<>();
-
-            checksumReset(checksum);
             switch (filename.workType) {
                 case cpu_sample_work:
+                    methodLookUp = Deserializer.readCheckedDelimited(Profile.MethodLookUp.parser(), cin, "methodLookup");
+                    checksumReset(checksum);
                     for (String traceName : traceNames.getNameList()) {
                         samplesPerTrace.put(traceName,
                                 new AggregatedSamplesPerTraceCtx(methodLookUp, new AggregatedCpuSamplesData(parseStacktraceTree(cin))));
                     }
                     break;
+                case io_trace_work:
+                    methodLookUp = Deserializer.readCheckedDelimited(Profile.MethodLookUp.parser(), cin, "methodLookup");
+                    checksumReset(checksum);
+                    for (String traceName : traceNames.getNameList()) {
+                        samplesPerTrace.put(traceName,
+                            new AggregatedSamplesPerTraceCtx(methodLookUp, new AggregatedIOTraceData(parseStacktraceTree(cin))));
+                    }
+                    break;
                 default:
                     break;
             }
-
             checksumVerify((int) checksum.getValue(), Deserializer.readVariantInt32(in), "checksum error " + filename.workType.name() + " aggregated samples");
 
             AggregatedProfileInfo profileInfo = new AggregatedProfileInfo(parsedHeader, traceNames, traceDetails, profiles, samplesPerTrace);
-
             future.complete(profileInfo);
         }
         catch (IOException e) {
@@ -171,21 +175,20 @@ public class AggregatedProfileLoader {
             // read profiles summary
             checksumReset(checksum);
             List<Profile.ProfileWorkInfo> profiles = new ArrayList<>();
-            int size = 0;
+            int size;
             while((size = Deserializer.readVariantInt32(cin)) != 0) {
                 profiles.add(Profile.ProfileWorkInfo.parseFrom(ByteStreams.limit(cin, size)));
             }
             checksumVerify((int)checksum.getValue(), Deserializer.readVariantInt32(in), "checksum error profileWorkInfo");
 
-            // read work specific samples
+            // read work specific information
             Map<WorkEntities.WorkType, AggregationWindowSummary.WorkSpecificSummary> summaryPerTrace = new HashMap<>();
-
-            // cpu_sampling
-            Profile.TraceCtxDetailList traceDetails = Deserializer.readCheckedDelimited(Profile.TraceCtxDetailList.parser(), cin, "cpu_sample traceDetails");
-            summaryPerTrace.put(WorkEntities.WorkType.cpu_sample_work, new AggregationWindowSummary.CpuSampleSummary(traceDetails));
+            List<WorkEntities.WorkType> wtypes = parsedHeader.getPolicy().getWorkList().stream().map(WorkEntities.Work::getWType).collect(Collectors.toList());
+            for (WorkEntities.WorkType workType: wtypes) {
+                summaryPerTrace.put(workType, parseWorkSpecificSummary(cin, workType));
+            }
 
             AggregationWindowSummary summary = new AggregationWindowSummary(parsedHeader, traceNames, profiles, summaryPerTrace);
-
             future.complete(summary);
         }
         catch (IOException e) {
@@ -199,6 +202,21 @@ public class AggregatedProfileLoader {
 
     private void checksumVerify(int actualChecksum, int expectedChecksum, String msg) {
         assert actualChecksum == expectedChecksum : msg;
+    }
+
+    private AggregationWindowSummary.WorkSpecificSummary parseWorkSpecificSummary(CheckedInputStream cin, WorkEntities.WorkType workType)
+        throws IOException {
+        Profile.TraceCtxDetailList traceDetails;
+        switch (workType) {
+            case cpu_sample_work:
+                traceDetails = Deserializer.readCheckedDelimited(Profile.TraceCtxDetailList.parser(), cin, "traceDetails for cpu_sample_work");
+                return new AggregationWindowSummary.CpuSampleSummary(traceDetails);
+            case io_trace_work:
+                traceDetails = Deserializer.readCheckedDelimited(Profile.TraceCtxDetailList.parser(), cin, "traceDetails for io_trace_work");
+                return new AggregationWindowSummary.IOTraceSummary(traceDetails);
+            default:
+                throw new IllegalArgumentException("Unsupported work type for parsing work specific summary details from profile " + workType);
+        }
     }
 
     private StacktraceTreeIterable parseStacktraceTree(InputStream in) throws IOException {

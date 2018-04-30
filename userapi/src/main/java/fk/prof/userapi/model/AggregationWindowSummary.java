@@ -61,4 +61,16 @@ public class AggregationWindowSummary {
             return traceDetails.getTraceCtxList();
         }
     }
+
+    public static class IOTraceSummary extends WorkSpecificSummary {
+        private Profile.TraceCtxDetailList traceDetails;
+
+        public IOTraceSummary(Profile.TraceCtxDetailList traceDetails) {
+            this.traceDetails = traceDetails;
+        }
+
+        public Iterable<Profile.TraceCtxDetail> getTraces() {
+            return traceDetails.getTraceCtxList();
+        }
+    }
 }

@@ -1,0 +1,38 @@
+{
+  "userapiHttpOptions": {
+    "config": {
+      "verticle.count": 1,
+      "http.port": 8082,
+      "req.timeout": 2000
+    }
+  },
+  "profile.retention.duration.min": 30,
+  "profile.load.timeout": 10000,
+  "storage": {
+    "s3": {
+      "endpoint": "http://localhost:4567",
+      "access.key": "foo",
+      "secret.key": "bar",
+      "list.objects.timeout.ms": 1000
+    },
+    "thread.pool": {
+      "coresize": 2,
+      "maxsize": 5,
+      "idletime.secs": 60,
+      "queue.maxsize": 50
+    }
+  },
+  "backend":{
+    "ip": "127.0.0.1",
+    "port": 2491
+  },
+  "http.client": {
+    "connect.timeout.ms": 5000,
+    "idle.timeout.secs": 120,
+    "max.attempts": 3,
+    "keepalive": true,
+    "compression": true
+  },
+  "aggregatedProfiles.baseDir": "profiles",
+  "vertx.worker.pool.size": 50
+}

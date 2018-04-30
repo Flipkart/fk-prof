@@ -75,6 +75,7 @@ public class HttpVerticle extends AbstractVerticle {
         router.get(PROFILES_PROCS_FOR_APP_CLUSTER).handler(this::getProcName);
         router.get(PROFILES_FOR_APP_CLUSTER_PROC).handler(this::getProfiles);
         router.get(CPU_SAMPLING_PROFILE_FOR_APP_CLUSTER_PROC_TRACE).handler(this::getCpuSamplingTraces);
+        router.get(IO_TRACING_PROFILE_FOR_APP_CLUSTER_PROC_TRACE).handler(this::getIOTracingTraces);
         router.get(HEALTH_CHECK).handler(this::handleGetHealth);
 
         UserapiHttpHelper.attachHandlersToRoute(router, HttpMethod.GET, POLICIES_APPS, this::proxyListAPIToBackend);
@@ -202,40 +203,11 @@ public class HttpVerticle extends AbstractVerticle {
     }
 
     private void getCpuSamplingTraces(RoutingContext routingContext) {
-        String appId = routingContext.request().getParam("appId");
-        String clusterId = routingContext.request().getParam("clusterId");
-        String procName = routingContext.request().getParam("procName");
-        WorkEntities.WorkType workType = WorkEntities.WorkType.cpu_sample_work;
-        String traceName = routingContext.request().getParam("traceName");
+        getWorkSpecificTraces(routingContext, WorkEntities.WorkType.cpu_sample_work);
+    }
 
-        ZonedDateTime startTime;
-        int duration;
-
-        try {
-            startTime = ZonedDateTime.parse(routingContext.request().getParam("start"), DateTimeFormatter.ISO_ZONED_DATE_TIME);
-            duration = Integer.parseInt(routingContext.request().getParam("duration"));
-        } catch (Exception e) {
-            setResponse(Future.failedFuture(new IllegalArgumentException(e)), routingContext);
-            return;
-        }
-
-        AggregatedProfileNamingStrategy filename;
-        try {
-            filename = new AggregatedProfileNamingStrategy(baseDir, 1, appId, clusterId, procName, startTime, duration, workType);
-        } catch (Exception e) {
-            setResponse(Future.failedFuture(new IllegalArgumentException(e)), routingContext);
-            return;
-        }
-
-        Future<AggregatedProfileInfo> future = Future.future();
-        future.setHandler((AsyncResult<AggregatedProfileInfo> result) -> {
-            if (result.succeeded()) {
-                setResponse(Future.succeededFuture(result.result().getAggregatedSamples(traceName)), routingContext, true);
-            } else {
-                setResponse(result, routingContext);
-            }
-        });
-        profileStoreAPI.load(future, filename);
+    private void getIOTracingTraces(RoutingContext routingContext) {
+        getWorkSpecificTraces(routingContext, WorkEntities.WorkType.io_trace_work);
     }
 
     private void handleGetHealth(RoutingContext routingContext) {
@@ -275,6 +247,41 @@ public class HttpVerticle extends AbstractVerticle {
             UserapiHttpFailure httpFailure = UserapiHttpFailure.failure(ex);
             UserapiHttpHelper.handleFailure(routingContext, httpFailure);
         }
+    }
+
+    private void getWorkSpecificTraces(RoutingContext routingContext, WorkEntities.WorkType workType) {
+        String appId = routingContext.request().getParam("appId");
+        String clusterId = routingContext.request().getParam("clusterId");
+        String procName = routingContext.request().getParam("procName");
+        String traceName = routingContext.request().getParam("traceName");
+
+        ZonedDateTime startTime;
+        int duration;
+        try {
+            startTime = ZonedDateTime.parse(routingContext.request().getParam("start"), DateTimeFormatter.ISO_ZONED_DATE_TIME);
+            duration = Integer.parseInt(routingContext.request().getParam("duration"));
+        } catch (Exception e) {
+            setResponse(Future.failedFuture(new IllegalArgumentException(e)), routingContext);
+            return;
+        }
+
+        AggregatedProfileNamingStrategy filename;
+        try {
+            filename = new AggregatedProfileNamingStrategy(baseDir, 1, appId, clusterId, procName, startTime, duration, workType);
+        } catch (Exception e) {
+            setResponse(Future.failedFuture(new IllegalArgumentException(e)), routingContext);
+            return;
+        }
+
+        Future<AggregatedProfileInfo> future = Future.future();
+        future.setHandler((AsyncResult<AggregatedProfileInfo> result) -> {
+            if (result.succeeded()) {
+                setResponse(Future.succeededFuture(result.result().getAggregatedSamples(traceName)), routingContext, true);
+            } else {
+                setResponse(result, routingContext);
+            }
+        });
+        profileStoreAPI.load(future, filename);
     }
 
     private Future<ProfHttpClient.ResponseWithStatusTuple> makeRequestToBackend(HttpMethod method, String path, Buffer payloadAsBuffer, boolean withRetry) {
