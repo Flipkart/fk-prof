@@ -37,6 +37,12 @@ public class Configuration {
 
     @NotNull
     @Valid
+    @JsonProperty("http.client")
+    private HttpClientConfig httpClientConfig;
+
+
+    @NotNull
+    @Valid
     @JsonIgnore
     private HttpConfig httpConfig;
 
@@ -44,6 +50,11 @@ public class Configuration {
     @Valid
     @JsonProperty("storage")
     private StorageConfig storageConfig;
+
+    @NotNull
+    @Valid
+    @JsonProperty("backend")
+    private BackendConfig backendConfig;
 
     @NotNull
     @JsonProperty("aggregatedProfiles.baseDir")
@@ -80,6 +91,15 @@ public class Configuration {
     public StorageConfig getStorageConfig() {
         return storageConfig;
     }
+
+    public BackendConfig getBackendConfig() {
+        return backendConfig;
+    }
+
+    public HttpClientConfig getHttpClientConfig() {
+        return httpClientConfig;
+    }
+
 
     public String getProfilesBaseDir() {
         return profilesBaseDir;
@@ -170,6 +190,60 @@ public class Configuration {
 
         public Long getListObjectsTimeoutMs() {
             return listObjectsTimeoutMs;
+        }
+    }
+
+    public static class BackendConfig {
+        @NotNull
+        private String ip;
+
+        @NotNull
+        private Integer port;
+
+        public String getIp() {
+            return ip;
+        }
+
+        public Integer getPort() {
+            return port;
+        }
+    }
+
+    //TODO : Duplicate from backend, extract out in a common module
+    public static class HttpClientConfig {
+        @JsonProperty("connect.timeout.ms")
+        private Integer connectTimeoutMs = 5000;
+
+        @JsonProperty("idle.timeout.secs")
+        private Integer idleTimeoutSecs = 120;
+
+        @JsonProperty("max.attempts")
+        private Integer maxAttempts = 3;
+
+        @JsonProperty("keepalive")
+        private Boolean keepAlive = true;
+
+        @JsonProperty("compression")
+        private Boolean supportCompression = true;
+
+        public Integer getConnectTimeoutMs() {
+            return connectTimeoutMs;
+        }
+
+        public Integer getIdleTimeoutSecs() {
+            return idleTimeoutSecs;
+        }
+
+        public Integer getMaxAttempts() {
+            return maxAttempts;
+        }
+
+        public Boolean getKeepAlive() {
+            return keepAlive;
+        }
+
+        public Boolean getSupportCompression() {
+            return supportCompression;
         }
     }
 

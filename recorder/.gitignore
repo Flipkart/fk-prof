@@ -1,3 +1,7 @@
 libbagent.a
 libtestbase.a
 *.tmp
+.idea
+*.a
+*.vscode
+*.cbp

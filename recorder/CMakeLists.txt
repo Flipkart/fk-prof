@@ -50,8 +50,8 @@ add_definitions("-DBUILD_ENV='${BUILD_ENV}'")
 # Paths
 set(SRC "src/main/cpp")
 set(SRC_PRELOAD "src/main/c")
-set(INCLUDE_VENDOR_CONCQUEUE "vendor/concurrentqueue")
-set(INCLUDE_VENDOR_SPDLOG "vendor/spdlog/include")
+set(INCLUDE_VENDOR_CONCQUEUE "${CMAKE_SOURCE_DIR}/vendor/concurrentqueue")
+set(INCLUDE_VENDOR_SPDLOG "${CMAKE_SOURCE_DIR}/vendor/spdlog/include")
 set(SRC_TEST "src/test/cpp")
 set(BIN "build")
 set(BASE_OUTPUT "bagent")
@@ -60,7 +60,7 @@ set(PRELOAD_LIB "prefkp")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${BIN})
 #protobuf idl setup
 add_subdirectory(src/idl)
-include_directories(src/idl src/main/cpp)
+include_directories(${CMAKE_BINARY_DIR}/src/idl src/main/cpp)
 
 ##########################################################
 # Libraries & Code
