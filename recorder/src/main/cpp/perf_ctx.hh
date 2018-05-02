@@ -1,3 +1,6 @@
+#ifndef PERF_CTX_H
+#define PERF_CTX_H
+
 #include <cstdint>
 #include <stack>
 #include <stdexcept>
@@ -11,9 +14,6 @@
 #include <unordered_map>
 #include <functional>
 #include "metrics.hh"
-
-#ifndef PERF_CTX_H
-#define PERF_CTX_H
 
 // special context IDs
 #define DEFAULT_CTX_ID 0

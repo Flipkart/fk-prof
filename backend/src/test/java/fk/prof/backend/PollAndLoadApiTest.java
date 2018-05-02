@@ -18,10 +18,9 @@ import fk.prof.backend.model.election.impl.InMemoryLeaderStore;
 import fk.prof.backend.model.policy.PolicyStore;
 import fk.prof.backend.model.policy.ZookeeperBasedPolicyStore;
 import fk.prof.backend.model.slot.WorkSlotPool;
-import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.BitOperationUtil;
 import fk.prof.backend.util.ProtoUtil;
-import fk.prof.backend.util.proto.BackendDTOProtoUtil;
+import fk.prof.idl.*;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -39,8 +38,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import proto.PolicyDTO;
-import recording.Recorder;
 
 import java.io.File;
 import java.io.IOException;
@@ -162,11 +159,11 @@ public class PollAndLoadApiTest {
   @Test(timeout = 10000)
   public void testReportOfLoadFromDaemon(TestContext context) throws Exception {
     final Async async = context.async();
-    Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
+    Entities.ProcessGroup processGroup = Entities.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
     //this test can be brittle because teardown of zk in previous running test, causes delay in setting up of leader when zk is setup again for this test
     //mocking leader address here so that association does not return 503
     when(leaderStore.getLeader())
-        .thenReturn(BackendDTO.LeaderDetail.newBuilder().setHost("127.0.0.1").setPort(config.getLeaderHttpServerOpts().getPort()).build());
+        .thenReturn(Backend.LeaderDetail.newBuilder().setHost("127.0.0.1").setPort(config.getLeaderHttpServerOpts().getPort()).build());
     try {
       makeRequestPostAssociation(buildRecorderInfoFromProcessGroup(processGroup)).setHandler(ar -> {
         if (ar.failed()) {
@@ -201,7 +198,7 @@ public class PollAndLoadApiTest {
   @Test(timeout = 10000)
   public void testFetchForWorkForAggregationWindow(TestContext context) throws Exception {
     final Async async = context.async();
-    Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
+    Entities.ProcessGroup processGroup = Entities.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
     policyStore.createVersionedPolicy(processGroup, MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),-1));
     CountDownLatch latch = new CountDownLatch(1);
     when(policyStore.getVersionedPolicy(processGroup)).then(invocationOnMock -> {
@@ -240,7 +237,7 @@ public class PollAndLoadApiTest {
 
   @Test(timeout = 20000)
   public void testAggregationWindowSetupWithMinHealthyRecordersNotSpecified(TestContext context) throws Exception {
-    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),-1);
+    PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(0),-1);
     testAggregationWindowSetupAndPollResponse(context, versionedPolicyDetails, result -> {
       try {
         context.assertEquals(200, result.getStatusCode());
@@ -256,7 +253,7 @@ public class PollAndLoadApiTest {
 
   @Test(timeout = 20000)
   public void testAggregationWindowSetupWithoutMinHealthyRecorders(TestContext context) throws Exception {
-    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(4),-1);
+    PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(4),-1);
     testAggregationWindowSetupAndPollResponse(context, versionedPolicyDetails, result -> {
       try {
         context.assertEquals(200, result.getStatusCode());
@@ -270,7 +267,7 @@ public class PollAndLoadApiTest {
 
   @Test(timeout = 20000)
   public void testAggregationWindowSetupWithMinHealthyRecorders(TestContext context) throws Exception {
-    PolicyDTO.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(3),-1);
+    PolicyEntities.VersionedPolicyDetails versionedPolicyDetails = MockPolicyData.getMockVersionedPolicyDetails(MockPolicyData.mockPolicyDetails.get(3),-1);
     testAggregationWindowSetupAndPollResponse(context, versionedPolicyDetails, result -> {
       try {
         context.assertEquals(200, result.getStatusCode());
@@ -284,14 +281,14 @@ public class PollAndLoadApiTest {
     });
   }
 
-  private void testAggregationWindowSetupAndPollResponse(TestContext context, PolicyDTO.VersionedPolicyDetails versionedPolicyDetails, Consumer<ProfHttpClient.ResponseWithStatusTuple> assertionTask) throws Exception {
+  private void testAggregationWindowSetupAndPollResponse(TestContext context, PolicyEntities.VersionedPolicyDetails versionedPolicyDetails, Consumer<ProfHttpClient.ResponseWithStatusTuple> assertionTask) throws Exception {
     final Async async = context.async();
-    Recorder.ProcessGroup processGroup = Recorder.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
+    Entities.ProcessGroup processGroup = Entities.ProcessGroup.newBuilder().setAppId("1").setCluster("1").setProcName("1").build();
     policyStore.createVersionedPolicy(processGroup, versionedPolicyDetails);
 
     Recorder.PollReq pollReq = Recorder.PollReq.newBuilder()
         .setRecorderInfo(buildRecorderInfo(processGroup, 1))
-        .setWorkLastIssued(buildWorkResponse(0, Recorder.WorkResponse.WorkState.complete))
+        .setWorkLastIssued(buildWorkResponse(0, WorkEntities.WorkResponse.WorkState.complete))
         .build();
     Recorder.AssignedBackend assignedBackend = Recorder.AssignedBackend.newBuilder().setHost(config.getIpAddress()).setPort(config.getBackendHttpServerOpts().getPort()).build();
     makePollRequest(assignedBackend, pollReq).setHandler(ar1 -> {
@@ -316,7 +313,7 @@ public class PollAndLoadApiTest {
                   try {
                     Recorder.PollReq pollReq1 = Recorder.PollReq.newBuilder()
                         .setRecorderInfo(buildRecorderInfo(processGroup, 2))
-                        .setWorkLastIssued(buildWorkResponse(0, Recorder.WorkResponse.WorkState.complete))
+                        .setWorkLastIssued(buildWorkResponse(0, WorkEntities.WorkResponse.WorkState.complete))
                         .build();
                     makePollRequest(assignedBackend, pollReq1).setHandler(ar3 -> {
                       if(ar3.failed()) {
@@ -325,13 +322,13 @@ public class PollAndLoadApiTest {
                       try {
                         context.assertEquals(200, ar3.result().getStatusCode());
                         Recorder.PollRes pollRes1 = ProtoUtil.buildProtoFromBuffer(Recorder.PollRes.parser(), ar3.result().getResponse());
-                        context.assertEquals(Recorder.WorkAssignment.getDefaultInstance(), pollRes1.getAssignment());
+                        context.assertEquals(WorkEntities.WorkAssignment.getDefaultInstance(), pollRes1.getAssignment());
                         Recorder.PollReq pollReq2 = Recorder.PollReq.newBuilder()
                             .setRecorderInfo(buildRecorderInfo(processGroup, 3))
-                            .setWorkLastIssued(buildWorkResponse(0, Recorder.WorkResponse.WorkState.complete))
+                            .setWorkLastIssued(buildWorkResponse(0, WorkEntities.WorkResponse.WorkState.complete))
                             .build();
                         //wait for recorder defunct threshold time post which backend would have fetched work from leader and setup aggregation window
-                        vertx.setTimer(thresholdForDefunctRecorderInSecs * 1000, timerId2 -> {
+                        vertx.setTimer((thresholdForDefunctRecorderInSecs + 2) * 1000, timerId2 -> {
                           try {
                             makePollRequest(assignedBackend, pollReq2).setHandler(ar4 -> {
                               if(ar4.failed()) {
@@ -407,7 +404,7 @@ public class PollAndLoadApiTest {
     return future;
   }
 
-  private Recorder.RecorderInfo buildRecorderInfo(Recorder.ProcessGroup processGroup, long tick) {
+  private Recorder.RecorderInfo buildRecorderInfo(Entities.ProcessGroup processGroup, long tick) {
     return Recorder.RecorderInfo.newBuilder()
         .setAppId(processGroup.getAppId())
         .setCluster(processGroup.getCluster())
@@ -423,24 +420,24 @@ public class PollAndLoadApiTest {
         .setVmId("1")
         .setZone("1")
         .setIp("1")
-        .setCapabilities(enableCpuSampling())
+        .setCapabilities(enableCpuSamplingAndIOTracing())
         .build();
   }
 
-  public static Recorder.RecorderCapabilities enableCpuSampling() {
-    return Recorder.RecorderCapabilities.newBuilder().setCanCpuSample(true).build();
+  public static Recorder.RecorderCapabilities enableCpuSamplingAndIOTracing() {
+    return Recorder.RecorderCapabilities.newBuilder().setCanCpuSample(true).setCanTraceIo(true).build();
   }
 
-  private Recorder.WorkResponse buildWorkResponse(long workId, Recorder.WorkResponse.WorkState workState) {
-    return Recorder.WorkResponse.newBuilder()
+  private WorkEntities.WorkResponse buildWorkResponse(long workId, WorkEntities.WorkResponse.WorkState workState) {
+    return WorkEntities.WorkResponse.newBuilder()
         .setWorkId(workId)
-        .setWorkResult(Recorder.WorkResponse.WorkResult.success)
+        .setWorkResult(WorkEntities.WorkResponse.WorkResult.success)
         .setWorkState(workState)
         .setElapsedTime(100)
         .build();
   }
 
-  private static Recorder.RecorderInfo buildRecorderInfoFromProcessGroup(Recorder.ProcessGroup processGroup) {
+  private static Recorder.RecorderInfo buildRecorderInfoFromProcessGroup(Entities.ProcessGroup processGroup) {
     return Recorder.RecorderInfo.newBuilder()
         .setAppId(processGroup.getAppId())
         .setCluster(processGroup.getCluster())
@@ -456,7 +453,7 @@ public class PollAndLoadApiTest {
         .setVmId("1")
         .setZone("1")
         .setIp("1")
-        .setCapabilities(enableCpuSampling())
+        .setCapabilities(enableCpuSamplingAndIOTracing())
         .build();
   }
 }

@@ -120,7 +120,7 @@ public class BackendManager {
 
           PolicyStore policyStore = createPolicyStore(vertx, curatorClient);
           VerticleDeployer leaderHttpVerticleDeployer = new LeaderHttpVerticleDeployer(vertx, config, backendAssociationStore, policyStore);
-          Runnable leaderElectedTask = createLeaderElectedTask(vertx, leaderHttpVerticleDeployer, backendDeployments, backendAssociationStore, policyStore);
+          Runnable leaderElectedTask = createLeaderElectedTask(vertx, leaderHttpVerticleDeployer, config.getBackendHttpVerticleConfig().shouldAggregateWhenLeader(), backendDeployments, backendAssociationStore, policyStore);
 
           VerticleDeployer leaderElectionParticipatorVerticleDeployer = new LeaderElectionParticipatorVerticleDeployer(
               vertx, config, curatorClient, leaderElectedTask);
@@ -208,10 +208,12 @@ public class BackendManager {
     return new ZookeeperBasedPolicyStore(vertx, curatorClient, config.getPolicyBaseDir(), config.getPolicyVersion());
   }
 
-  public static Runnable createLeaderElectedTask(Vertx vertx, VerticleDeployer leaderHttpVerticleDeployer, List<String> backendDeployments,
+  public static Runnable createLeaderElectedTask(Vertx vertx, VerticleDeployer leaderHttpVerticleDeployer, boolean enableAggregation, List<String> backendDeployments,
                                                  BackendAssociationStore associationStore, PolicyStore policyStore) {
     LeaderElectedTask.Builder builder = LeaderElectedTask.newBuilder();
-    builder.disableBackend(backendDeployments);
+    if(!enableAggregation) {
+      builder.disableBackend(backendDeployments);
+    }
     return builder.build(vertx, leaderHttpVerticleDeployer, associationStore, policyStore);
   }
 

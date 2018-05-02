@@ -1,13 +1,13 @@
 package fk.prof.aggregation.model;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel.*;
+import fk.prof.idl.Profile.*;
 import fk.prof.aggregation.stacktrace.StacktraceFrameNode;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
 
-public class FinalizedCpuSamplingAggregationBucket {
+public class FinalizedCpuSamplingAggregationBucket implements FinalizedWorkSpecificAggregationBucket {
   protected final MethodIdLookup methodIdLookup;
   protected final Map<String, CpuSamplingTraceDetail> traceDetailLookup;
 

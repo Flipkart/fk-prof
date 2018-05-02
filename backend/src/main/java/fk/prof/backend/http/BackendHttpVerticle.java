@@ -16,11 +16,14 @@ import fk.prof.backend.model.aggregation.AggregationWindowDiscoveryContext;
 import fk.prof.backend.model.assignment.ProcessGroupContextForPolling;
 import fk.prof.backend.model.assignment.ProcessGroupDiscoveryContext;
 import fk.prof.backend.model.election.LeaderReadContext;
-import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.request.profile.RecordedProfileProcessor;
 import fk.prof.backend.request.profile.impl.SharedMapBasedSingleProcessingOfProfileGate;
 import fk.prof.backend.util.ProtoUtil;
 import fk.prof.backend.util.proto.RecorderProtoUtil;
+import fk.prof.idl.Backend;
+import fk.prof.idl.Entities;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.WorkEntities;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
 import io.vertx.core.AbstractVerticle;
@@ -38,7 +41,6 @@ import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.LoggerHandler;
-import recording.Recorder;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -172,7 +174,7 @@ public class BackendHttpVerticle extends AbstractVerticle {
         logger.debug("Poll request: " + RecorderProtoUtil.pollReqCompactRepr(pollReq));
       }
 
-      Recorder.ProcessGroup processGroup = RecorderProtoUtil.mapRecorderInfoToProcessGroup(pollReq.getRecorderInfo());
+      Entities.ProcessGroup processGroup = RecorderProtoUtil.mapRecorderInfoToProcessGroup(pollReq.getRecorderInfo());
       String processGroupStr = new ProcessGroupTag(processGroup.getAppId(), processGroup.getCluster(), processGroup.getProcName()).toString();
       Meter mtrAssocMiss = metricRegistry.meter(MetricRegistry.name(MetricName.Poll_Assoc_Miss.get(), processGroupStr));
       Counter ctrWinMiss = metricRegistry.counter(MetricRegistry.name(MetricName.Poll_Window_Miss.get(), processGroupStr));
@@ -183,7 +185,7 @@ public class BackendHttpVerticle extends AbstractVerticle {
         throw new BadRequestException("Process group " + RecorderProtoUtil.processGroupCompactRepr(processGroup) + " not associated with the backend");
       }
 
-      Recorder.WorkAssignment nextWorkAssignment = processGroupContextForPolling.getWorkAssignment(pollReq);
+      WorkEntities.WorkAssignment nextWorkAssignment = processGroupContextForPolling.getWorkAssignment(pollReq);
       if (nextWorkAssignment != null) {
         AggregationWindow aggregationWindow = aggregationWindowDiscoveryContext.getAssociatedAggregationWindow(nextWorkAssignment.getWorkId());
         if (aggregationWindow == null) {
@@ -217,11 +219,11 @@ public class BackendHttpVerticle extends AbstractVerticle {
 
   // /association API is requested over ELB, routed to some backend which in turns proxies it to a leader
   private void handlePostAssociation(RoutingContext context) {
-    BackendDTO.LeaderDetail leaderDetail = verifyLeaderAvailabilityOrFail(context.response());
+    Backend.LeaderDetail leaderDetail = verifyLeaderAvailabilityOrFail(context.response());
     if (leaderDetail != null) {
       try {
         Recorder.RecorderInfo recorderInfo = ProtoUtil.buildProtoFromBuffer(Recorder.RecorderInfo.parser(), context.getBody());
-        Recorder.ProcessGroup processGroup = RecorderProtoUtil.mapRecorderInfoToProcessGroup(recorderInfo);
+        Entities.ProcessGroup processGroup = RecorderProtoUtil.mapRecorderInfoToProcessGroup(recorderInfo);
         ProcessGroupContextForPolling processGroupContextForPolling = this.processGroupDiscoveryContext.getProcessGroupContextForPolling(processGroup);
         if (processGroupContextForPolling != null) {
           Recorder.AssignedBackend assignedBackend = Recorder.AssignedBackend.newBuilder().setHost(ipAddress).setPort(backendHttpPort).build();
@@ -243,7 +245,7 @@ public class BackendHttpVerticle extends AbstractVerticle {
 
   // /associations API is requested over ELB, routed to some backend which in turns proxies it to a leader
   private void handleGetAssociations(RoutingContext context) {
-    BackendDTO.LeaderDetail leaderDetail = verifyLeaderAvailabilityOrFail(context.response());
+    Backend.LeaderDetail leaderDetail = verifyLeaderAvailabilityOrFail(context.response());
     if (leaderDetail != null) {
       try {
         //Proxy request to leader
@@ -262,7 +264,7 @@ public class BackendHttpVerticle extends AbstractVerticle {
           }
 
           try {
-            Recorder.BackendAssociations associations = ProtoUtil.buildProtoFromBuffer(Recorder.BackendAssociations.parser(), ar.result().getResponse());
+            Backend.BackendAssociations associations = ProtoUtil.buildProtoFromBuffer(Backend.BackendAssociations.parser(), ar.result().getResponse());
             context.response().putHeader("Content-Type", "application/json");
             context.response().end(JsonFormat.printer().print(associations));
           } catch (Exception ex) {
@@ -278,7 +280,7 @@ public class BackendHttpVerticle extends AbstractVerticle {
   }
 
   private void proxyToLeader(RoutingContext context) {
-    BackendDTO.LeaderDetail leaderDetail = verifyLeaderAvailabilityOrFail(context.response());
+    Backend.LeaderDetail leaderDetail = verifyLeaderAvailabilityOrFail(context.response());
     final String path = context.normalisedPath() + ((context.request().query() != null) ? "?" + context.request().query() : "");
     if (leaderDetail != null) {
       try {
@@ -291,13 +293,13 @@ public class BackendHttpVerticle extends AbstractVerticle {
     }
   }
 
-  private BackendDTO.LeaderDetail verifyLeaderAvailabilityOrFail(HttpServerResponse response) {
-    if (leaderReadContext.isLeader()) {
+  private Backend.LeaderDetail verifyLeaderAvailabilityOrFail(HttpServerResponse response) {
+    if (leaderReadContext.isLeader() && !config.getBackendHttpVerticleConfig().shouldAggregateWhenLeader()) {
       ctrLeaderSelfReq.inc();
       response.setStatusCode(400).end("Leader refuses to respond to this request");
       return null;
     } else {
-      BackendDTO.LeaderDetail leaderDetail = leaderReadContext.getLeader();
+      Backend.LeaderDetail leaderDetail = leaderReadContext.getLeader();
       if (leaderDetail == null) {
         ctrLeaderUnknownReq.inc();
         response.setStatusCode(503).putHeader("Retry-After", "10").end("Leader not elected yet");
@@ -308,7 +310,7 @@ public class BackendHttpVerticle extends AbstractVerticle {
     }
   }
 
-  private Future<ProfHttpClient.ResponseWithStatusTuple> makeRequestToLeader(BackendDTO.LeaderDetail leaderDetail, HttpMethod method, String path, Buffer payloadAsBuffer, boolean withRetry) {
+  private Future<ProfHttpClient.ResponseWithStatusTuple> makeRequestToLeader(Backend.LeaderDetail leaderDetail, HttpMethod method, String path, Buffer payloadAsBuffer, boolean withRetry) {
     path = ApiPathConstants.LEADER_PREFIX + path;
     if (withRetry) {
       return httpClient.requestAsyncWithRetry(method, leaderDetail.getHost(), leaderDetail.getPort(), path, payloadAsBuffer);

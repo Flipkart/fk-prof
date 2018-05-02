@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <cstdint>
+#include "defs.hh"
 
 template <typename T> class UniqueReadsafePtr;
 
@@ -32,10 +33,8 @@ public:
     T* operator->() {
         return _available ? ptr.ptr.get() : nullptr;
     }
-
-private:
-    ReadsafePtr(const ReadsafePtr&);
-    void operator=(const ReadsafePtr&);
+    
+    DISALLOW_COPY_AND_ASSIGN(ReadsafePtr);
 };
 
 template <typename T> class UniqueReadsafePtr {
@@ -59,10 +58,8 @@ public:
         ptr.reset(t);
         if (t != nullptr) available.store(true, std::memory_order_seq_cst);
     }
-
-private:
-    UniqueReadsafePtr(const UniqueReadsafePtr&);
-    void operator=(const UniqueReadsafePtr&);
+    
+    DISALLOW_COPY_AND_ASSIGN(UniqueReadsafePtr);
 };
 
 #endif

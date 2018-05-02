@@ -1,6 +1,7 @@
 package fk.prof;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -9,10 +10,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TestJni {
     private static final AtomicBoolean loaded = new AtomicBoolean(false);
 
-    public static void loadJniLib() {
+    public static void loadJniLib() throws Exception {
         if (loaded.compareAndSet(false, true)) {
-            String linkTargetPath = new File("build/libtestjni" + Platforms.getDynamicLibraryExtension()).getAbsolutePath();
-            System.load(linkTargetPath);
+            String libName = "build/libtestjni" + Platforms.getDynamicLibraryExtension();
+            File lib = new File(libName);
+            if(!lib.exists()) {
+                lib = new File("build/" + libName);
+                if(!lib.exists()) {
+                    throw new FileNotFoundException(libName);
+                }
+            }
+
+            System.load(lib.getAbsolutePath());
         }
     }
     

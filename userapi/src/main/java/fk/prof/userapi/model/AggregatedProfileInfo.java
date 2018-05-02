@@ -1,6 +1,6 @@
 package fk.prof.userapi.model;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.idl.Profile;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -14,16 +14,16 @@ import java.util.Map;
  */
 public class AggregatedProfileInfo {
 
-    private final AggregatedProfileModel.Header header;
-    private final AggregatedProfileModel.TraceCtxNames traceNames;
-    private final AggregatedProfileModel.TraceCtxDetailList traceCtxDetailList;
-    private final List<AggregatedProfileModel.ProfileWorkInfo> profiles;
+    private final Profile.Header header;
+    private final Profile.TraceCtxNames traceNames;
+    private final Profile.TraceCtxDetailList traceCtxDetailList;
+    private final List<Profile.ProfileWorkInfo> profiles;
 
     private final Map<String, AggregatedSamplesPerTraceCtx> aggregatedSamples;
 
-    public AggregatedProfileInfo(AggregatedProfileModel.Header header, AggregatedProfileModel.TraceCtxNames traceNames,
-                                 AggregatedProfileModel.TraceCtxDetailList traceCtxDetailList,
-                                 List<AggregatedProfileModel.ProfileWorkInfo> profiles,
+    public AggregatedProfileInfo(Profile.Header header, Profile.TraceCtxNames traceNames,
+                                 Profile.TraceCtxDetailList traceCtxDetailList,
+                                 List<Profile.ProfileWorkInfo> profiles,
                                  Map<String, AggregatedSamplesPerTraceCtx> aggregatedSamples) {
         this.header = header;
         this.traceNames = traceNames;
@@ -44,11 +44,11 @@ public class AggregatedProfileInfo {
         return traceNames.getNameList();
     }
 
-    public Iterable<AggregatedProfileModel.TraceCtxDetail> getTraceDetails() {
+    public Iterable<Profile.TraceCtxDetail> getTraceDetails() {
         return traceCtxDetailList.getTraceCtxList();
     }
 
-    public Iterable<AggregatedProfileModel.ProfileWorkInfo> getProfiles() {
+    public Iterable<Profile.ProfileWorkInfo> getProfiles() {
         return profiles;
     }
 

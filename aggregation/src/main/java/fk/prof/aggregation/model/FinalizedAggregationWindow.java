@@ -1,12 +1,14 @@
 package fk.prof.aggregation.model;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel.*;
+import fk.prof.idl.Profile.*;
+import fk.prof.idl.WorkEntities;
 import fk.prof.metrics.ProcessGroupTag;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class FinalizedAggregationWindow {
   protected final String appId;
@@ -16,7 +18,8 @@ public class FinalizedAggregationWindow {
   protected final LocalDateTime endedAt;
   protected final int durationInSecs;
   protected final Map<Long, FinalizedProfileWorkInfo> workInfoLookup;
-  protected final FinalizedCpuSamplingAggregationBucket cpuSamplingAggregationBucket;
+  protected final RecordingPolicy policy;
+  protected final Map<WorkEntities.WorkType, FinalizedWorkSpecificAggregationBucket> workSpecificBuckets;
 
   private final ProcessGroupTag processGroupTag;
 
@@ -27,7 +30,8 @@ public class FinalizedAggregationWindow {
                                     LocalDateTime endedAt,
                                     int durationInSecs,
                                     Map<Long, FinalizedProfileWorkInfo> workInfoLookup,
-                                    FinalizedCpuSamplingAggregationBucket cpuSamplingAggregationBucket) {
+                                    RecordingPolicy policy,
+                                    Map<WorkEntities.WorkType, FinalizedWorkSpecificAggregationBucket> workSpecificBuckets) {
     this.appId = appId;
     this.clusterId = clusterId;
     this.procId = procId;
@@ -35,7 +39,8 @@ public class FinalizedAggregationWindow {
     this.endedAt = endedAt;
     this.durationInSecs = durationInSecs;
     this.workInfoLookup = workInfoLookup;
-    this.cpuSamplingAggregationBucket = cpuSamplingAggregationBucket;
+    this.policy = policy;
+    this.workSpecificBuckets = workSpecificBuckets;
 
     this.processGroupTag = new ProcessGroupTag(appId, clusterId, procId);
   }
@@ -51,6 +56,11 @@ public class FinalizedAggregationWindow {
   //NOTE: This is computed on expiry of aggregation window, null otherwise. Having a getter here to make this testable
   public LocalDateTime getEndedAt() {
     return this.endedAt;
+  }
+
+  //Order of work types in policy is important as serialization and deserialization of data in summary profile happens in the same order
+  public List<WorkEntities.WorkType> getWorkTypes() {
+    return this.policy.getWorkList().stream().map(WorkEntities.Work::getWType).collect(Collectors.toList());
   }
 
   @Override
@@ -78,12 +88,13 @@ public class FinalizedAggregationWindow {
         && this.procId.equals(other.procId)
         && this.start.equals(other.start)
         && this.durationInSecs == other.durationInSecs
-        && this.endedAt == null ? other.endedAt == null : this.endedAt.equals(other.endedAt)
+        && (this.endedAt == null ? other.endedAt == null : this.endedAt.equals(other.endedAt))
         && this.workInfoLookup.equals(other.workInfoLookup)
-        && this.cpuSamplingAggregationBucket.equals(other.cpuSamplingAggregationBucket);
+        && this.policy.equals(other.policy)
+        && this.workSpecificBuckets.equals(other.workSpecificBuckets);
   }
 
-  protected Header buildHeaderProto(int version, WorkType workType) {
+  protected Header buildHeaderProto(int version, WorkEntities.WorkType workType) {
     Header.Builder builder = Header.newBuilder()
         .setFormatVersion(version)
         .setAggregationEndTime(endedAt == null ? null : endedAt.atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
@@ -91,7 +102,8 @@ public class FinalizedAggregationWindow {
         .setWindowDuration(durationInSecs)
         .setAppId(appId)
         .setClusterId(clusterId)
-        .setProcId(procId);
+        .setProcId(procId)
+        .setPolicy(policy);
 
     if(workType != null) {
       builder.setWorkType(workType);
@@ -110,7 +122,7 @@ public class FinalizedAggregationWindow {
    * @param traces
    * @return {@link ProfileWorkInfo} iterable
    */
-  protected Iterable<ProfileWorkInfo> buildProfileWorkInfoProto(WorkType workType, TraceCtxNames traces) {
+  protected Iterable<ProfileWorkInfo> buildProfileWorkInfoProto(WorkEntities.WorkType workType, TraceCtxNames traces) {
     return workInfoLookup.entrySet().stream().map(e -> e.getValue().buildProfileWorkInfoProto(workType, start, traces))::iterator;
   }
 
@@ -148,19 +160,35 @@ public class FinalizedAggregationWindow {
    * @param workType
    * @return
    */
-  protected TraceCtxNames buildTraceCtxNamesProto(WorkType workType) {
+  protected TraceCtxNames buildTraceCtxNamesProto(WorkEntities.WorkType workType) {
+    if(workSpecificBuckets.get(workType) == null) {
+      throw new IllegalArgumentException(String.format("Recording policy does not specify work type=%s", workType));
+    }
+
     switch (workType) {
       case cpu_sample_work:
+        FinalizedCpuSamplingAggregationBucket cpuSamplingAggregationBucket = (FinalizedCpuSamplingAggregationBucket)workSpecificBuckets.get(WorkEntities.WorkType.cpu_sample_work);
         return cpuSamplingAggregationBucket.buildTraceNamesProto();
+      case io_trace_work:
+        FinalizedIOTracingAggregationBucket ioTracingAggregationBucket = (FinalizedIOTracingAggregationBucket) workSpecificBuckets.get(WorkEntities.WorkType.io_trace_work);
+        return ioTracingAggregationBucket.buildTraceNamesProto();
       default:
         throw new IllegalArgumentException(workType.name() + " not supported");
     }
   }
 
-  protected TraceCtxDetailList buildTraceCtxDetailListProto(WorkType workType, TraceCtxNames traces) {
+  protected TraceCtxDetailList buildTraceCtxDetailListProto(WorkEntities.WorkType workType, TraceCtxNames traces) {
+    if(workSpecificBuckets.get(workType) == null) {
+      throw new IllegalArgumentException(String.format("Recording policy does not specify work type=%s", workType));
+    }
+
     switch (workType) {
       case cpu_sample_work:
+        FinalizedCpuSamplingAggregationBucket cpuSamplingAggregationBucket = (FinalizedCpuSamplingAggregationBucket)workSpecificBuckets.get(WorkEntities.WorkType.cpu_sample_work);
         return cpuSamplingAggregationBucket.buildTraceCtxListProto(traces);
+      case io_trace_work:
+        FinalizedIOTracingAggregationBucket ioTracingAggregationBucket = (FinalizedIOTracingAggregationBucket) workSpecificBuckets.get(WorkEntities.WorkType.io_trace_work);
+        return ioTracingAggregationBucket.buildTraceCtxListProto(traces);
       default:
         throw new IllegalArgumentException(workType.name() + " not supported");
     }

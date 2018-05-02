@@ -8,6 +8,7 @@ public enum MetricName {
 
   AW_State_Transition_Failure("aw.state.transition.failure"),
   AW_CpuSampling_Aggregation_Failure("aw.cpusampling.agg.failure"),
+  AW_IOTracing_Aggregation_Failure("aw.iotracing.agg.failure"),
   AW_Active_Count("aw.active.count"),
   AW_Work_Success("aw.work.success"),
   AW_Work_Failure("aw.work.failure"),
@@ -42,7 +43,7 @@ public enum MetricName {
   Profile_Payload_Corrupt("profile.payload.corrupt"),
   Profile_Payload_Invalid("profile.payload.invalid"),
   Profile_Window_Miss("profile.window.miss"),
-  Profile_Wse_Size("profile.wse.size"),
+  Profile_RecChunk_Size("profile.recchunk.size"),
   Profile_Header_Size("profile.header.size"),
 
   Recorder_Poll_Complete("recorder.poll.complete"),

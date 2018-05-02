@@ -223,14 +223,12 @@ PerfCtx::TracePt PerfCtx::Registry::find_or_bind(const char* name, std::uint8_t 
     assert(new_prime < USER_CREATED_CTX_ID_MASK);
     pt = (static_cast<std::uint64_t>(coverage_pct) << COVERAGE_PCT_SHIFT) | (static_cast<std::uint64_t>(merge_type) << MERGE_SEMANTIC_SHIFT) | new_prime;
     if (name_to_pt.insert(name, pt)) {
-        auto reverse_insert = pt_to_name.insert(pt, name);
-        assert(reverse_insert);
+        assert(pt_to_name.insert(pt, name));
         s_c_ctx.inc();
         return pt;
     }
     unused_prime_nos.enqueue(new_prime);
-    auto found = name_to_pt.find(name, pt);
-    assert(found);
+    assert(name_to_pt.find(name, pt));
     assert_equal(name, coverage_pct, merge_type, pt, s_m_create_conflict);
     s_m_create_rebind.mark();
     return pt;
@@ -396,7 +394,7 @@ JNIEXPORT void JNICALL Java_fk_prof_PerfCtx_end(JNIEnv* env, jobject self, jlong
     }
     try {
         SPDLOG_TRACE(logger, "Ending perf-ctx {} for jniEnv: {}", ctx_id, reinterpret_cast<std::uint64_t>(env));
-        thd_info->ctx_tracker.exit(static_cast<PerfCtx::TracePt>(ctx_id));
+        thd_info->data.ctx_tracker.exit(static_cast<PerfCtx::TracePt>(ctx_id));
     } catch (const PerfCtx::IncorrectEnterExitPairing& e) {
         env->ThrowNew(env->FindClass("fk/prof/IncorrectContextException"), e.what());
     }
@@ -412,7 +410,7 @@ JNIEXPORT void JNICALL Java_fk_prof_PerfCtx_begin(JNIEnv* env, jobject self, jlo
         return;
     }
     SPDLOG_TRACE(logger, "Begining perf-ctx {} for jniEnv: {}", ctx_id, reinterpret_cast<std::uint64_t>(env));
-    thd_info->ctx_tracker.enter(static_cast<PerfCtx::TracePt>(ctx_id));
+    thd_info->data.ctx_tracker.enter(static_cast<PerfCtx::TracePt>(ctx_id));
     thd_info->release();
 }
 

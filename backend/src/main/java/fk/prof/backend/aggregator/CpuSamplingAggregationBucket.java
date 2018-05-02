@@ -1,19 +1,15 @@
 package fk.prof.backend.aggregator;
 
 import com.codahale.metrics.Meter;
-import fk.prof.aggregation.FinalizableBuilder;
-import fk.prof.aggregation.model.MethodIdLookup;
-import fk.prof.aggregation.model.CpuSamplingFrameNode;
-import fk.prof.aggregation.model.CpuSamplingTraceDetail;
-import fk.prof.aggregation.model.FinalizedCpuSamplingAggregationBucket;
+import fk.prof.aggregation.model.*;
 import fk.prof.backend.exception.AggregationFailure;
 import fk.prof.backend.model.profile.RecordedProfileIndexes;
-import recording.Recorder;
+import fk.prof.idl.Recording;
 
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class CpuSamplingAggregationBucket extends FinalizableBuilder<FinalizedCpuSamplingAggregationBucket> {
+public class CpuSamplingAggregationBucket extends WorkSpecificAggregationBucket<FinalizedCpuSamplingAggregationBucket> {
   private final MethodIdLookup methodIdLookup = new MethodIdLookup();
   private final ConcurrentHashMap<String, CpuSamplingTraceDetail> traceDetailLookup = new ConcurrentHashMap<>();
 
@@ -22,10 +18,10 @@ public class CpuSamplingAggregationBucket extends FinalizableBuilder<FinalizedCp
    *
    * @param stackSampleWse
    */
-  public void aggregate(Recorder.StackSampleWse stackSampleWse, RecordedProfileIndexes indexes, Meter mtrAggrFailures)
+  public void aggregate(Recording.StackSampleWse stackSampleWse, RecordedProfileIndexes indexes, Meter mtrAggrFailures)
       throws AggregationFailure {
     try {
-      for (Recorder.StackSample stackSample : stackSampleWse.getStackSampleList()) {
+      for (Recording.StackSample stackSample : stackSampleWse.getStackSampleList()) {
         for (Integer traceId : stackSample.getTraceIdList()) {//TODO: this is not necessarily the best way of doing this from temporal locality PoV (may be we want a de-duped DS), think thru this -jj
           String trace = indexes.getTrace(traceId);
           if (trace == null) {
@@ -35,7 +31,7 @@ public class CpuSamplingAggregationBucket extends FinalizableBuilder<FinalizedCp
               key -> new CpuSamplingTraceDetail()
           );
 
-          List<Recorder.Frame> frames = stackSample.getFrameList();
+          List<Recording.Frame> frames = stackSample.getFrameList();
           if (frames.size() > 0) {
 
             // global sample count increment
@@ -50,7 +46,7 @@ public class CpuSamplingAggregationBucket extends FinalizableBuilder<FinalizedCp
 
             //callee -> caller ordering in frames, so iterating bottom up in the list to merge in existing tree in root->leaf fashion
             for (int i = frames.size() - 1; i >= 0; i--) {
-              Recorder.Frame frame = frames.get(i);
+              Recording.Frame frame = frames.get(i);
               String method = indexes.getMethod(frame.getMethodId());
               if (method == null) {
                 throw new AggregationFailure("Unknown method id encountered in stack sample, aborting aggregation of this profile");

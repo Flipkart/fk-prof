@@ -24,7 +24,6 @@
 #include "blocking_ring_buffer.hh"
 #include "ti_thd.hh"
 
-#define MAX_DATA_SIZE 100
 #define PROCESSOR_ITVL_FACTOR 2
 
 class Controller {
@@ -39,7 +38,7 @@ public:
 
     bool is_running() const;
 
-    friend void controllerRunnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg);
+    friend void controllerRunnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, Controller *controller);
 
 private:
     JavaVM *jvm;
@@ -47,14 +46,14 @@ private:
     ThreadMap& thread_map;
     ConfigurationOptions& cfg;
     std::atomic_bool keep_running;
-    ThdProcP thd_proc;
+    ThdProcP<Controller *> thd_proc;
     Buff buff;
+    BlockingRingBuffer raw_writer_ring;
     std::shared_ptr<ProfileWriter> writer;
     std::shared_ptr<ProfileSerializingWriter> serializer;
     std::shared_ptr<Processor> processor;
     std::function<void()> cancel_work;
-    BlockingRingBuffer raw_writer_ring;
-
+    
     Scheduler scheduler;
     
     std::recursive_mutex current_work_mtx;
@@ -66,7 +65,7 @@ private:
     WRes current_work_result;
     Time::Pt work_start, work_end;
 
-    SerializationFlushThresholds sft;
+    FlushCtr sft;
     TruncationThresholds tts;
 
     std::string vm_id;
@@ -79,6 +78,7 @@ private:
     metrics::Ctr& s_c_associate_rpc_failures;
 
     metrics::Value& s_v_work_cpu_sampling;
+    metrics::Value& s_v_work_io_tracer;
 
     metrics::Ctr& s_c_work_success;
     metrics::Ctr& s_c_work_failure;
@@ -98,15 +98,26 @@ private:
 
     bool capable(const recording::Work& w);
     void prep(const recording::Work& w);
-    void issue(const recording::Work& w, Processes& processes, JNIEnv* env);
+    ProcessPtr issue(const recording::Work& w, JNIEnv* env);
     void retire(const recording::Work& w);
 
     bool capable(const recording::CpuSampleWork& csw);
     void prep(const recording::CpuSampleWork& csw);
-    void issue(const recording::CpuSampleWork& csw, Processes& processes, JNIEnv* env);
+    ProcessPtr issue(const recording::CpuSampleWork& csw, JNIEnv* env);
     void retire(const recording::CpuSampleWork& csw);
-
-    static std::uint32_t sampling_freq_to_itvl(std::uint32_t sampling_freq);
+    
+    bool capable(const recording::IOTraceWork& csw);
+    void prep(const recording::IOTraceWork& csw);
+    ProcessPtr issue(const recording::IOTraceWork& csw, JNIEnv* env);
+    void retire(const recording::IOTraceWork& csw);
+    
+    void reset_flush_ctr() {
+        sft = std::numeric_limits<decltype(sft)>::max();
+    }
+    
+    void update_flush_ctr(FlushCtr ctr) {
+        sft = std::min(sft, ctr);
+    }
 };
 
 #endif

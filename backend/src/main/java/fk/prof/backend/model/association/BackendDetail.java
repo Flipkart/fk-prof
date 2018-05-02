@@ -4,9 +4,10 @@ import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import fk.prof.backend.ConfigManager;
+import fk.prof.idl.Entities;
+import fk.prof.idl.Recorder;
 import fk.prof.metrics.BackendTag;
 import fk.prof.metrics.MetricName;
-import recording.Recorder;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -17,7 +18,7 @@ public class BackendDetail {
 
   private final Recorder.AssignedBackend backend;
   private final long thresholdForDefunctInNanoSeconds;
-  private final Set<Recorder.ProcessGroup> associatedProcessGroups;
+  private final Set<Entities.ProcessGroup> associatedProcessGroups;
 
   private long lastReportedTick = 0;
   //lastReportedTime is null unless backend reports stable load more than once (i.e. currTick reported by backend > 0, since in first load report currTick = 0)
@@ -32,7 +33,7 @@ public class BackendDetail {
     this(backend, loadReportIntervalInSeconds, loadMissTolerance, new HashSet<>());
   }
 
-  public BackendDetail(Recorder.AssignedBackend backend, int loadReportIntervalInSeconds, int loadMissTolerance, Set<Recorder.ProcessGroup> associatedProcessGroups)
+  public BackendDetail(Recorder.AssignedBackend backend, int loadReportIntervalInSeconds, int loadMissTolerance, Set<Entities.ProcessGroup> associatedProcessGroups)
       throws IOException {
     if(backend == null) {
       throw new IllegalArgumentException("Backend cannot be null");
@@ -72,11 +73,11 @@ public class BackendDetail {
     return timeUpdated;
   }
 
-  public void associateProcessGroup(Recorder.ProcessGroup processGroup) {
+  public void associateProcessGroup(Entities.ProcessGroup processGroup) {
     this.associatedProcessGroups.add(processGroup);
   }
 
-  public void deAssociateProcessGroup(Recorder.ProcessGroup processGroup) {
+  public void deAssociateProcessGroup(Entities.ProcessGroup processGroup) {
     this.associatedProcessGroups.remove(processGroup);
   }
 
@@ -93,7 +94,7 @@ public class BackendDetail {
     return this.backend;
   }
 
-  public Set<Recorder.ProcessGroup> getAssociatedProcessGroups() {
+  public Set<Entities.ProcessGroup> getAssociatedProcessGroups() {
     return this.associatedProcessGroups;
   }
 
@@ -118,8 +119,8 @@ public class BackendDetail {
     return result;
   }
 
-  public Recorder.ProcessGroups buildProcessGroupsProto() {
-    return Recorder.ProcessGroups.newBuilder().addAllProcessGroup(associatedProcessGroups).build();
+  public Entities.ProcessGroups buildProcessGroupsProto() {
+    return Entities.ProcessGroups.newBuilder().addAllProcessGroup(associatedProcessGroups).build();
   }
 
 }

@@ -1,0 +1,160 @@
+syntax = "proto2";
+package fk.prof.idl;
+
+import "work_entities.proto";
+
+message RecordingHeader {
+    required uint32 recorder_version = 1;
+    required uint32 controller_version = 2;
+    required uint32 controller_id = 3;
+    required WorkAssignment work_assignment = 4;
+}
+
+/* partial recording containing new events */
+message RecordingChunk {
+    optional IndexedData indexed_data = 1;
+    repeated Wse wse = 2;
+}
+
+/* entry */
+message Wse {
+    required WorkType w_type = 2;
+    optional StackSampleWse cpu_sample_entry = 3;
+    optional IOTraceWse io_trace_entry = 4;
+}
+
+/* indexed data, incrementally sent  */
+message IndexedData {
+    repeated TraceContext trace_ctx = 1;
+    repeated MethodInfo method_info = 2;
+    repeated ThreadInfo thread_info = 3;
+    repeated FDInfo fd_info = 4;
+}
+
+message TraceContext {
+    required uint32 trace_id = 1;
+    required string trace_name = 2;
+    required bool is_generated = 3;
+    optional uint32 coverage_pct = 4;
+    enum MergeSemantics {
+        parent = 0;
+        scoped = 1;
+        scoped_strict = 2;
+        stack = 3;
+        duplicate = 4;
+    }
+    optional MergeSemantics merge = 5;
+}
+
+message MethodInfo {
+    required int64 method_id = 1; //this is int64 for backward compatibility (it should be uint32), as we were earlier passing jMethodId un-translated
+    required string file_name = 2;
+    required string class_fqdn = 3;
+    required string method_name = 4;
+    required string signature = 5;
+    enum CodeClass {
+        cls_java                = 0;
+        cls_native              = 1;
+        // jruby, clojure etc can all go here
+    }
+    optional CodeClass c_cls = 6 [default = cls_java];
+}
+
+message ThreadInfo {
+    required int64 thread_id = 1;
+    required string thread_name = 2;
+    required int32 priority = 3;
+    required bool is_daemon = 4;
+    required int64 tid = 5;
+}
+
+message FDInfo {
+    required uint32 id = 1;
+    required FDType fd_type = 2;
+    optional FileInfo file_info = 3;
+    optional SocketInfo socket_info = 4;
+}
+
+enum FDType {
+    file = 0;
+    filenio = 1;
+    socket = 2;
+    socketnio = 3;
+}
+
+message FileInfo {
+    required string filename = 1;
+    optional string flags = 2;
+}
+
+message SocketInfo {
+    required string address = 1;                  // ip:port
+    required bool connect = 2;                    // to distinguish between accept/connect
+    optional bool blocking = 3 [default = true];
+}
+
+message StackSampleWse {
+    repeated StackSample stack_sample = 1;
+}
+
+message StackSample {
+    required uint32 start_offset_micros = 1;
+    optional int64 thread_id = 2;
+    repeated Frame frame = 3;
+    repeated uint32 trace_id = 4;
+    required bool snipped = 5;
+    enum Error {
+        ticks_no_Java_frame         = 0;
+        ticks_no_class_load         = 1;
+        ticks_GC_active             = 2;
+        ticks_unknown_not_Java      = 3;
+        ticks_not_walkable_not_Java = 4;
+        ticks_unknown_Java          = 5;
+        ticks_not_walkable_Java     = 6;
+        ticks_unknown_state         = 7;
+        ticks_thread_exit           = 8;
+        ticks_deopt                 = 9;
+        ticks_safepoint             = 10;
+        fkp_no_error                = 100;
+        fkp_no_jni_env              = 101;
+        fkp_getstacktrace_error     = 102;
+    } // TODO: write me a test (to bijectively match BacktraceError)
+    optional Error error = 6;
+}
+
+message Frame {
+    required int64 method_id = 1;
+    required int32 bci = 2;
+    required int32 line_no = 3;
+}
+
+message IOTraceWse {
+    repeated IOTrace traces = 1;
+}
+
+message IOTrace {
+    required IOTraceType type = 1;
+    required uint32 fd_id = 2;
+    required uint64 ts = 3;
+    required uint64 latency_ns = 4;
+    optional FdRead read = 5;
+    optional FdWrite write = 6;
+    optional StackSample stack = 7;
+}
+
+enum IOTraceType {
+    socket_read = 0;
+    socket_write = 1;
+    file_read = 2;
+    file_write = 3;
+    select = 4;
+}
+
+message FdRead {
+    required uint32 count = 1;
+    optional bool timeout = 2 [default = false];
+}
+
+message FdWrite {
+    required uint32 count = 1;
+}

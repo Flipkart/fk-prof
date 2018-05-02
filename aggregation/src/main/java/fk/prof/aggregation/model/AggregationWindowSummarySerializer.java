@@ -1,14 +1,14 @@
 package fk.prof.aggregation.model;
 
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.serialize.Serializer;
+import fk.prof.idl.Profile;
+import fk.prof.idl.WorkEntities;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.zip.Adler32;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.Checksum;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * @author gaurav.ashok
@@ -35,13 +35,13 @@ public class AggregationWindowSummarySerializer implements Serializer {
         Serializer.writeCheckedDelimited(aggregation.buildHeaderProto(VERSION), cout);
 
         // all traces
-        AggregatedProfileModel.TraceCtxNames traceNames = aggregation.buildTraceCtxNamesProto();
+        Profile.TraceCtxNames traceNames = aggregation.buildTraceCtxNamesProto();
 
         Serializer.writeCheckedDelimited(traceNames, cout);
 
         // all profile work summary
         checksum.reset();
-        for(AggregatedProfileModel.ProfileWorkInfo workInfo: aggregation.buildProfileWorkInfoProto(traceNames)) {
+        for(Profile.ProfileWorkInfo workInfo: aggregation.buildProfileWorkInfoProto(traceNames)) {
             if(workInfo != null) {
                 workInfo.writeDelimitedTo(cout);
             }
@@ -51,7 +51,8 @@ public class AggregationWindowSummarySerializer implements Serializer {
         Serializer.writeVariantInt32((int)checksum.getValue(), cout);
 
         // work specific trace summary
-        // cpu_sample_work
-        Serializer.writeCheckedDelimited(aggregation.cpuSamplingAggregationBucket.buildTraceCtxListProto(traceNames), cout);
+        for(WorkEntities.WorkType workType: aggregation.getWorkTypes()) {
+            Serializer.writeCheckedDelimited(aggregation.buildTraceCtxDetailListProto(workType, traceNames), cout);
+        }
     }
 }

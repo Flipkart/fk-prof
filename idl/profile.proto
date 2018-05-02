@@ -1,0 +1,123 @@
+syntax = "proto2";
+package fk.prof.idl;
+
+import "work_entities.proto";
+import "recording.proto";
+
+message TraceCtxNames {
+    repeated string name = 1;
+}
+
+// Additional properties computed for the context
+message TraceCtxDetail {
+    required uint32 traceIdx = 1;
+    optional uint32 sampleCount = 2;
+}
+
+// List of all trace contexts.
+message TraceCtxDetailList {
+    repeated TraceCtxDetail traceCtx = 1;
+}
+
+message RecordingPolicy {
+    required uint32 duration = 1;
+    required uint32 coverage_pct = 2;
+    repeated Work work = 3;
+    required string description = 4;
+    optional uint32 min_healthy = 5;
+}
+
+message RecorderDetails {
+    optional string ip = 1;
+    optional string hostname = 2;
+    optional string appId = 3;
+    optional string instanceGroup = 4;
+    optional string cluster = 5;
+    optional string instanceId = 6;
+    optional string processName = 7;
+    optional string vmId = 8;
+    optional string zone = 9;
+    optional string instanceType = 10;
+}
+
+// Status at the end of the aggregation window.
+enum AggregationStatus {
+    Completed = 0;
+    Retried = 1;		// may have duplicated samples because of retries
+    Aborted = 2; 		// may not have all samples because recorder sent them too late.
+    Scheduled = 3;   	// no samples
+    Corrupt = 4;     	// in case of corrupt data received
+    Incomplete = 5;		// in case of end marker not received or connection error
+}
+
+message ProfileWorkInfo {
+    optional uint32 startOffset = 1;				// offset in seconds from the current header.aggregationStartTime
+    optional uint32 duration = 2;
+    optional uint32 recorderVersion = 3;
+    optional RecorderDetails recorderDetails = 7;
+    repeated SampleCount sampleCount = 4;
+    required AggregationStatus status = 5;
+    repeated TraceCtxToCoveragePctMap traceCoverageMap = 6;
+
+    message TraceCtxToCoveragePctMap {
+        required uint32 traceCtxIdx = 1;
+        required float coveragePct = 2;
+    }
+
+    message SampleCount {
+        optional WorkType workType = 1;
+        required uint32 sampleCount = 2;
+    }
+}
+
+message MethodLookUp {
+    repeated string fqdn = 1;
+}
+
+message FDLookup {
+    repeated FDInfo fd_info = 1;
+}
+
+// Represents the node of the stackTrace tree. Each node has methodId, line no.
+// childCount and the associated data.
+message FrameNode {
+    required uint32 methodId = 1;
+    required uint32 childCount = 2;
+    optional uint32 lineNo = 3;
+    optional CPUSamplingNodeProps cpuSamplingProps = 4;
+    repeated IOTracingNodeProps ioTracingProps = 5;
+}
+
+// StacktraceTree is traversed in dfs manner and serialized to a set of FrameNodeList
+message FrameNodeList {
+    required uint32 traceCtxIdx = 1;
+    repeated FrameNode frameNodes = 2;
+}
+
+message CPUSamplingNodeProps {
+    optional uint32 onCpuSamples = 1;
+    optional uint32 onStackSamples = 2;
+}
+
+message IOTracingNodeProps {
+    optional uint32 fdIdx = 1;
+    optional IOTraceType traceType = 2;
+    optional uint32 samples = 3;
+    optional float latency99 = 4;
+    optional float latency95 = 5;
+    optional float mean = 6;
+    optional uint64 bytes = 7;
+    optional bool dropped = 8;
+}
+
+message Header {
+    required uint32 formatVersion = 1;
+    optional string appId = 2;
+    optional string clusterId = 3;
+    optional string procId = 4;
+    optional string aggregationStartTime = 5;				// iso8601 string
+    optional string aggregationEndTime = 6;					// iso8601 string
+    optional WorkType workType = 7;
+    optional uint32 windowDuration = 8;
+    optional RecordingPolicy policy = 9;
+}

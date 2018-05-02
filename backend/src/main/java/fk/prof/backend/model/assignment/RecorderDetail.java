@@ -5,26 +5,29 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import com.google.common.base.Preconditions;
 import fk.prof.backend.ConfigManager;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.WorkEntities;
 import fk.prof.metrics.MetricName;
-import fk.prof.metrics.RecorderTag;
-import recording.Recorder;
+
+import java.util.Set;
 
 public class RecorderDetail {
-  private static final double NANOSECONDS_IN_SECOND = Math.pow(10, 9);
+  private static final long NANOSECONDS_IN_SECOND = 1_000_000_000;
 
   private final RecorderIdentifier recorderIdentifier;
   private final long thresholdForDefunctRecorderInNanos;
 
   private long lastReportedTick = 0;
   private Long lastReportedTime = null;
-  private Recorder.WorkResponse currentWorkResponse;
+  private WorkEntities.WorkResponse currentWorkResponse;
+  private Recorder.RecorderCapabilities lastReportedCapability = null;
 
   private final MetricRegistry metricRegistry = SharedMetricRegistries.getOrCreate(ConfigManager.METRIC_REGISTRY);
   private final Meter mtrPollReset, mtrPollStale, mtrPollComplete;
 
   public RecorderDetail(RecorderIdentifier recorderIdentifier, int thresholdForDefunctRecorderInSecs) {
     this.recorderIdentifier = Preconditions.checkNotNull(recorderIdentifier);
-    this.thresholdForDefunctRecorderInNanos = (long)(thresholdForDefunctRecorderInSecs * NANOSECONDS_IN_SECOND);
+    this.thresholdForDefunctRecorderInNanos = (thresholdForDefunctRecorderInSecs * NANOSECONDS_IN_SECOND);
 
     String recorderStr = recorderIdentifier.metricTag().toString();
     this.mtrPollComplete = metricRegistry.meter(MetricRegistry.name(MetricName.Recorder_Poll_Complete.get(), recorderStr));
@@ -46,6 +49,7 @@ public class RecorderDetail {
         mtrPollReset.mark();
       }
       this.currentWorkResponse = pollReq.getWorkLastIssued();
+      this.lastReportedCapability = pollReq.getRecorderInfo().getCapabilities();
       mtrPollComplete.mark();
     } else {
       mtrPollStale.mark();
@@ -58,9 +62,32 @@ public class RecorderDetail {
         ((System.nanoTime() - lastReportedTime) > thresholdForDefunctRecorderInNanos);
   }
 
+  public boolean canSupportWork(Set<WorkEntities.WorkType> workTypes) {
+    if(lastReportedCapability == null) {
+      return false;
+    }
+
+    boolean canSupport = true;
+    for(WorkEntities.WorkType workType: workTypes) {
+      switch(workType) {
+        case cpu_sample_work:
+          canSupport = canSupport
+              && lastReportedCapability.hasCanCpuSample() && lastReportedCapability.getCanCpuSample();
+          break;
+        case io_trace_work:
+          canSupport = canSupport
+              && lastReportedCapability.hasCanTraceIo() && lastReportedCapability.getCanTraceIo();
+          break;
+        default:
+          canSupport = false;
+      }
+    }
+    return canSupport;
+  }
+
   public boolean canAcceptWork() {
     return !isDefunct() &&
-        (currentWorkResponse.getWorkId() == 0 || Recorder.WorkResponse.WorkState.complete.equals(currentWorkResponse.getWorkState()));
+        (currentWorkResponse.getWorkId() == 0 || WorkEntities.WorkResponse.WorkState.complete.equals(currentWorkResponse.getWorkState()));
   }
 
   @Override

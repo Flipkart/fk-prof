@@ -298,6 +298,10 @@ public class Configuration {
         private Boolean reportLoad;
 
         @NotNull
+        @JsonProperty("leader.aggregation")
+        private Boolean aggregateWhenLeader = false;
+
+        @NotNull
         @Valid
         @JsonProperty("parser")
         private ParserConfig parserConfig;
@@ -308,6 +312,10 @@ public class Configuration {
 
         public Boolean getReportLoad() {
             return reportLoad;
+        }
+
+        public boolean shouldAggregateWhenLeader() {
+            return aggregateWhenLeader;
         }
 
         public ParserConfig getParserConfig() {
@@ -335,10 +343,6 @@ public class Configuration {
 
     public static class LeaderElectionVerticleConfig {
         @NotNull
-        @JsonProperty("aggregation.enabled")
-        private Boolean aggregationEnabled;
-
-        @NotNull
         @JsonProperty("leader.watching.path")
         private String leaderWatchPath;
 
@@ -349,10 +353,6 @@ public class Configuration {
         @NotNull
         @JsonProperty("kill.behavior")
         private KillBehavior killBehaviour;
-
-        public Boolean getAggregationEnabled() {
-            return aggregationEnabled;
-        }
 
         public String getLeaderWatchPath() {
             return leaderWatchPath;

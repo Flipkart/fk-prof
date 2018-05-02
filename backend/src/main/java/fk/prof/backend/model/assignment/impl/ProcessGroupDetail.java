@@ -2,9 +2,11 @@ package fk.prof.backend.model.assignment.impl;
 
 import com.google.common.base.Preconditions;
 import fk.prof.backend.model.assignment.*;
+import fk.prof.idl.Entities;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.WorkEntities;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import recording.Recorder;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,18 +15,18 @@ import java.util.stream.Collectors;
 public class ProcessGroupDetail implements ProcessGroupContextForScheduling, ProcessGroupContextForPolling {
   private static final Logger logger = LoggerFactory.getLogger(ProcessGroupDetail.class);
 
-  private final Recorder.ProcessGroup processGroup;
+  private final Entities.ProcessGroup processGroup;
   private final int thresholdForDefunctRecorderInSecs;
   private final Map<RecorderIdentifier, RecorderDetail> recorderLookup = new ConcurrentHashMap<>();
   private volatile WorkAssignmentSchedule workAssignmentSchedule = null;
 
-  public ProcessGroupDetail(Recorder.ProcessGroup processGroup, int thresholdForDefunctRecorderInSecs) {
+  public ProcessGroupDetail(Entities.ProcessGroup processGroup, int thresholdForDefunctRecorderInSecs) {
     this.processGroup = Preconditions.checkNotNull(processGroup);
     this.thresholdForDefunctRecorderInSecs = thresholdForDefunctRecorderInSecs;
   }
 
   @Override
-  public Recorder.ProcessGroup getProcessGroup() {
+  public Entities.ProcessGroup getProcessGroup() {
     return processGroup;
   }
 
@@ -40,7 +42,7 @@ public class ProcessGroupDetail implements ProcessGroupContextForScheduling, Pro
    * @return
    */
   @Override
-  public Recorder.WorkAssignment getWorkAssignment(Recorder.PollReq pollReq) {
+  public WorkEntities.WorkAssignment getWorkAssignment(Recorder.PollReq pollReq) {
     RecorderIdentifier recorderIdentifier = RecorderIdentifier.from(pollReq.getRecorderInfo());
     //TODO: clean-up job to remove recorders from lookup which have been defunct for a long long time
     //The above is only a problem if the same backend stays associated with recorder for a long time, otherwise ProcessGroupDetail will be GC-eligible on de-association
@@ -51,7 +53,8 @@ public class ProcessGroupDetail implements ProcessGroupContextForScheduling, Pro
     boolean canAcceptWork = recorderDetail.canAcceptWork();
     if (pollReceived
         && workAssignmentSchedule != null
-        && canAcceptWork) {
+        && canAcceptWork
+        && recorderDetail.canSupportWork(workAssignmentSchedule.getAssociatedWorkTypes())) {
 
       try {
         return workAssignmentSchedule.getNextWorkAssignment(recorderIdentifier);
@@ -78,9 +81,9 @@ public class ProcessGroupDetail implements ProcessGroupContextForScheduling, Pro
 
   //Called by backend daemon thread
   @Override
-  public int getHealthyRecordersCount() {
+  public int getHealthyRecordersCount(Set<WorkEntities.WorkType> workTypes) {
     final List<RecorderDetail> availableRecorders = this.recorderLookup.values().stream()
-        .filter(recorderDetail -> !recorderDetail.isDefunct())
+        .filter(recorderDetail -> !recorderDetail.isDefunct() && recorderDetail.canSupportWork(workTypes))
         .collect(Collectors.toList());
     return availableRecorders.size();
   }

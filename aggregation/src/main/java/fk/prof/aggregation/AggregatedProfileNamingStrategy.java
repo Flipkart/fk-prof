@@ -2,7 +2,8 @@ package fk.prof.aggregation;
 
 import com.amazonaws.util.StringUtils;
 import com.google.common.io.BaseEncoding;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
+import fk.prof.idl.Profile;
+import fk.prof.idl.WorkEntities;
 import fk.prof.storage.FileNamingStrategy;
 
 import java.nio.charset.Charset;
@@ -25,13 +26,13 @@ public class AggregatedProfileNamingStrategy implements FileNamingStrategy {
     public final String procId;
     public final ZonedDateTime startTime;
     public final int duration;
-    public final AggregatedProfileModel.WorkType workType;
+    public final WorkEntities.WorkType workType;
 
     public final boolean isSummaryFile;
 
     private final String fileNamePrefix;
 
-    public AggregatedProfileNamingStrategy(String baseDir, int version, String appId, String clusterId, String procId, ZonedDateTime startTime, int duration, AggregatedProfileModel.WorkType workType) {
+    public AggregatedProfileNamingStrategy(String baseDir, int version, String appId, String clusterId, String procId, ZonedDateTime startTime, int duration, WorkEntities.WorkType workType) {
         this.baseDir = baseDir;
         this.version = version;
         this.appId = appId;
@@ -61,7 +62,7 @@ public class AggregatedProfileNamingStrategy implements FileNamingStrategy {
                 encode32(procId), startTime, duration, "summary");
     }
 
-    public static AggregatedProfileNamingStrategy fromHeader(String baseDir, AggregatedProfileModel.Header header) {
+    public static AggregatedProfileNamingStrategy fromHeader(String baseDir, Profile.Header header) {
         if(header.hasWorkType()) {
             return new AggregatedProfileNamingStrategy(baseDir, header.getFormatVersion(), header.getAppId(), header.getClusterId(), header.getProcId(),
                     ZonedDateTime.parse(header.getAggregationStartTime(), DateTimeFormatter.ISO_ZONED_DATE_TIME),
@@ -92,7 +93,7 @@ public class AggregatedProfileNamingStrategy implements FileNamingStrategy {
 
         return new AggregatedProfileNamingStrategy(tokens[0], Integer.parseInt(tokens[1].substring(1)), decode32(tokens[2]), decode32(tokens[3]), decode32(tokens[4]),
                 ZonedDateTime.parse(tokens[5], DateTimeFormatter.ISO_ZONED_DATE_TIME), Integer.parseInt(tokens[6]),
-                AggregatedProfileModel.WorkType.valueOf(tokens[7]));
+                WorkEntities.WorkType.valueOf(tokens[7]));
     }
 
     private static String encode32(String str) {
@@ -103,7 +104,7 @@ public class AggregatedProfileNamingStrategy implements FileNamingStrategy {
         return new String(BaseEncoding.base32().decode(str), Charset.forName("utf-8"));
     }
 
-    private static int getDurationFromHeader(AggregatedProfileModel.Header header) {
+    private static int getDurationFromHeader(Profile.Header header) {
         ZonedDateTime startDateTime = ZonedDateTime.parse(header.getAggregationStartTime(), DateTimeFormatter.ISO_ZONED_DATE_TIME);
         ZonedDateTime endDateTime = ZonedDateTime.parse(header.getAggregationEndTime(), DateTimeFormatter.ISO_ZONED_DATE_TIME);
         return (int)startDateTime.until(endDateTime, ChronoUnit.SECONDS);

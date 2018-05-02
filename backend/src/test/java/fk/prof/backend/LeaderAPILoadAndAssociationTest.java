@@ -7,8 +7,10 @@ import fk.prof.backend.model.association.BackendAssociationStore;
 import fk.prof.backend.model.association.ProcessGroupCountBasedBackendComparator;
 import fk.prof.backend.model.association.impl.ZookeeperBasedBackendAssociationStore;
 import fk.prof.backend.model.policy.PolicyStore;
-import fk.prof.backend.proto.BackendDTO;
 import fk.prof.backend.util.ProtoUtil;
+import fk.prof.idl.Backend;
+import fk.prof.idl.Entities;
+import fk.prof.idl.Recorder;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -25,7 +27,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import recording.Recorder;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -46,15 +47,15 @@ public class LeaderAPILoadAndAssociationTest {
 
   private TestingServer testingServer;
   private CuratorFramework curatorClient;
-  private List<Recorder.ProcessGroup> mockProcessGroups;
+  private List<Entities.ProcessGroup> mockProcessGroups;
 
 
   @Before
   public void setBefore(TestContext context) throws Exception {
     mockProcessGroups = Arrays.asList(
-      Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build(),
-      Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p2").build(),
-      Recorder.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p3").build()
+      Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p1").build(),
+      Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p2").build(),
+      Entities.ProcessGroup.newBuilder().setAppId("a").setCluster("c").setProcName("p3").build()
     );
     ConfigManager.setDefaultSystemProperties();
 
@@ -98,7 +99,7 @@ public class LeaderAPILoadAndAssociationTest {
 
   @Test(timeout = 5000)
   public void reportNewBackendLoad(TestContext context) throws IOException {
-    makeRequestReportLoad(BackendDTO.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f).setCurrTick(1).build())
+    makeRequestReportLoad(Backend.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f).setCurrTick(1).build())
         .setHandler(ar -> {
           if(ar.succeeded()) {
             context.assertEquals(0, ar.result().getProcessGroupList().size());
@@ -123,8 +124,8 @@ public class LeaderAPILoadAndAssociationTest {
   @Test(timeout = 5000)
   public void getAssociationForProcessGroups(TestContext context) throws IOException {
     final Async async = context.async();
-    BackendDTO.LoadReportRequest.Builder loadRequestBuilder1 = BackendDTO.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f);
-    BackendDTO.LoadReportRequest.Builder loadRequestBuilder2 = BackendDTO.LoadReportRequest.newBuilder().setIp("2").setPort(1).setLoad(0.5f);
+    Backend.LoadReportRequest.Builder loadRequestBuilder1 = Backend.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f);
+    Backend.LoadReportRequest.Builder loadRequestBuilder2 = Backend.LoadReportRequest.newBuilder().setIp("2").setPort(1).setLoad(0.5f);
 
     makeRequestReportLoad(loadRequestBuilder1.clone().setCurrTick(1).build())
         .setHandler(ar1 -> {
@@ -209,10 +210,10 @@ public class LeaderAPILoadAndAssociationTest {
   @Test(timeout = 5000)
   public void getAllAssociations(TestContext context) throws IOException {
     final Async async = context.async();
-    BackendDTO.LoadReportRequest loadRequest1 = BackendDTO.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f).setCurrTick(2).build();
-    BackendDTO.LoadReportRequest loadRequest2 = BackendDTO.LoadReportRequest.newBuilder().setIp("2").setPort(2).setLoad(0.5f).setCurrTick(2).build();
-    Future<Recorder.ProcessGroups> r1 = makeRequestReportLoad(loadRequest1);
-    Future<Recorder.ProcessGroups> r2 = makeRequestReportLoad(loadRequest2);
+    Backend.LoadReportRequest loadRequest1 = Backend.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f).setCurrTick(2).build();
+    Backend.LoadReportRequest loadRequest2 = Backend.LoadReportRequest.newBuilder().setIp("2").setPort(2).setLoad(0.5f).setCurrTick(2).build();
+    Future<Entities.ProcessGroups> r1 = makeRequestReportLoad(loadRequest1);
+    Future<Entities.ProcessGroups> r2 = makeRequestReportLoad(loadRequest2);
     CompositeFuture.all(r1, r2).setHandler(ar -> {
       if(ar.failed()) {
         context.fail(ar.cause());
@@ -226,20 +227,20 @@ public class LeaderAPILoadAndAssociationTest {
             context.fail(ar1.cause());
           }
           try {
-            Future<Recorder.BackendAssociations> r6 = makeRequestGetAssociations();
+            Future<Backend.BackendAssociations> r6 = makeRequestGetAssociations();
             r6.setHandler(ar2 -> {
               if(ar2.failed()) {
                 context.fail(ar2.cause());
               }
-              Recorder.BackendAssociations associations = ar2.result();
-              Set<Recorder.ProcessGroup> expectedPGs = new HashSet<>(Arrays.asList(mockProcessGroups.get(0), mockProcessGroups.get(1), mockProcessGroups.get(2)));
-              Set<Recorder.ProcessGroup> actualPGs = new HashSet<>();
+              Backend.BackendAssociations associations = ar2.result();
+              Set<Entities.ProcessGroup> expectedPGs = new HashSet<>(Arrays.asList(mockProcessGroups.get(0), mockProcessGroups.get(1), mockProcessGroups.get(2)));
+              Set<Entities.ProcessGroup> actualPGs = new HashSet<>();
               int actualPGCount = 0;
               Set<String> expectedIPs = new HashSet<>(Arrays.asList("1", "2"));
               Set<String> actualIPs = new HashSet<>();
-              for (Recorder.BackendAssociation backendAssociation: associations.getAssociationsList()) {
+              for (Backend.BackendAssociation backendAssociation: associations.getAssociationsList()) {
                 actualIPs.add(backendAssociation.getBackend().getHost());
-                for (Recorder.ProcessGroup processGroup: backendAssociation.getProcessGroupsList()) {
+                for (Entities.ProcessGroup processGroup: backendAssociation.getProcessGroupsList()) {
                   actualPGCount++;
                   actualPGs.add(processGroup);
                 }
@@ -262,10 +263,10 @@ public class LeaderAPILoadAndAssociationTest {
   @Test(timeout = 5000)
   public void associateAndDeassociateBackend(TestContext context) throws IOException {
     final Async async = context.async();
-    BackendDTO.LoadReportRequest loadRequest1 = BackendDTO.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f).setCurrTick(2).build();
-    BackendDTO.LoadReportRequest loadRequest2 = BackendDTO.LoadReportRequest.newBuilder().setIp("2").setPort(2).setLoad(0.5f).setCurrTick(2).build();
-    Future<Recorder.ProcessGroups> r1 = makeRequestReportLoad(loadRequest1);
-    Future<Recorder.ProcessGroups> r2 = makeRequestReportLoad(loadRequest2);
+    Backend.LoadReportRequest loadRequest1 = Backend.LoadReportRequest.newBuilder().setIp("1").setPort(1).setLoad(0.5f).setCurrTick(2).build();
+    Backend.LoadReportRequest loadRequest2 = Backend.LoadReportRequest.newBuilder().setIp("2").setPort(2).setLoad(0.5f).setCurrTick(2).build();
+    Future<Entities.ProcessGroups> r1 = makeRequestReportLoad(loadRequest1);
+    Future<Entities.ProcessGroups> r2 = makeRequestReportLoad(loadRequest2);
     CompositeFuture.all(r1, r2).setHandler(ar -> {
       if(ar.failed()) {
         context.fail(ar.cause());
@@ -295,16 +296,16 @@ public class LeaderAPILoadAndAssociationTest {
     });
   }
 
-  private Future<Recorder.ProcessGroups> makeRequestReportLoad(BackendDTO.LoadReportRequest payload)
+  private Future<Entities.ProcessGroups> makeRequestReportLoad(Backend.LoadReportRequest payload)
       throws IOException {
-    Future<Recorder.ProcessGroups> future = Future.future();
+    Future<Entities.ProcessGroups> future = Future.future();
     HttpClientRequest request = vertx.createHttpClient()
         .post(port, "localhost", "/leader/load")
         .handler(response -> {
           response.bodyHandler(buffer -> {
             try {
               if(response.statusCode() == 200) {
-                Recorder.ProcessGroups result = Recorder.ProcessGroups.parseFrom(buffer.getBytes());
+                Entities.ProcessGroups result = Entities.ProcessGroups.parseFrom(buffer.getBytes());
                 future.complete(result);
               } else {
                 future.fail(buffer.toString());
@@ -339,7 +340,7 @@ public class LeaderAPILoadAndAssociationTest {
     return future;
   }
 
-  private Future<Recorder.AssignedBackend> makeRequestDeleteAssociation(Recorder.ProcessGroup processGroup)
+  private Future<Recorder.AssignedBackend> makeRequestDeleteAssociation(Entities.ProcessGroup processGroup)
       throws IOException {
     Future<Recorder.AssignedBackend> future = Future.future();
     HttpClientRequest request = vertx.createHttpClient()
@@ -360,16 +361,16 @@ public class LeaderAPILoadAndAssociationTest {
   }
 
 
-  private Future<Recorder.BackendAssociations> makeRequestGetAssociations()
+  private Future<Backend.BackendAssociations> makeRequestGetAssociations()
       throws IOException {
-    Future<Recorder.BackendAssociations> future = Future.future();
+    Future<Backend.BackendAssociations> future = Future.future();
     HttpClientRequest request = vertx.createHttpClient()
         .get(port, "localhost", "/leader/associations")
         .handler(response -> {
           response.bodyHandler(buffer -> {
             try {
               if(response.statusCode() == 200) {
-                Recorder.BackendAssociations result = Recorder.BackendAssociations.parseFrom(buffer.getBytes());
+                Backend.BackendAssociations result = Backend.BackendAssociations.parseFrom(buffer.getBytes());
                 future.complete(result);
               } else {
                 future.fail(buffer.toString());
@@ -385,7 +386,7 @@ public class LeaderAPILoadAndAssociationTest {
     return future;
   }
 
-  private static Recorder.RecorderInfo buildRecorderInfoFromProcessGroup(Recorder.ProcessGroup processGroup) {
+  private static Recorder.RecorderInfo buildRecorderInfoFromProcessGroup(Entities.ProcessGroup processGroup) {
     return Recorder.RecorderInfo.newBuilder()
         .setAppId(processGroup.getAppId())
         .setCluster(processGroup.getCluster())
@@ -401,7 +402,7 @@ public class LeaderAPILoadAndAssociationTest {
         .setVmId("1")
         .setZone("1")
         .setIp("1")
-        .setCapabilities(Recorder.RecorderCapabilities.newBuilder().setCanCpuSample(true))
+        .setCapabilities(Recorder.RecorderCapabilities.newBuilder().setCanCpuSample(true).setCanTraceIo(true))
         .build();
   }
 }

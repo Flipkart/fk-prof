@@ -7,6 +7,8 @@ import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.HandlerList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.servlet.DispatcherType;
 import javax.servlet.ServletException;
@@ -25,7 +27,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 import java.util.function.Function;
-
 /**
  * @understands running a mock backend-server to support integration-testing recorder
  */
@@ -106,12 +107,15 @@ public class TestBackendServer {
     }
 
     class StubCallingHandler extends AbstractHandler {
+        private Logger logger = LoggerFactory.getLogger(StubCallingHandler.class);
         @Override
         public void handle(String path, Request request, HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) throws IOException, ServletException {
             if (request.getDispatcherType().equals(DispatcherType.ERROR)) {
+                logger.debug("Request Handler - Error: " + path);
                 request.setHandled(true);
                 return;
             }
+            logger.debug("Request Handler - Normal: " + path);
             Queue<HandlerStub> handlerStubs = actions.get(path);
             HandlerStub stub = handlerStubs.poll();
             ServletOutputStream os = httpServletResponse.getOutputStream();

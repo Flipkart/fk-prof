@@ -1,7 +1,7 @@
 package fk.prof.backend.util;
 
 import com.google.common.io.BaseEncoding;
-import recording.Recorder;
+import fk.prof.idl.Entities;
 
 import java.nio.charset.Charset;
 
@@ -26,7 +26,7 @@ public class PathNamingUtil {
 
     }
 
-    public static String getPolicyNodePath(Recorder.ProcessGroup processGroup, String policyRootPath, String policyVersion) {
+    public static String getPolicyNodePath(Entities.ProcessGroup processGroup, String policyRootPath, String policyVersion) {
         return policyRootPath + DELIMITER + policyVersion +
                 DELIMITER + encode32(processGroup.getAppId()) +
                 DELIMITER + encode32(processGroup.getCluster()) +

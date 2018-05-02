@@ -2,8 +2,8 @@ package fk.prof.aggregation.model;
 
 import com.codahale.metrics.*;
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
 import fk.prof.aggregation.serialize.Serializer;
+import fk.prof.idl.WorkEntities;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
 import fk.prof.storage.AsyncStorage;
@@ -40,17 +40,14 @@ public class AggregationWindowStorage {
     }
 
     public void store(FinalizedAggregationWindow aggregationWindow) throws IOException {
-
-        // right now only cpu_sample data is available. In future data related to other pivots like thread, contentions will be collected and serialized here.
-
-        // cpu_sample
-        store(aggregationWindow, AggregatedProfileModel.WorkType.cpu_sample_work);
-
+        for(WorkEntities.WorkType workType: aggregationWindow.getWorkTypes()) {
+            store(aggregationWindow, workType);
+        }
         // summary file
         storeSummary(aggregationWindow);
     }
 
-    private void store(FinalizedAggregationWindow aggregationWindow, AggregatedProfileModel.WorkType workType) throws IOException {
+    private void store(FinalizedAggregationWindow aggregationWindow, WorkEntities.WorkType workType) throws IOException {
         Timer tmr = metricRegistry.timer(MetricRegistry.name(MetricName.AW_Store_Profile_Complete.get(), aggregationWindow.getProcessGroupTag().toString()));
         try (Timer.Context context = tmr.time()) {
             AggregatedProfileNamingStrategy filename = getFilename(aggregationWindow, workType);
@@ -119,7 +116,7 @@ public class AggregationWindowStorage {
         }
     }
 
-    private AggregatedProfileNamingStrategy getFilename(FinalizedAggregationWindow aw, AggregatedProfileModel.WorkType workType) {
+    private AggregatedProfileNamingStrategy getFilename(FinalizedAggregationWindow aw, WorkEntities.WorkType workType) {
         ZonedDateTime start = aw.start.atOffset(ZoneOffset.UTC).toZonedDateTime();
         return new AggregatedProfileNamingStrategy(baseDir, AggregationWindowSerializer.VERSION, aw.appId, aw.clusterId, aw.procId, start, aw.durationInSecs, workType);
     }

@@ -6,14 +6,18 @@ import com.codahale.metrics.SharedMetricRegistries;
 import fk.prof.aggregation.FinalizableBuilder;
 import fk.prof.aggregation.model.FinalizedAggregationWindow;
 import fk.prof.aggregation.model.FinalizedProfileWorkInfo;
+import fk.prof.aggregation.model.FinalizedWorkSpecificAggregationBucket;
 import fk.prof.aggregation.state.AggregationState;
 import fk.prof.backend.ConfigManager;
 import fk.prof.backend.exception.AggregationFailure;
 import fk.prof.backend.model.aggregation.ActiveAggregationWindows;
 import fk.prof.backend.model.profile.RecordedProfileIndexes;
+import fk.prof.idl.Profile;
+import fk.prof.idl.Recorder;
+import fk.prof.idl.Recording;
+import fk.prof.idl.WorkEntities;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
-import recording.Recorder;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -26,32 +30,48 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
   private final String procId;
   private LocalDateTime start = null, endedAt = null;
   private final int durationInSecs;
+  private final Profile.RecordingPolicy policy;
 
   private final Map<Long, ProfileWorkInfo> workInfoLookup;
-  private final CpuSamplingAggregationBucket cpuSamplingAggregationBucket = new CpuSamplingAggregationBucket();
+  private final Map<WorkEntities.WorkType, WorkSpecificAggregationBucket> workSpecificBuckets = new HashMap<>();
 
   private final ProcessGroupTag processGroupTag;
   private MetricRegistry metricRegistry = SharedMetricRegistries.getOrCreate(ConfigManager.METRIC_REGISTRY);
-  private final Meter mtrStateTransitionFailures, mtrCSAggrFailures;
+  private final Meter mtrStateTransitionFailures, mtrCSAggrFailures, mtrIOAggrFailures;
 
   public AggregationWindow(String appId, String clusterId, String procId,
-                           LocalDateTime start, int durationInSecs, long[] workIds, int workDurationInSec) {
+                           LocalDateTime start, int durationInSecs, long[] workIds, Profile.RecordingPolicy policy) {
     this.appId = appId;
     this.clusterId = clusterId;
     this.procId = procId;
     this.start = start;
     this.durationInSecs = durationInSecs;
+    this.policy = policy;
 
     Map<Long, ProfileWorkInfo> workInfoModifiableLookup = new HashMap<>();
     for (int i = 0; i < workIds.length; i++) {
-      workInfoModifiableLookup.put(workIds[i], new ProfileWorkInfo(workDurationInSec));
+      workInfoModifiableLookup.put(workIds[i], new ProfileWorkInfo(policy.getDuration()));
     }
     this.workInfoLookup = Collections.unmodifiableMap(workInfoModifiableLookup);
+
+    for(WorkEntities.Work work: policy.getWorkList()) {
+      switch (work.getWType()) {
+        case cpu_sample_work:
+          workSpecificBuckets.put(WorkEntities.WorkType.cpu_sample_work, new CpuSamplingAggregationBucket());
+          break;
+        case io_trace_work:
+          workSpecificBuckets.put(WorkEntities.WorkType.io_trace_work, new IOTracingAggregationBucket());
+          break;
+        default:
+          throw new AggregationFailure(String.format("Aggregation not supported for work type=%s", work.getWType()));
+      }
+    }
 
     this.processGroupTag = new ProcessGroupTag(appId, clusterId, procId);
     String processGroupTagStr = this.processGroupTag.toString();
     this.mtrStateTransitionFailures = metricRegistry.meter(MetricRegistry.name(MetricName.AW_State_Transition_Failure.get(), processGroupTagStr));
     this.mtrCSAggrFailures = metricRegistry.meter(MetricRegistry.name(MetricName.AW_CpuSampling_Aggregation_Failure.get(), processGroupTagStr));
+    this.mtrIOAggrFailures = metricRegistry.meter(MetricRegistry.name(MetricName.AW_IOTracing_Aggregation_Failure.get(), processGroupTagStr));
   }
 
   public AggregationState startProfile(long workId, int recorderVersion, LocalDateTime startedAt) throws AggregationFailure {
@@ -137,30 +157,45 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
     }
   }
 
-  public void aggregate(Recorder.Wse wse, RecordedProfileIndexes indexes) throws AggregationFailure {
+  public void aggregate(Recording.Wse wse, RecordedProfileIndexes indexes) throws AggregationFailure {
     ensureEntityIsWriteable();
+    if(workSpecificBuckets.get(wse.getWType()) == null) {
+      throw new AggregationFailure(String.format("Recording policy does not specify work type=%s", wse.getWType()));
+    }
 
     switch (wse.getWType()) {
       case cpu_sample_work:
-        Recorder.StackSampleWse stackSampleWse = wse.getCpuSampleEntry();
+        CpuSamplingAggregationBucket cpuSamplingAggregationBucket = (CpuSamplingAggregationBucket)workSpecificBuckets.get(WorkEntities.WorkType.cpu_sample_work);
+        Recording.StackSampleWse stackSampleWse = wse.getCpuSampleEntry();
         if (stackSampleWse == null) {
           throw new AggregationFailure(String.format("work type=%s did not have associated samples", wse.getWType()));
         }
         cpuSamplingAggregationBucket.aggregate(stackSampleWse, indexes, mtrCSAggrFailures);
         break;
+
+      case io_trace_work:
+        IOTracingAggregationBucket ioTracingAggregationBucket = (IOTracingAggregationBucket)workSpecificBuckets.get(WorkEntities.WorkType.io_trace_work);
+        Recording.IOTraceWse ioTraceWse = wse.getIoTraceEntry();
+        if (ioTraceWse == null) {
+          throw new AggregationFailure(String.format("work type=%s did not have associated samples", wse.getWType()));
+        }
+        ioTracingAggregationBucket.aggregate(ioTraceWse, indexes, mtrIOAggrFailures);
+        break;
+
       default:
         throw new AggregationFailure(String.format("Aggregation not supported for work type=%s", wse.getWType()));
     }
   }
 
-  public void updateWorkInfoWithWSE(long workId, Recorder.Wse wse) {
+  public void updateWorkInfo(long workId, Recording.RecordingChunk recordingChunk) {
     ensureEntityIsWriteable();
 
     ProfileWorkInfo workInfo = workInfoLookup.get(workId);
     if (workInfo == null) {
       throw new AggregationFailure(String.format("Cannot find work id=%d association in the aggregation window", workId), true);
     }
-    workInfo.updateWSESpecificDetails(wse);
+
+    workInfo.updateWSEDetails(recordingChunk);
   }
 
   public void updateRecorderInfo(long workId, Recorder.RecorderInfo recorderInfo) {
@@ -193,11 +228,15 @@ public class AggregationWindow extends FinalizableBuilder<FinalizedAggregationWi
         .stream()
         .collect(Collectors.toMap(Map.Entry::getKey,
             entry -> entry.getValue().finalizeEntity()));
+    Map<WorkEntities.WorkType, FinalizedWorkSpecificAggregationBucket> finalizedWorkSpecificBuckets = workSpecificBuckets.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey,
+            entry -> entry.getValue().finalizeEntity()));
 
     return new FinalizedAggregationWindow(
         appId, clusterId, procId, start, endedAt, durationInSecs,
         finalizedWorkInfoLookup,
-        cpuSamplingAggregationBucket.finalizeEntity()
+        policy,
+        finalizedWorkSpecificBuckets
     );
   }
 }

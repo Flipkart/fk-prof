@@ -48,12 +48,12 @@ public class ProfileDiscoveryAPITest {
     private Vertx vertx;
 
     String[] objects = {
-            "profiles/v0001/MZXW6===/MJQXE===/NVQWS3Q=/2017-01-20T12:37:20.551+05:30/1500/thread_sample_work/0001",
+            "profiles/v0001/MZXW6===/MJQXE===/NVQWS3Q=/2017-01-20T12:37:20.551+05:30/1500/io_trace_work/0001",
             "profiles/v0001/MZXW6===/MJQXE===/NVQWS3Q=/2017-01-20T12:37:20.551+05:30/1500/cpu_sample_work/0001",
             "profiles/v0001/MZXW6===/MJQXE===/NVQWS3Q=/2017-01-20T12:37:20.551+05:30/1500/summary/0001",
-            "profiles/v0001/MFYHAMI=/MNWHK43UMVZDC===/OBZG6Y3FONZTC===/2017-01-20T12:37:20.551+05:30/1500/monitor_contention_work/0001",
+            "profiles/v0001/MFYHAMI=/MNWHK43UMVZDC===/OBZG6Y3FONZTC===/2017-01-20T12:37:20.551+05:30/1500/io_trace_work/0001",
             "profiles/v0001/MFYHAMI=/MNWHK43UMVZDC===/OBZG6Y3FONZTC===/2017-01-20T12:37:20.551+05:30/1500/summary/0001",
-            "profiles/v0001/MFYHAMI=/MNWHK43UMVZDC===/OBZG6Y3FONZTC===/2017-01-20T12:37:20.551+05:30/1800/monitor_wait_work/0001",
+            "profiles/v0001/MFYHAMI=/MNWHK43UMVZDC===/OBZG6Y3FONZTC===/2017-01-20T12:37:20.551+05:30/1800/cpu_sample_work/0001",
             "profiles/v0001/MFYHAMI=/MNWHK43UMVZDC===/OBZG6Y3FONZTC===/2017-01-20T12:37:20.551+05:30/1800/summary/0001",
     };
 
@@ -177,9 +177,9 @@ public class ProfileDiscoveryAPITest {
     @Test(timeout = 10000)
     public void testGetProfilesInTimeWindow(TestContext context) throws Exception {
         Async async = context.async();
-        FilteredProfiles profile1 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("monitor_contention_work"));
-        FilteredProfiles profile2 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1800), Sets.newSet("monitor_wait_work"));
-        FilteredProfiles profile3 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("thread_sample_work", "cpu_sample_work"));
+        FilteredProfiles profile1 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("cpu_sample_work"));
+        FilteredProfiles profile2 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1800), Sets.newSet("io_trace_work"));
+        FilteredProfiles profile3 = new FilteredProfiles(ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30"), ZonedDateTime.parse("2017-01-20T12:37:20.551+05:30").plusSeconds(1500), Sets.newSet("io_trace_work", "cpu_sample_work"));
 
         Map<List<Object>, Collection<?>> appIdTestPairs = new HashMap<List<Object>, Collection<?>>() {
             {

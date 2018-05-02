@@ -6,11 +6,11 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.SharedMetricRegistries;
 import com.google.common.base.Preconditions;
 import fk.prof.backend.ConfigManager;
+import fk.prof.idl.WorkEntities;
 import fk.prof.metrics.MetricName;
 import fk.prof.metrics.ProcessGroupTag;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import recording.Recorder;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -18,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 /**
  * vars prefixed with d are duration in seconds
@@ -33,6 +34,7 @@ public class WorkAssignmentSchedule {
   private final int dMaxDelay;
   private final int cMaxParallel;
 
+  private final Set<WorkEntities.WorkType> workTypes;
   private final PriorityQueue<ScheduleEntry> entries = new PriorityQueue<>();
   private Map<RecorderIdentifier, ScheduleEntry> assignedSchedule = new HashMap<>();
   private final ReentrantLock entriesLock = new ReentrantLock();
@@ -42,9 +44,12 @@ public class WorkAssignmentSchedule {
   private final Meter mtrSchedulingMiss;
 
   public WorkAssignmentSchedule(WorkAssignmentScheduleBootstrapConfig bootstrapConfig,
-                                Recorder.WorkAssignment.Builder[] workAssignmentBuilders,
+                                WorkEntities.WorkAssignment.Builder[] workAssignmentBuilders,
                                 int dProfileLen,
                                 ProcessGroupTag processGroupTag) {
+    this.workTypes = workAssignmentBuilders[0].getWorkList() == null
+        ? new HashSet<>()
+        : workAssignmentBuilders[0].getWorkList().stream().map(WorkEntities.Work::getWType).collect(Collectors.toSet());
     this.nRef = System.nanoTime();
     int cRequired = workAssignmentBuilders.length;
 
@@ -78,6 +83,10 @@ public class WorkAssignmentSchedule {
     this.mtrSchedulingMiss = metricRegistry.meter(MetricRegistry.name(MetricName.WA_Scheduling_Miss.get(), processGroupStr));
   }
 
+  public Set<WorkEntities.WorkType> getAssociatedWorkTypes() {
+    return this.workTypes;
+  }
+
   /**
    * Returns the maximum number of concurrently scheduled entries in this schedule
    * @return
@@ -97,7 +106,7 @@ public class WorkAssignmentSchedule {
    * > exception occurred while processing queue entries
    * @return WorkAssignment or null
    */
-  public Recorder.WorkAssignment getNextWorkAssignment(RecorderIdentifier recorderIdentifier) {
+  public WorkEntities.WorkAssignment getNextWorkAssignment(RecorderIdentifier recorderIdentifier) {
     Counter ctrAssignment = metricRegistry.counter(MetricRegistry.name(MetricName.Recorder_Assignment_Available.get(), recorderIdentifier.metricTag().toString()));
     try {
       boolean acquired = entriesLock.tryLock(100, TimeUnit.MILLISECONDS);
@@ -157,10 +166,10 @@ public class WorkAssignmentSchedule {
   public static class ScheduleEntry implements Comparable<ScheduleEntry> {
     private final static Logger logger = LoggerFactory.getLogger(ScheduleEntry.class);
 
-    private final Recorder.WorkAssignment.Builder workAssignmentBuilder;
+    private final WorkEntities.WorkAssignment.Builder workAssignmentBuilder;
     private final long nStartPad;
 
-    public ScheduleEntry(Recorder.WorkAssignment.Builder workAssignmentBuilder, long nStartPad) {
+    public ScheduleEntry(WorkEntities.WorkAssignment.Builder workAssignmentBuilder, long nStartPad) {
       this.workAssignmentBuilder = Preconditions.checkNotNull(workAssignmentBuilder);
       this.nStartPad = nStartPad;
     }
@@ -191,11 +200,11 @@ public class WorkAssignmentSchedule {
     }
 
     static class ScheduleEntryValue {
-      private final Recorder.WorkAssignment workAssignment;
+      private final WorkEntities.WorkAssignment workAssignment;
       private final boolean tooEarly;
       private final boolean tooLate;
 
-      ScheduleEntryValue(final Recorder.WorkAssignment workAssignment, final boolean tooEarly, final boolean tooLate) {
+      ScheduleEntryValue(final WorkEntities.WorkAssignment workAssignment, final boolean tooEarly, final boolean tooLate) {
         if(tooEarly && tooLate) {
           throw new IllegalArgumentException("Fetch of scheduling entry cannot be too early and too late simultaneously. Make up your mind!");
         }

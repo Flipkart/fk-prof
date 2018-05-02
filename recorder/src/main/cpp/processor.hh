@@ -7,24 +7,52 @@
 #include "circular_queue.hh"
 #include "ti_thd.hh"
 
-class Process {
+/**
+ * @brief Abstract class to send a notification
+ */
+class Notifiable {
 public:
-    Process() {}
-    virtual ~Process() {}
-    virtual void run() = 0;
-    virtual void stop() = 0;
+    virtual void notify() = 0;
+    virtual ~Notifiable() {
+    }
 };
 
-typedef std::vector<Process*> Processes;
-
-class Processor {
-
+class Process {
 public:
-    explicit Processor(jvmtiEnv* _jvmti, Processes&& _tasks, std::uint32_t _interval);
+    static constexpr Time::msec run_itvl_ignore = Time::msec::max();
 
-    ~Processor();
+    Process() {
+    }
 
-    void start(JNIEnv *jniEnv);
+    virtual ~Process() {
+    }
+
+    /* Do some work for this process and then return. */
+    virtual void run() = 0;
+
+    virtual void stop() = 0;
+
+    /**
+     * @brief  A processing thread can use the returned value as a hint for the
+     *         rate at which it needs to call the run method of this process.
+     * @return run interval in millis.
+     */
+    virtual Time::msec run_itvl() {
+        return run_itvl_ignore;
+    };
+};
+
+typedef std::shared_ptr<Process> ProcessPtr;
+
+typedef std::vector<std::shared_ptr<Process>> Processes;
+
+class Processor : public Notifiable {
+public:
+    explicit Processor(jvmtiEnv *_jvmti);
+
+    virtual ~Processor();
+
+    void start(JNIEnv *jniEnv, Processes _processes) throw(ThreadSpawnFailure);
 
     void run();
 
@@ -32,18 +60,30 @@ public:
 
     bool is_running() const;
 
+    void notify() override;
+
 private:
-    jvmtiEnv* jvmti;
+    jvmtiEnv *jvmti;
 
     std::atomic_bool running;
 
     Processes processes;
 
-    std::uint32_t interval;
+    ThdProcP<Processor *> thd_proc;
 
-    ThdProcP thd_proc;
+    /* Required for notifying the processor thd */
+    std::condition_variable cv;
 
-    void startCallback(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg);
+    std::mutex mutex;
+
+    std::mutex processes_mutex;
+
+    /* Flag for condition variable.
+     * True means that some process thd wants the processing thd to call run().
+     */
+    std::atomic_bool processing_pending;
+
+    void run_processes();
 
     DISALLOW_COPY_AND_ASSIGN(Processor);
 };

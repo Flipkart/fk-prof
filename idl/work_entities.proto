@@ -1,0 +1,52 @@
+syntax = "proto2";
+package fk.prof.idl;
+
+enum WorkType {
+    cpu_sample_work = 0;
+    io_trace_work = 1;
+}
+
+message Work {
+    required WorkType w_type = 1;
+    optional CpuSampleWork cpu_sample = 2;
+    optional IOTraceWork io_trace = 3;
+}
+
+message CpuSampleWork {
+    required uint32 frequency = 1;
+    required uint32 max_frames = 2;
+    optional uint32 serialization_flush_threshold = 3 [default = 100];
+}
+
+message IOTraceWork {
+    required uint32 max_frames = 1;
+    required uint32 latency_threshold_ms = 2;
+    optional uint32 serialization_flush_threshold = 3 [default = 100];
+}
+
+message WorkAssignment {
+    required uint64 work_id = 1;
+    repeated Work work = 2;
+    required string description = 3;
+    required string issue_time = 4; //controller local time
+    required uint32 duration = 5; //seconds, how long to collect data
+    required uint32 delay = 6; //seconds, how long to wait before start
+}
+
+message WorkResponse {
+    required uint64 work_id = 1;
+    enum WorkState {
+        pre_start = 0;
+        running = 1;
+        complete = 2;
+    }
+    required WorkState work_state = 2;
+    enum WorkResult {
+        unknown = 0;
+        success = 1;
+        failure = 2;
+    }
+    required WorkResult work_result = 3;
+    required uint32 elapsed_time = 4;
+}
+

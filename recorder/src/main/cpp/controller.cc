@@ -1,12 +1,12 @@
-#include "controller.hh"
 #include <chrono>
 #include <curl/curl.h>
+#include "controller.hh"
 #include "buff.hh"
 #include "blocking_ring_buffer.hh"
+#include "io_tracer.hh"
 
-void controllerRunnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg) {
-    auto control = static_cast<Controller*>(arg);
-    control->run();
+void controllerRunnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, Controller *controller) {
+    controller->run();
 }
 
 void write_system_prop(jvmtiEnv* env, const char* name, std::stringstream& ss) {
@@ -27,9 +27,14 @@ std::string load_vm_id(jvmtiEnv* env) {
     return ss.str();
 }
 
+bool bci_agent_loaded_without_fail() {
+    IOTracerJavaState& state = getIOTracerJavaState();
+    return state.isBciAgentLoaded() && (state.getBciFailedCount() == 0);
+}
+
 Controller::Controller(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap& _thread_map, ConfigurationOptions& _cfg) :
-    jvm(_jvm), jvmti(_jvmti), thread_map(_thread_map), cfg(_cfg), keep_running(false), writer(nullptr),
-    serializer(nullptr), processor(nullptr), raw_writer_ring(_cfg.tx_ring_sz),
+    jvm(_jvm), jvmti(_jvmti), thread_map(_thread_map), cfg(_cfg), keep_running(false), raw_writer_ring(_cfg.tx_ring_sz),
+    writer(nullptr), serializer(nullptr), processor(nullptr),
 
     s_t_poll_rpc(get_metrics_registry().new_timer({METRICS_DOMAIN, METRICS_TYPE_RPC, "poll"})),
     s_c_poll_rpc_failures(get_metrics_registry().new_counter({METRICS_DOMAIN, METRICS_TYPE_RPC, "poll", "failures"})),
@@ -38,6 +43,7 @@ Controller::Controller(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap& _thread_map, C
     s_c_associate_rpc_failures(get_metrics_registry().new_counter({METRICS_DOMAIN, METRICS_TYPE_RPC, "associate", "failures"})),
 
     s_v_work_cpu_sampling(get_metrics_registry().new_value({METRICS_DOMAIN, METRICS_TYPE_STATE, "working", "cpu_sampling"})),
+    s_v_work_io_tracer(get_metrics_registry().new_value({METRICS_DOMAIN, METRICS_TYPE_STATE, "working", "io_tracer"})),
 
     s_c_work_success(get_metrics_registry().new_counter({METRICS_DOMAIN, "work", "retire", "success"})),
     s_c_work_failure(get_metrics_registry().new_counter({METRICS_DOMAIN, "work", "retire", "failure"})),
@@ -51,7 +57,7 @@ Controller::Controller(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap& _thread_map, C
 }
 
 void Controller::start() {
-    keep_running.store(true, std::memory_order_relaxed);
+    keep_running.store(true);
     thd_proc = start_new_thd(jvm, jvmti, "Fk-Prof Controller Thread", controllerRunnable, this);
 }
 
@@ -61,8 +67,8 @@ void Controller::stop() {
             //This is necessary because it wakes up the scheduler.poll and makes keep_running == false
             //  We can either schedule something or we'd need additional stop-control in scheduler.
             //  This hack (in a good way) simplifies scheduler.
-            keep_running.store(false, std::memory_order_relaxed);
-        });
+            keep_running.store(false);
+        }, "Stop Controller Task");
     await_thd_death(thd_proc);
     thd_proc.reset();
 }
@@ -110,6 +116,8 @@ static void populate_recorder_info(recording::RecorderInfo& ri, const Configurat
 
     auto c = ri.mutable_capabilities();
     c->set_can_cpu_sample(cfg.allow_sigprof);
+    c->set_can_instrument_java(true);
+    c->set_can_trace_io(bci_agent_loaded_without_fail());
 }
 
 static void populate_issued_work_status(recording::WorkResponse& w_res, std::uint64_t work_id, recording::WorkResponse::WorkState state, recording::WorkResponse::WorkResult result, Time::Pt& start_tm, Time::Pt& end_tm) {
@@ -213,7 +221,7 @@ void Controller::run() {
     curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, read_from_curl_response);
     curl_easy_setopt(curl.get(), CURLOPT_TIMEOUT, cfg.rpc_timeout);
 
-    std::function<void()> poll_cb, assoc_cb;
+    Scheduler::Task poll_cb, assoc_cb;
 
     // setup things necessary for POLL
     std::string poll_url, poll_host;
@@ -221,7 +229,7 @@ void Controller::run() {
     auto poll_backoff_seconds = cfg.backoff_start;
     auto poll_retries_used = 0;
     std::uint64_t poll_tick = 0;
-    poll_cb = [&]() {
+    poll_cb = Scheduler::Task{.callback = [&]() {
         recording::PollReq p_req;
         populate_recorder_info(*p_req.mutable_recorder_info(), cfg, vm_id, start_time, poll_tick);
 
@@ -252,17 +260,17 @@ void Controller::run() {
                 logger->error("COMM failed too many times, giving up on the associate: {}", poll_url);
                 poll_retries_used = 0;
                 poll_backoff_seconds = cfg.backoff_start;
-                scheduler.schedule(Time::now(), assoc_cb);
+                scheduler.schedule(Time::now(), assoc_cb, "Get Associated Backend");
                 return;
             }
             next_tick += Time::sec(backoff(poll_backoff_seconds, cfg.backoff_multiplier, cfg.backoff_max));
         }
         scheduler.schedule(next_tick, poll_cb);
-    };
+    }, .description = "Poll Backend For Work"};
 
     // setup things necessary for discovering ASSOCIATE
     auto assoc_backoff_seconds = cfg.backoff_start;
-    assoc_cb = [&] {
+    assoc_cb = Scheduler::Task{.callback = [&] {
         recording::RecorderInfo ri;
         populate_recorder_info(ri, cfg, vm_id, start_time, 0);
         auto serialized_size = ri.ByteSize();
@@ -287,13 +295,13 @@ void Controller::run() {
             auto next_attempt = Time::now() + Time::sec(backoff(assoc_backoff_seconds, cfg.backoff_multiplier, cfg.backoff_max));
             scheduler.schedule(next_attempt, assoc_cb);
         }
-    };
+    }, .description = "Get Associated Backend"};
 
     // discover associate (it'll setup poll post discovery)
     scheduler.schedule(Time::now(), assoc_cb);
 
     // work, work work...
-    while (keep_running.load(std::memory_order_relaxed) && scheduler.poll());
+    while (is_running() && scheduler.poll());
 }
 
 void Controller::with_current_work(std::function<void(Controller::W&, Controller::WSt&, Controller::WRes&, Time::Pt&, Time::Pt&)> proc) {
@@ -350,7 +358,8 @@ void Controller::accept_work(Buff& poll_response_buff, const std::string& host, 
     }
 }
 
-void http_raw_writer_runnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg);
+class HttpRawProfileWriter;
+void http_raw_writer_runnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, HttpRawProfileWriter *rpw);
 
 typedef std::tuple<BlockingRingBuffer*, metrics::Timer*, metrics::Hist*> ProfileDataReadCtx;
 
@@ -392,7 +401,7 @@ private:
 
     std::uint32_t tx_timeout;
 
-    ThdProcP thd_proc;
+    ThdProcP<HttpRawProfileWriter *> thd_proc;
 
     metrics::Timer& s_t_rpc;
     metrics::Ctr& s_c_rpc_failures;
@@ -412,7 +421,11 @@ public:
         s_h_req_chunk_sz(get_metrics_registry().new_histogram({METRICS_DOMAIN, METRICS_TYPE_SZ, "profile", "chunk"})) {
 
         ring.reset();
+        
         thd_proc = start_new_thd(jvm, jvmti, "Fk-Prof Profiler Writer Thread", http_raw_writer_runnable, this);
+        if(!is_started(thd_proc)) {
+            throw ThreadSpawnFailure("Fk-Prof Profiler Writer Thread failed to start");
+        }
     }
     virtual ~HttpRawProfileWriter() {
         logger->trace("HTTP RawProfileWriter destructor called");
@@ -420,7 +433,7 @@ public:
         await_thd_death(thd_proc);
     }
 
-    void write_unbuffered(const std::uint8_t* data, std::uint32_t sz, std::uint32_t offset) {
+    void write_unbuffered(const std::uint8_t* data, std::uint32_t sz, std::uint32_t offset) override {
         ring.write(data, offset, sz);
     }
 
@@ -457,9 +470,8 @@ public:
     }
 };
 
-void http_raw_writer_runnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg) {
+void http_raw_writer_runnable(jvmtiEnv *jvmti_env, JNIEnv *jni_env, HttpRawProfileWriter *rpw) {
     logger->trace("HTTP raw-writer thread target entered");
-    auto rpw = static_cast<HttpRawProfileWriter*>(arg);
     rpw->run();
 }
 
@@ -471,16 +483,6 @@ void populate_recording_header(recording::RecordingHeader& rh, const recording::
     *wa = w;
 }
 
-std::uint32_t Controller::sampling_freq_to_itvl(std::uint32_t sampling_freq) {
-    auto mean_sampling_itvl_us = 1000000 / sampling_freq;
-    auto itvl_10_pct_us = mean_sampling_itvl_us / 10;
-    auto min_itvl_us = mean_sampling_itvl_us - itvl_10_pct_us;
-
-    auto itvl_ms = Size * min_itvl_us / 1000 / PROCESSOR_ITVL_FACTOR;
-
-    return itvl_ms;
-}
-
 void Controller::issue_work(const std::string& host, const std::uint32_t port, std::uint32_t controller_id, std::uint32_t controller_version) {
     auto at = Time::now() + Time::sec(current_work.delay());
     scheduler.schedule(at, [&, port, controller_id, controller_version]() {
@@ -490,54 +492,58 @@ void Controller::issue_work(const std::string& host, const std::uint32_t port, s
                         raw_writer_ring.readonly(); //because now there is no point in reading/writing anything anyway, this prevents some races:
                         // 1. Where processor wants to write more but raw-writer can't read any more
                         // 2. When user shuts down the JVM while profile is being recorded
+                        
                         scheduler.schedule(Time::now(), [&] {
                                 wres = recording::WorkResponse::failure;
                                 retire_work(work_id);
-                            });
+                            }, Util::to_s("Cancel Ongoing Work: ", work_id));
                     };
 
-                    if (w.work_size() > 0) {//something actually needs to be done
+                    recording::RecordingHeader rh;
+                    populate_recording_header(rh, w, controller_id, controller_version);
+                    
+                    try {
+                        if (w.work_size() > 0) {//something actually needs to be done
 
-                        // TODO: important! right now CpuSampleProcess calculates the itvl from sampling freq. Refactor that calculation to a common place.
-                        auto sampling_freq = w.work(0).cpu_sample().frequency();
+                            std::uint32_t tx_timeout = cfg.slow_tx_tolerance * w.duration();
+                            auto raw_writer = std::make_shared<HttpRawProfileWriter>(jvm, jvmti, host, port, raw_writer_ring, cancel_work, tx_timeout);
+                            writer.reset(new ProfileWriter(raw_writer, buff));
+                            
+                            for (auto i = 0; i < w.work_size(); i++) {
+                                auto work = w.work(i);
+                                prep(work);
+                            }
 
-                        std::uint32_t tx_timeout = cfg.slow_tx_tolerance * w.duration();
-                        std::shared_ptr<HttpRawProfileWriter> raw_writer(new HttpRawProfileWriter(jvm, jvmti, host, port, raw_writer_ring, cancel_work, tx_timeout));
-                        writer.reset(new ProfileWriter(raw_writer, buff));
-                        recording::RecordingHeader rh;
-                        populate_recording_header(rh, w, controller_id, controller_version);
-                        writer->write_header(rh);
+                            serializer.reset(new ProfileSerializingWriter(jvmti, *writer.get(), SiteResolver::method_info, SiteResolver::line_no, get_ctx_reg(), sft, tts, cfg.noctx_cov_pct));
 
-                        for (auto i = 0; i < w.work_size(); i++) {
-                            auto work = w.work(i);
-                            prep(work);
+                            JNIEnv *env = getJNIEnv(jvm);
+                            processor.reset(new Processor(jvmti));
+
+                            Processes processes;
+                            for (auto i = 0; i < w.work_size(); i++) {
+                                auto work = w.work(i);
+                                processes.emplace_back(issue(work, env));
+                            }
+
+                            processor->start(env, processes);
+                            
+                            writer->write_header(rh);
                         }
 
-                        serializer.reset(new ProfileSerializingWriter(jvmti, *writer.get(), SiteResolver::method_info, SiteResolver::line_no, get_ctx_reg(), sft, tts, cfg.noctx_cov_pct));
-
-                        JNIEnv *env = getJNIEnv(jvm);
-                        Processes processes;
-                        for (auto i = 0; i < w.work_size(); i++) {
-                            auto work = w.work(i);
-                            issue(work, processes, env);
-                        }
-
-                        auto processor_interval = sampling_freq_to_itvl(sampling_freq);
-                        logger->warn("Processor is using processor-interval value: {}", processor_interval);
-
-                        processor.reset(new Processor(jvmti, std::move(processes), processor_interval));
-                        processor->start(env);
+                        start_tm = Time::now();
+                        auto stop_at = start_tm + Time::sec(w.duration());
+                        scheduler.schedule(stop_at, [&, work_id]() {
+                                retire_work(work_id);
+                            }, Util::to_s("Retiring Work: ", work_id));
+                        logger->info("Issuing work-id {} (sz: {}), it is slated for retire in {} seconds", w.work_id(), w.work_size(), w.duration());
+                        wst = recording::WorkResponse::running;
                     }
-
-                    start_tm = Time::now();
-                    auto stop_at = start_tm + Time::sec(w.duration());
-                    scheduler.schedule(stop_at, [&, work_id]() {
-                            retire_work(work_id);
-                        });
-                    logger->info("Issuing work-id {} (sz: {}), it is slated for retire in {} seconds", w.work_id(), w.work_size(), w.duration());
-                    wst = recording::WorkResponse::running;
+                    catch (std::exception& e) {
+                        logger->error("Exception while issuing work: {}", e.what());
+                        cancel_work();
+                    }
                 });
-        });
+        }, "Issue Work");
 }
 
 void Controller::retire_work(const std::uint64_t work_id) {
@@ -552,8 +558,10 @@ void Controller::retire_work(const std::uint64_t work_id) {
             }
 
             if (w.work_size() > 0) {//something actually was being done
-                processor->stop();
-                processor.reset();
+                if(processor) {
+                    processor->stop();
+                    processor.reset();
+                }
 
                 logger->info("Will now retire work {}", work_id);
 
@@ -562,8 +570,8 @@ void Controller::retire_work(const std::uint64_t work_id) {
                     retire(work);
                 }
 
-                serializer.reset();
-                writer.reset();
+                if(serializer) serializer.reset();
+                if(writer) writer.reset();
             }
 
             logger->info("Retiring work-id {}, status before retire {}", w.work_id(), wres);
@@ -583,11 +591,9 @@ void Controller::retire_work(const std::uint64_t work_id) {
         });
 }
 
-bool has_cpu_sample_work_p(const recording::Work& work) {
-    if (work.has_cpu_sample()) return true;
-    logger->error("Work of CPU-sampling-type {} doesn't have a definition", work.w_type());
-    return false;
-}
+#define has_work_desc(work, worktype)                       \
+    (work.has_##worktype() ? true :                         \
+        (logger->error("work of type: {} doesn't have a definition", work.w_type()), false))
 
 bool Controller::capable(const W& w) {
     for (auto i = 0; i < w.work_size(); i++) {
@@ -600,99 +606,159 @@ bool Controller::capable(const W& w) {
 bool Controller::capable(const recording::Work& work) {
     auto w_type = work.w_type();
     switch(w_type) {
-    case recording::WorkType::cpu_sample_work:
-        return has_cpu_sample_work_p(work) && capable(work.cpu_sample());
-    default:
-        logger->error("Encountered unknown work type {}", w_type);
-        return false;
+        case recording::WorkType::cpu_sample_work:
+            return has_work_desc(work, cpu_sample) && capable(work.cpu_sample());
+        case recording::WorkType::io_trace_work:
+            return has_work_desc(work, io_trace) && capable(work.io_trace());
+        default:
+            logger->error("Encountered unknown work type {}", w_type);
+            return false;
     }
 }
 
 void Controller::prep(const recording::Work& work) {
     auto w_type = work.w_type();
     switch(w_type) {
-    case recording::WorkType::cpu_sample_work:
-        if (has_cpu_sample_work_p(work)) {
-            prep(work.cpu_sample());
-        }
-        return;
-    default:
-        assert(false);
+        case recording::WorkType::cpu_sample_work:
+            if (work.has_cpu_sample()) {
+                prep(work.cpu_sample());
+            }
+            return;
+        case recording::WorkType::io_trace_work:
+            if (work.has_io_trace()) {
+                prep(work.io_trace());
+            }
+            return;
+        default:
+            assert(false);
     }
 }
 
-void Controller::issue(const recording::Work& work, Processes& processes, JNIEnv* env) {
+ProcessPtr Controller::issue(const recording::Work& work, JNIEnv* env) {
     auto w_type = work.w_type();
+    ProcessPtr p;
     switch(w_type) {
-    case recording::WorkType::cpu_sample_work:
-        if (has_cpu_sample_work_p(work)) {
-            issue(work.cpu_sample(), processes, env);
-            s_v_work_cpu_sampling.update(1);
-        }
-        return;
-    default:
-        assert(false);
+        case recording::WorkType::cpu_sample_work:
+            if (work.has_cpu_sample()) {
+                p = issue(work.cpu_sample(), env);
+                s_v_work_cpu_sampling.update(1);
+            }
+            break;
+        case recording::WorkType::io_trace_work:
+            if(work.has_io_trace()) {
+                p = issue(work.io_trace(), env);
+                s_v_work_io_tracer.update(1);
+            }
+            break;
+        default:
+            assert(false);
     }
+    return p;
 }
 
 void Controller::retire(const recording::Work& work) {
     auto w_type = work.w_type();
     switch(w_type) {
-    case recording::WorkType::cpu_sample_work:
-        if (has_cpu_sample_work_p(work)) {
-            retire(work.cpu_sample());
-            s_v_work_cpu_sampling.update(0);
-        }
-        return;
-    default:
-        assert(false);
+        case recording::WorkType::cpu_sample_work:
+            if (work.has_cpu_sample()) {
+                retire(work.cpu_sample());
+                s_v_work_cpu_sampling.update(0);
+            }
+            return;
+        case recording::WorkType::io_trace_work:
+            if(work.has_io_trace()) {
+                retire(work.io_trace());
+                s_v_work_io_tracer.update(0);
+            }
+            return;
+        default:
+            assert(false);
     }
 }
 
 bool Controller::capable(const recording::CpuSampleWork& csw) {
     bool capable = cfg.allow_sigprof;
-    if (! capable) logger->warn("Not capable of cpu-sampling work");
     return capable;
 }
 
 void Controller::prep(const recording::CpuSampleWork& csw) {
-    sft.cpu_samples = csw.serialization_flush_threshold();
+    update_flush_ctr(csw.serialization_flush_threshold());
     tts.cpu_samples_max_stack_sz = Profiler::calculate_max_stack_depth(csw.max_frames());
 }
 
-class CpuProfileProcess : public Process {
-    ReadsafePtr<Profiler> p;
+template <typename T>
+class ProcessWrapper : public Process {
+    ReadsafePtr<T> p;
     bool available;
 
 public:
-    CpuProfileProcess() : p(GlobalCtx::recording.cpu_profiler) {
+    ProcessWrapper(UniqueReadsafePtr<T> &ptr) : p(ptr) {
         available = p.available();
     }
 
-    virtual ~CpuProfileProcess() {}
-
-    void run() {
-        if (available) p->run();
+    virtual ~ProcessWrapper() {
     }
 
-    void stop() {
-        if (available) p->stop();
+    void run() override {
+        if (available)
+            p->run();
+    }
+
+    void stop() override {
+        if (available)
+            p->stop();
+    }
+
+    Time::msec run_itvl() override {
+        if (available)
+            return p->run_itvl();
+        return Process::run_itvl_ignore;
     }
 };
 
-void Controller::issue(const recording::CpuSampleWork& csw, Processes& processes, JNIEnv* env) {
+ProcessPtr Controller::issue(const recording::CpuSampleWork& csw, JNIEnv* env) {
     auto freq = csw.frequency();
     logger->info("Starting cpu-sampling at {} Hz and for upto {} frames", freq, tts.cpu_samples_max_stack_sz);
     
-    GlobalCtx::recording.cpu_profiler.reset(new Profiler(jvm, jvmti, thread_map, *serializer.get(), tts.cpu_samples_max_stack_sz, freq, get_prob_pct(), cfg.noctx_cov_pct, cfg.capture_native_bt, cfg.capture_unknown_thd_bt));
+    GlobalCtx::recording.cpu_profiler.reset(new Profiler(jvm, jvmti, thread_map, *serializer, tts.cpu_samples_max_stack_sz, freq, get_prob_pct(), cfg.noctx_cov_pct, cfg.capture_native_bt, cfg.capture_unknown_thd_bt));
     ReadsafePtr<Profiler> p(GlobalCtx::recording.cpu_profiler);
     p->start(env);
-    processes.push_back(new CpuProfileProcess());
+    return std::make_shared<ProcessWrapper<Profiler>>(GlobalCtx::recording.cpu_profiler);
 }
 
 void Controller::retire(const recording::CpuSampleWork& csw) {
     logger->info("Stopping cpu-sampling");
     GlobalCtx::recording.cpu_profiler.reset();
+}
+
+bool Controller::capable(const recording::IOTraceWork& w) {
+    return bci_agent_loaded_without_fail();
+}
+
+void Controller::prep(const recording::IOTraceWork& w) {
+    update_flush_ctr(w.serialization_flush_threshold());
+    tts.io_trace_max_stack_sz = Profiler::calculate_max_stack_depth(w.max_frames());
+}
+
+ProcessPtr Controller::issue(const recording::IOTraceWork& w, JNIEnv* env) {
+    std::uint64_t latency_threshold = w.latency_threshold_ms() * NANOS_IN_MILLIS;
+    
+    logger->info("Starting io-tracing with threashold {} ms and for upto {} frames", w.latency_threshold_ms(), tts.io_trace_max_stack_sz);
+    
+    // process instance
+    GlobalCtx::recording.io_tracer.reset(new IOTracer(jvm, jvmti, thread_map, getFdMap(), processor, *serializer, latency_threshold, tts.io_trace_max_stack_sz));
+
+    ReadsafePtr<IOTracer> p(GlobalCtx::recording.io_tracer);
+
+    // enable tracing
+    p->start(env);
+    
+    return std::make_shared<ProcessWrapper<IOTracer>>(GlobalCtx::recording.io_tracer);
+}
+
+void Controller::retire(const recording::IOTraceWork& csw) {
+    logger->info("Stopping io-tracing");
+    GlobalCtx::recording.io_tracer.reset();
 }
 
 namespace GlobalCtx {

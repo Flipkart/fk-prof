@@ -12,7 +12,7 @@ static void handle_profiling_signal(int signum, siginfo_t *info, void *context) 
 }
 
 void Profiler::handle(int signum, siginfo_t *info, void *context) {
-    IMPLICITLY_USE(signum);//TODO: make this reenterant or implement try_lock+backoff
+    IMPLICITLY_USE(signum);
     IMPLICITLY_USE(info);//TODO: put a timer here after perf-tuning medida heavily, we'd dearly love a timer here, but the overhead makes it a no-go as of now.
     s_c_cpu_samp_total.inc();
     JNIEnv *jniEnv = getJNIEnv(jvm);
@@ -25,7 +25,7 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
     if (jniEnv != nullptr) {
         thread_info = thread_map.get(jniEnv);
         if (thread_info != nullptr) {//TODO: increment a counter here to monitor freq of this, it could be GC thd or compiler-broker etc
-            ctx_tracker = &(thread_info->ctx_tracker);
+            ctx_tracker = &(thread_info->data.ctx_tracker);
             if (ctx_tracker->in_ctx()) {
                 do_record = ctx_tracker->should_record();
             } else {
@@ -48,13 +48,15 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
 
     if (jniEnv != NULL) {
         STATIC_ARRAY(frames, JVMPI_CallFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
+        
         JVMPI_CallTrace trace;
         trace.env_id = jniEnv;
         trace.frames = frames;
         ASGCTType asgct = Asgct::GetAsgct();
         (*asgct)(&trace, capture_stack_depth(), context);
         if (trace.num_frames > 0) {
-            buffer->push(trace, err, default_ctx, thread_info);
+            cpu::InMsg m(trace, thread_info, err, default_ctx);
+            buffer->push(m);
             return; // we got java trace, so bail-out
         }
         if (trace.num_frames <= 0) {
@@ -69,11 +71,14 @@ void Profiler::handle(int signum, siginfo_t *info, void *context) {
     // Will definitely land here if jnienv == null
     // Can land here despite jnienv != null if asgct could not walk the stack of current thread.
     // We want to be absolutely sure if native bt capture has been enabled before proceeding
-    if(!capture_native_bt) return;
+    if(!capture_native_bt) {
+        return;
+    }
     STATIC_ARRAY(native_trace, NativeFrame, capture_stack_depth(), MAX_FRAMES_TO_CAPTURE);
 
     auto bt_len = Stacktraces::fill_backtrace(native_trace, capture_stack_depth());
-    buffer->push(native_trace, bt_len, err, default_ctx, thread_info);
+    cpu::InMsg m(native_trace, bt_len, thread_info, err, default_ctx);
+    buffer->push(m);
 }
 
 bool Profiler::start(JNIEnv *jniEnv) {
@@ -96,6 +101,7 @@ void Profiler::stop() {
     }
 
     handler->stopSigprof();
+    running = false;
 }
 
 void Profiler::set_sampling_freq(std::uint32_t sampling_freq) {
@@ -113,7 +119,7 @@ std::uint32_t Profiler::calculate_max_stack_depth(std::uint32_t _max_stack_depth
 }
 
 void Profiler::configure() {
-    buffer = new CircularQueue(serializer, capture_stack_depth());
+    buffer = new cpu::Queue(serializer, capture_stack_depth());
 
     handler = new SignalHandler(itvl_min, itvl_max);
     //int processor_interval = Size * itvl_min / 1000 / 2;
@@ -127,7 +133,6 @@ Profiler::Profiler(JavaVM *_jvm, jvmtiEnv *_jvmti, ThreadMap &_thread_map, Profi
       prob_pct(_prob_pct), sampling_attempts(0), noctx_cov_pct(_noctx_cov_pct), capture_native_bt(_capture_native_bt), capture_unknown_thd_bt(_capture_unknown_thd_bt), running(false), samples_handled(0),
 
       s_c_cpu_samp_total(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "opportunities"})),
-
       s_c_cpu_samp_err_no_jni(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "err_no_jni"})),
       s_c_cpu_samp_err_unexpected(get_metrics_registry().new_counter({METRICS_DOMAIN, METRIC_TYPE, "err_unexpected"})),
 
@@ -160,4 +165,8 @@ void Profiler::run() {
         }
         samples_handled = 0;
     }
+}
+
+Time::msec Profiler::run_itvl() {
+    return Time::msec(Size * itvl_min / 1000 / 2);
 }

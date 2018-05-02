@@ -7,6 +7,7 @@
 #include "globals.hh"
 #include "config.hh"
 #include "profiler.hh"
+#include "io_tracer.hh"
 #include "thread_map.hh"
 #include "controller.hh"
 #include "perf_ctx.hh"
@@ -26,7 +27,7 @@ static PerfCtx::Registry ctx_reg;
 static ProbPct prob_pct;
 static medida::reporting::UdpReporter* metrics_reporter;
 static MetricFormatter::SyslogTsdbFormatter *formatter;
-static ThdProcP metrics_thd;
+static ThdProcP<void *> metrics_thd;
 std::atomic<bool> abort_metrics_poll;
 
 // This has to be here, or the VM turns off class loading events.
@@ -85,7 +86,11 @@ void JNICALL OnVMInit(jvmtiEnv *jvmti, JNIEnv *jniEnv, jthread thread) {
         CreateJMethodIDsForClass(jvmti, klass);
     }
 
-    metrics_thd = start_new_thd(jniEnv, jvmti, "Fk-Prof Metrics Reporter", metrics_poller, nullptr);
+    metrics_thd = start_new_thd<void *>(jniEnv, jvmti, "Fk-Prof Metrics Reporter", metrics_poller, nullptr);
+    
+    // load IOTRace class and initialize the local iotrace object.
+    getIOTracerJavaState().onVMInit(jvmti, jniEnv);
+    
     controller->start();
 }
 
@@ -103,6 +108,8 @@ void JNICALL OnClassPrepare(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
 void JNICALL OnVMDeath(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
     IMPLICITLY_USE(jvmti_env);
     IMPLICITLY_USE(jni_env);
+    
+    getIOTracerJavaState().onVMDeath(jvmti_env, jni_env);
 }
 
 static bool PrepareJvmti(jvmtiEnv *jvmti) {
@@ -205,7 +212,7 @@ void JNICALL OnNativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread th
 volatile bool main_started = false;
 
 void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread) {
-    SPDLOG_TRACE(logger, "Some thraed started");
+    SPDLOG_TRACE(logger, "Some thread started");
     jvmtiThreadInfo thread_info;
     int error = jvmti_env->GetThreadInfo(thread, &thread_info);
     if (error == JNI_OK) {

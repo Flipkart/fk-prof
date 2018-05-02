@@ -26,6 +26,12 @@ pom.xml.versionsBackup
 *.ipr
 *.iws
 *.iml
+*.cproject
+*.classpath
+*.project
+compile_commands.json
+*.vscode
+nbproject
 
 logs/*
 !.gitkeep
@@ -68,3 +74,5 @@ recorder/.vscode/settings.json
 *.so
 BtPrinter.h
 ui/.vscode
+
+bciagenttest/dependency-reduced-pom.xml

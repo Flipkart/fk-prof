@@ -64,7 +64,7 @@ JNIEXPORT jint JNICALL Java_fk_prof_TestJni_getCurrentCtx(JNIEnv* jni, jobject s
         return -1;
     }
     
-    PerfCtx::ThreadTracker& ctx_tracker = thread_info->ctx_tracker;
+    PerfCtx::ThreadTracker& ctx_tracker = thread_info->data.ctx_tracker;
 
     PerfCtx::ThreadTracker::EffectiveCtx eff_ctx;
     auto count = ctx_tracker.current(eff_ctx);

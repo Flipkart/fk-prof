@@ -1,11 +1,12 @@
 package fk.prof.aggregation.model;
 
 import fk.prof.aggregation.AggregatedProfileNamingStrategy;
-import fk.prof.aggregation.proto.AggregatedProfileModel;
-import fk.prof.aggregation.proto.AggregatedProfileModel.*;
+import fk.prof.idl.Profile;
+import fk.prof.idl.Profile.*;
+import fk.prof.idl.WorkEntities;
+import fk.prof.idl.WorkEntities.WorkType;
 import fk.prof.aggregation.state.AggregationState;
 import org.hamcrest.core.IsCollectionContaining;
-import org.joda.time.LocalDate;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
@@ -52,9 +53,10 @@ public class ModelToProtoTest {
         LocalDateTime now = LocalDateTime.now(Clock.systemUTC());
         FinalizedAggregationWindow window = new FinalizedAggregationWindow("app1", "cluster1", "proc1", now, now.plusSeconds(1200), 1200,
                 buildMap(
-                        101l, new FinalizedProfileWorkInfo(1, null, AggregationState.COMPLETED, now.plusSeconds(10), now.plusSeconds(90), 80, buildMap("trace1", 5, "trace2", 10), buildMap(WorkType.cpu_sample_work, 100, WorkType.thread_sample_work, 80)),
-                        102l, new FinalizedProfileWorkInfo(1, null, AggregationState.ABORTED, now.plusSeconds(100), now.plusSeconds(200), 100, buildMap("trace1", 10, "trace2", 10), buildMap(WorkType.cpu_sample_work, 1000, WorkType.thread_sample_work, 800))
+                        101l, new FinalizedProfileWorkInfo(1, null, AggregationState.COMPLETED, now.plusSeconds(10), now.plusSeconds(90), 80, buildMap("trace1", 5, "trace2", 10), buildMap(WorkType.cpu_sample_work, 100)),
+                        102l, new FinalizedProfileWorkInfo(1, null, AggregationState.ABORTED, now.plusSeconds(100), now.plusSeconds(200), 100, buildMap("trace1", 10, "trace2", 10), buildMap(WorkType.cpu_sample_work, 1000))
                         ),
+                buildRecordingPolicy(new HashSet<>(Arrays.asList(WorkType.cpu_sample_work))),
                 null
                 );
 
@@ -101,7 +103,7 @@ public class ModelToProtoTest {
 
         FinalizedProfileWorkInfo wi1 = new FinalizedProfileWorkInfo(1, null, AggregationState.COMPLETED, now, now.plusMinutes(1), 60,
                 buildMap("trace1", 5, "trace2", 10, "trace3", 15),
-                buildMap(WorkType.cpu_sample_work, 100, WorkType.thread_sample_work, 80));
+                buildMap(WorkType.cpu_sample_work, 100));
 
         ProfileWorkInfo workInfo = wi1.buildProfileWorkInfoProto(WorkType.cpu_sample_work, now, buildTraceList("trace1", "trace2"));
 
@@ -173,11 +175,11 @@ public class ModelToProtoTest {
         assertThat(in.available(), is(0));
     }
 
-    private Set<RecorderInfo> recorders() {
-        Set<RecorderInfo> recorders = new HashSet<>();
+    private Set<RecorderDetails> recorders() {
+        Set<RecorderDetails> recorders = new HashSet<>();
         recorders.addAll(
                 Arrays.asList(
-                    AggregatedProfileModel.RecorderInfo.newBuilder()
+                    Profile.RecorderDetails.newBuilder()
                             .setIp("192.168.1.1")
                             .setHostname("some-box-1")
                             .setAppId("app1")
@@ -188,7 +190,7 @@ public class ModelToProtoTest {
                             .setVmId("vm1")
                             .setZone("chennai-1")
                             .setInstanceType("c1.xlarge").build(),
-                    AggregatedProfileModel.RecorderInfo.newBuilder()
+                    Profile.RecorderDetails.newBuilder()
                             .setIp("192.168.1.2")
                             .setHostname("some-box-2")
                             .setAppId("app1")
@@ -202,7 +204,14 @@ public class ModelToProtoTest {
         return recorders;
     }
 
-
+    private RecordingPolicy buildRecordingPolicy(Set<WorkType> workTypes) {
+        List<WorkEntities.Work> workList = new ArrayList<>();
+        for(WorkType workType: workTypes) {
+            workList.add(WorkEntities.Work.newBuilder().setWType(workType).build());
+        }
+        return RecordingPolicy.newBuilder().setDuration(60).setMinHealthy(10)
+            .setDescription("Test policy").setCoveragePct(100).addAllWork(workList).build();
+    }
 
     private TraceCtxDetail buildTraceCtxDetails(int idx, int count) {
         return TraceCtxDetail.newBuilder().setTraceIdx(idx).setSampleCount(count).build();

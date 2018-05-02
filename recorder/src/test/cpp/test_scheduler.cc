@@ -148,16 +148,24 @@ TEST(Scheduler___schedules_in_desired_order___when_another_thd_enqueues___during
 
     CHECK_EQUAL(0, co_trigger_tracker);
     CHECK_CLOSE(100 - 50, time_poll(s), 5);
+    
+    int max_tries = 2;
+    int try_count = 0;
+    while(try_count < max_tries && co_trigger_tracker < 3) {
+        CHECK_CLOSE(1, time_poll(s), 1);
+        ++try_count;
+    }
+    
     CHECK_EQUAL(100, order_tracker);
     CHECK_EQUAL(3, co_trigger_tracker);
 
-    CHECK_CLOSE(200 - 100, time_poll(s), 5);
+    CHECK_CLOSE(200 - 100, time_poll(s), 10);
     CHECK_EQUAL(200, order_tracker);
 
-    CHECK_CLOSE(250 - 200, time_poll(s), 5);
+    CHECK_CLOSE(250 - 200, time_poll(s), 10);
     CHECK_EQUAL(250, order_tracker);
 
-    CHECK_CLOSE(300 - 250, time_poll(s), 5);
+    CHECK_CLOSE(300 - 250, time_poll(s), 10);
     CHECK_EQUAL(300, order_tracker);
 
     CHECK_CLOSE(1, time_poll(s, false), 1);

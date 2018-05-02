@@ -4,11 +4,13 @@
 #ifndef FIXTURES_H
 #define FIXTURES_H
 
-class ItemHolder : public QueueListener {
+class ItemHolder : public cpu::Queue::Listener {
 public:
   explicit ItemHolder() {}
 
-    virtual void record(const Backtrace &trace, ThreadBucket *info, std::uint8_t ctx_len, PerfCtx::ThreadTracker::EffectiveCtx* ctx, bool default_ctx) {
+    virtual void record(const cpu::Sample& entry) {
+        auto& trace = entry.trace;
+        
         CHECK_EQUAL(2, trace.num_frames);
         CHECK_EQUAL(BacktraceType::Java, trace.type);
 
@@ -26,7 +28,7 @@ public:
 struct GivenQueue {
   GivenQueue() {
     holder = new ItemHolder();
-    queue = new CircularQueue(*holder, DEFAULT_MAX_FRAMES_TO_CAPTURE);
+    queue = new cpu::Queue(*holder, DEFAULT_MAX_FRAMES_TO_CAPTURE);
   }
 
   ~GivenQueue() {
@@ -36,7 +38,7 @@ struct GivenQueue {
 
   ItemHolder *holder;
 
-  CircularQueue *queue;
+  cpu::Queue *queue;
 
   // wrap an easy to test api around the queue
   bool pop(const long envId) {
