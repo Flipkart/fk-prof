@@ -8,6 +8,7 @@ import java.util.Random;
 public class ThreadSpawner {
 
     int n, maxSleepDuration;
+
     boolean isDebug;
 
     public ThreadSpawner(int n, int maxSleepDuration, boolean isDebug) {
@@ -20,40 +21,42 @@ public class ThreadSpawner {
 
         Thread[] threads = new Thread[n];
 
-        while(true) {
+        while (true) {
             for (int i = 0; i < n; ++i) {
 
-                if(threads[i] != null) {
-                    while(true) {
+                if (threads[i] != null) {
+                    while (true) {
                         boolean joined = false;
                         try {
                             threads[i].join();
                             joined = true;
-                        } catch (Exception e) {}
+                        } catch (Exception e) {
+                        }
 
-                        if(joined) break;
+                        if (joined) {
+                            break;
+                        }
                     }
                 }
 
                 final int th_id = i;
                 threads[i] = new Thread(() -> {
                     try {
-                        if(isDebug) {
+                        if (isDebug) {
                             System.out.println("Threadspawner: thd " + th_id + " started");
                         }
                         Thread.sleep(100 + (new Random().nextInt() % maxSleepDuration)); // atleast 100 ms.
-                        if(isDebug) {
+                        if (isDebug) {
                             System.out.println("Threadspawner: thd " + th_id + " will now end");
                         }
-                    }
-                    catch (Exception e) {
+                    } catch (Exception e) {
                     }
                 });
 
                 threads[i].start();
             }
 
-            if(Thread.currentThread().isInterrupted()) {
+            if (Thread.currentThread().isInterrupted()) {
                 return;
             }
         }

@@ -42,11 +42,11 @@ server:
     - type: http
       port: 8182
 
-driver_ip: 127.0.0.1
-driver_port: 8082
+driverIp: 127.0.0.1
+driverPort: 8082
 
-app_ip: 127.0.0.1
-app_port: 8081
+appIp: 127.0.0.1
+appPort: 8081
 
 driver: true
 

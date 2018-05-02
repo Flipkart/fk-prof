@@ -6,9 +6,12 @@ package fk.prof.nfr;
 public class MatrixMultiplicationLoad {
 
     RndGen rnd;
+
     int size;
+
     float[][] matrix1, matrix2;
-    float [][] mul;
+
+    float[][] mul;
 
     public MatrixMultiplicationLoad(int size, RndGen rndGen) {
         this.size = size;
@@ -20,8 +23,8 @@ public class MatrixMultiplicationLoad {
     }
 
     public void reset() {
-        for(int i = 0; i < size; ++i) {
-            for(int j = 0; j < size; ++j) {
+        for (int i = 0; i < size; ++i) {
+            for (int j = 0; j < size; ++j) {
                 matrix1[i][j] = rnd.getFloat() + 1.0f;
                 matrix2[i][j] = rnd.getFloat() + 1.0f;
             }
@@ -33,20 +36,20 @@ public class MatrixMultiplicationLoad {
     }
 
     private void for_all_i() {
-        for(int i = 0; i < size; ++i) {
+        for (int i = 0; i < size; ++i) {
             for_all_j(i);
         }
     }
 
     private void for_all_j(int i) {
-        for(int j = 0; j < size; ++j) {
+        for (int j = 0; j < size; ++j) {
             for_i_j(i, j);
         }
     }
 
     private void for_i_j(int i, int j) {
         float sum = 0.0f;
-        for(int k = 0; k < size; ++k) {
+        for (int k = 0; k < size; ++k) {
             sum += matrix1[i][k] * matrix2[k][j];
         }
 

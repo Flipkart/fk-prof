@@ -52,10 +52,27 @@ database:
   # whether or not idle connections should be validated
   checkConnectionWhileIdle: false
 
-driver_ip: 127.0.0.1
-driver_port: 8082
+driverIp: 127.0.0.1
+driverPort: 8082
 
-app_ip: 127.0.0.1
-app_port: 8081
+appIp: 127.0.0.1
+appPort: 8081
 
 driver: false
+
+isDebug: true
+
+enableCpuWork: true
+enableIoWork: true
+cpuWork:
+  threadCnt: 6
+  loadShare: [0.33, 0.33, 0.34]
+  loadMultiplier: 1.0
+  traceDuplicationMultiplier: 1
+  perfCtxCodeCovrg: 50
+  stacktraceFanout: 4
+  stacktraceDepth: 64
+
+threadSpawnWork:
+  threadCnt: 4
+  threadSleepDuration: 5000

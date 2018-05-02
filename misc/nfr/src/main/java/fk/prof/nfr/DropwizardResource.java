@@ -1,18 +1,20 @@
 package fk.prof.nfr;
 
 import com.codahale.metrics.annotation.Timed;
-import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import io.dropwizard.hibernate.UnitOfWork;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.validation.constraints.NotNull;
-import javax.ws.rs.*;
-import javax.ws.rs.core.MediaType;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import javax.validation.constraints.NotNull;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Path("/load-gen-app/io")
 @Produces(MediaType.APPLICATION_JSON)
@@ -21,7 +23,9 @@ public class DropwizardResource {
     private static Logger logger = LoggerFactory.getLogger(DropwizardResource.class);
 
     private final String ip;
+
     private final int port;
+
     private final UserDAO userDAO;
 
     private Random rndm = new Random(121);
@@ -89,11 +93,11 @@ public class DropwizardResource {
     }
 
     private int dataSz() {
-        return Math.max(0, (int)(rndm.nextGaussian() * 128 + 1024));
+        return Math.max(0, (int) (rndm.nextGaussian() * 128 + 1024));
     }
 
     private int delay() {
-        return Math.max(0, (int)(rndm.nextGaussian() * 50 + 50));
+        return Math.max(0, (int) (rndm.nextGaussian() * 50 + 50));
     }
 
     private String clientUri(String path) {

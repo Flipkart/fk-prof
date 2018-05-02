@@ -3,10 +3,12 @@ package fk.prof.nfr;
 import fk.prof.ClosablePerfCtx;
 import fk.prof.MergeSemantics;
 import fk.prof.PerfCtx;
-
 import java.time.Clock;
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Created by gaurav.ashok on 03/04/17.
@@ -14,14 +16,16 @@ import java.util.*;
 public class JsonGenerator {
 
     private static RndGen rnd;
-    private static PerfCtx childCtx = new PerfCtx("hashmap-create-ctx", 20, MergeSemantics.PARENT_SCOPED);
+
+    private static PerfCtx childCtx = new PerfCtx("hashmap-create-ctx", 20,
+        MergeSemantics.PARENT_SCOPED);
 
     public JsonGenerator(RndGen rndGen) {
         this.rnd = rndGen;
     }
 
     public Map<String, Object> genJsonMap(int size, float objProb, float arrayProb) {
-        try(ClosablePerfCtx ctx = childCtx.open()) {
+        try (ClosablePerfCtx ctx = childCtx.open()) {
             Map<String, Object> map = new HashMap<>();
             if (size == 0) {
                 return map;
@@ -36,9 +40,10 @@ public class JsonGenerator {
         return rnd.getString(len);
     }
 
-    private void genFields(Map<String, Object> map, int size, int idx, float objProb, float arrayProb) {
+    private void genFields(Map<String, Object> map, int size, int idx, float objProb,
+        float arrayProb) {
 
-        if(idx < size) {
+        if (idx < size) {
             map.put(randomString(32), genRndmObject(size / 2, objProb, arrayProb));
             genFields(map, size, idx + 1, objProb, arrayProb);
         }
@@ -47,22 +52,19 @@ public class JsonGenerator {
 
     private Object genRndmObject(int size, float objProb, float arrayProb) {
         float rndFloat = rnd.getFloat();
-        if(rndFloat < objProb) {
+        if (rndFloat < objProb) {
             return genJsonMap(size, objProb, arrayProb);
-        }
-        else if(rndFloat < arrayProb + objProb) {
+        } else if (rndFloat < arrayProb + objProb) {
             List<Object> list = new ArrayList<>();
-            for(int i = 0; i < size; ++i) {
+            for (int i = 0; i < size; ++i) {
                 list.add(genRndmObject(size / 2, objProb, arrayProb));
             }
             return list;
-        }
-        else {
+        } else {
             int rndmInt = rnd.getInt(2);
-            if(rndmInt == 0) {
+            if (rndmInt == 0) {
                 return randomString(32);
-            }
-            else {
+            } else {
                 return ZonedDateTime.now(Clock.systemUTC());
             }
         }

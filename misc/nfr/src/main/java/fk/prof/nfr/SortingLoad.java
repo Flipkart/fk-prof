@@ -10,7 +10,9 @@ import java.util.stream.Collectors;
 public class SortingLoad {
 
     int size;
+
     List<String> list = new ArrayList<>();
+
     RndGen rndGen;
 
     public SortingLoad(int size, RndGen rndGen) {
@@ -21,7 +23,7 @@ public class SortingLoad {
     public int doWork() {
         list.clear();
 
-        for(int i = 0; i < size; ++i) {
+        for (int i = 0; i < size; ++i) {
             list.add(rndGen.getString(64));
         }
 
@@ -31,7 +33,7 @@ public class SortingLoad {
     }
 
     private int findLocation(List<String> haystack, String needle, int i) {
-        if(i >= haystack.size()) {
+        if (i >= haystack.size()) {
             return i;
         }
         return haystack.get(i).compareTo(needle) >= 0 ? i : findLocation(haystack, needle, i + 1);

@@ -1,27 +1,29 @@
 package fk.prof.nfr.driver;
 
+import java.util.Random;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.util.EntityUtils;
-import org.apache.logging.log4j.core.util.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.InputStreamReader;
-import java.util.Random;
 
 public class Driver implements Runnable {
 
     private static final Logger logger = LoggerFactory.getLogger(Driver.class);
 
     private final HttpClient client;
-    private String ip;
-    private int port;
+
     private final Random rndm = new Random();
+
     long dataTransferred = 0;
+
     long reqDone = 0;
+
+    private String ip;
+
+    private int port;
 
     public Driver(HttpClient client, String ip, int port) {
         this.client = client;
@@ -31,7 +33,7 @@ public class Driver implements Runnable {
 
     @Override
     public void run() {
-        while(true) {
+        while (true) {
             HttpUriRequest req = new HttpGet(uri());
             HttpResponse resp = null;
             try {
@@ -47,7 +49,7 @@ public class Driver implements Runnable {
                     break;
                 }
             } finally {
-                if(resp != null) {
+                if (resp != null) {
                     EntityUtils.consumeQuietly(resp.getEntity());
                 }
             }

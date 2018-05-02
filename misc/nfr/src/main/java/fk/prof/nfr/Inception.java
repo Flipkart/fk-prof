@@ -2,7 +2,6 @@ package fk.prof.nfr;
 
 import fk.prof.ClosablePerfCtx;
 import fk.prof.PerfCtx;
-
 import java.lang.reflect.Array;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -13,18 +12,25 @@ import java.util.function.Consumer;
 public class Inception {
 
     int maxFanOut;
+
     int[] iterationCounts;
+
     Runnable[] work;
+
     RndGen rndGen;
 
     Consumer<Param>[] functions;
+
     PerfCtx[][] perfctxs;
+
     int perfCtxCount;
+
     int maxlevelDepth;
 
     AtomicInteger[] counters;
 
-    public Inception(int[] iterations, Runnable[] work, PerfCtx[][] perfctxs, RndGen rndGen, int maxFanOut, int maxlevelDepth, AtomicInteger[] counters) {
+    public Inception(int[] iterations, Runnable[] work, PerfCtx[][] perfctxs, RndGen rndGen,
+        int maxFanOut, int maxlevelDepth, AtomicInteger[] counters) {
         assert maxFanOut <= 20 : "fanout cannot be no more than 20";
         this.maxFanOut = maxFanOut;
         this.iterationCounts = iterations;
@@ -70,77 +76,95 @@ public class Inception {
     private void level1(Param params) {
         jumpAround(params);
     }
+
     private void level2(Param params) {
         jumpAround(params);
     }
+
     private void level3(Param params) {
         jumpAround(params);
     }
+
     private void level4(Param params) {
         jumpAround(params);
     }
+
     private void level5(Param params) {
         jumpAround(params);
     }
+
     private void level6(Param params) {
         jumpAround(params);
     }
+
     private void level7(Param params) {
         jumpAround(params);
     }
+
     private void level8(Param params) {
         jumpAround(params);
     }
+
     private void level9(Param params) {
         jumpAround(params);
     }
+
     private void level10(Param params) {
         jumpAround(params);
     }
+
     private void level11(Param params) {
         jumpAround(params);
     }
+
     private void level12(Param params) {
         jumpAround(params);
     }
+
     private void level13(Param params) {
         jumpAround(params);
     }
+
     private void level14(Param params) {
         jumpAround(params);
     }
+
     private void level15(Param params) {
         jumpAround(params);
     }
+
     private void level16(Param params) {
         jumpAround(params);
     }
+
     private void level17(Param params) {
         jumpAround(params);
     }
+
     private void level18(Param params) {
         jumpAround(params);
     }
+
     private void level19(Param params) {
         jumpAround(params);
     }
+
     private void level20(Param params) {
         jumpAround(params);
     }
 
     private void jumpAround(Param params) {
-        if(params.curDepth > params.maxDepth) {
+        if (params.curDepth > params.maxDepth) {
             doSecondWorthOfWork();
             return;
-        }
-        else {
+        } else {
             Param next = params.next();
             next.jump();
         }
     }
 
     private void doSecondWorthOfWork() {
-        for(int i = 0; i < iterationCounts.length; ++i) {
+        for (int i = 0; i < iterationCounts.length; ++i) {
             try (ClosablePerfCtx ctx = perfctxs[i][rndGen.getInt(perfCtxCount)].open()) {
                 for (int j = 0; j < iterationCounts[i]; ++j) {
                     work[i].run();
@@ -151,8 +175,11 @@ public class Inception {
     }
 
     private class Param {
+
         public int idx;
+
         public int maxDepth;
+
         public int curDepth;
 
         public Param(int maxDepth, int curDepth, int idx) {
