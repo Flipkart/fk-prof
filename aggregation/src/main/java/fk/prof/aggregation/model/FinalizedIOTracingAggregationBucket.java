@@ -12,10 +12,12 @@ import java.util.Map;
 
 public class FinalizedIOTracingAggregationBucket implements FinalizedWorkSpecificAggregationBucket {
   protected final MethodIdLookup methodIdLookup;
+  protected final IOSourceLookup ioSourceLookup;
   protected final Map<String, IOTracingTraceDetail> traceDetailLookup;
 
-  public FinalizedIOTracingAggregationBucket(MethodIdLookup methodIdLookup, Map<String, IOTracingTraceDetail> traceDetailLookup) {
+  public FinalizedIOTracingAggregationBucket(MethodIdLookup methodIdLookup, IOSourceLookup ioSourceLookup, Map<String, IOTracingTraceDetail> traceDetailLookup) {
     this.methodIdLookup = methodIdLookup;
+    this.ioSourceLookup = ioSourceLookup;
     this.traceDetailLookup = traceDetailLookup;
   }
 
@@ -30,6 +32,7 @@ public class FinalizedIOTracingAggregationBucket implements FinalizedWorkSpecifi
 
     FinalizedIOTracingAggregationBucket other = (FinalizedIOTracingAggregationBucket) o;
     return this.methodIdLookup.equals(other.methodIdLookup)
+        && this.ioSourceLookup.equals(other.ioSourceLookup)
         && this.traceDetailLookup.equals(other.traceDetailLookup);
   }
 
