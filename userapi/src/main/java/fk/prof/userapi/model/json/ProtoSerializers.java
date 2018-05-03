@@ -25,6 +25,7 @@ public class ProtoSerializers {
         module.addSerializer(Profile.RecorderDetails.class, new RecorderDetailsSerializer());
         module.addSerializer(Profile.ProfileWorkInfo.class, new ProfileWorkInfoSerializer());
         module.addSerializer(Profile.TraceCtxDetail.class, new TraceCtxDetailsSerializer());
+        module.addSerializer(Profile.IOSource.class, new IOSourceSerializer());
         om.registerModule(module);
     }
 
@@ -98,7 +99,7 @@ public class ProtoSerializers {
         @Override
         public void serialize(Profile.IOTracingNodeProps value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             gen.writeStartArray();
-            gen.writeNumber(value.getFdIdx());
+            gen.writeNumber(value.getSrcIdx());
             gen.writeString(value.getTraceType().toString());
             gen.writeNumber(value.getSamples());
             gen.writeNumber(value.getLatency99());
@@ -106,6 +107,20 @@ public class ProtoSerializers {
             gen.writeNumber(value.getMean());
             gen.writeNumber(value.getBytes());
             gen.writeBoolean(value.getDropped());
+            gen.writeEndArray();
+        }
+    }
+
+    static class IOSourceSerializer extends StdSerializer<Profile.IOSource> {
+        public IOSourceSerializer() {
+            super(Profile.IOSource.class);
+        }
+
+        @Override
+        public void serialize(Profile.IOSource value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeStartArray();
+            gen.writeString(value.getFdType().toString());
+            gen.writeString(value.getUri());
             gen.writeEndArray();
         }
     }

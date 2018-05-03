@@ -122,7 +122,9 @@ public class AggregatedProfileLoader {
             checksumVerify((int) checksum.getValue(), Deserializer.readVariantInt32(in), "checksum error profileWorkInfo");
 
             Profile.MethodLookUp methodLookUp;
+            fk.prof.idl.Profile.IOSources ioSources;
             Map<String, AggregatedSamplesPerTraceCtx> samplesPerTrace = new HashMap<>();
+
             switch (filename.workType) {
                 case cpu_sample_work:
                     methodLookUp = Deserializer.readCheckedDelimited(Profile.MethodLookUp.parser(), cin, "methodLookup");
@@ -134,10 +136,11 @@ public class AggregatedProfileLoader {
                     break;
                 case io_trace_work:
                     methodLookUp = Deserializer.readCheckedDelimited(Profile.MethodLookUp.parser(), cin, "methodLookup");
+                    ioSources = Deserializer.readCheckedDelimited(Profile.IOSources.parser(), cin, "ioSourcesLookup");
                     checksumReset(checksum);
                     for (String traceName : traceNames.getNameList()) {
                         samplesPerTrace.put(traceName,
-                            new AggregatedSamplesPerTraceCtx(methodLookUp, new AggregatedIOTraceData(parseStacktraceTree(cin))));
+                            new AggregatedSamplesPerTraceCtx(methodLookUp, new AggregatedIOTraceData(ioSources.getIoSourcesList(), parseStacktraceTree(cin))));
                     }
                     break;
                 default:
