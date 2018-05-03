@@ -74,8 +74,13 @@ message MethodLookUp {
     repeated string fqdn = 1;
 }
 
-message FDLookup {
-    repeated FDInfo fd_info = 1;
+message IOSource {
+    required FDType fd_type = 1;
+    optional string uri = 2;
+}
+
+message IOSources {
+    repeated IOSource io_sources = 1;
 }
 
 // Represents the node of the stackTrace tree. Each node has methodId, line no.
@@ -100,7 +105,7 @@ message CPUSamplingNodeProps {
 }
 
 message IOTracingNodeProps {
-    optional uint32 fdIdx = 1;
+    optional uint32 srcIdx = 1;
     optional IOTraceType traceType = 2;
     optional uint32 samples = 3;
     optional float latency99 = 4;

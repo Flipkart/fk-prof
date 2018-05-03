@@ -28,8 +28,8 @@ class IOTracingAggregatedSamplesSerializer implements Serializer {
     Checksum checksum = new Adler32();
     CheckedOutputStream cout = new CheckedOutputStream(out, checksum);
 
-    // method lookup
-    Serializer.writeCheckedDelimited(ioTracingAggregation.methodIdLookup.buildMethodIdLookupProto(), cout);
+    Serializer.writeCheckedDelimited(ioTracingAggregation.methodIdLookup.buildProto(), cout);
+    Serializer.writeCheckedDelimited(ioTracingAggregation.ioSourceLookup.buildProto(), cout);
 
     // stacktrace tree
     checksum.reset();

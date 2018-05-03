@@ -592,6 +592,16 @@ public class ProfileApiTest {
     expectedMethodIdLookup.getOrAdd("#F ()");
     expectedMethodIdLookup.getOrAdd("#E ()");
 
+    IOSourceLookup expectedIOSourceLookup = new IOSourceLookup();
+    expectedIOSourceLookup.getOrAdd(Recording.FDInfo.newBuilder()
+        .setId(10).setFdType(Recording.FDType.file)
+        .setFileInfo(Recording.FileInfo.newBuilder().setFilename("/hello_world.txt").build())
+        .build());
+    expectedIOSourceLookup.getOrAdd(Recording.FDInfo.newBuilder()
+        .setId(11).setFdType(Recording.FDType.socket)
+        .setSocketInfo(Recording.SocketInfo.newBuilder().setAddress("http://hello.world").setConnect(true).build())
+        .build());
+
     Map<String, IOTracingTraceDetail> traces = new HashMap<>();
 
     IOTracingTraceDetail expectedDetails = new IOTracingTraceDetail();
@@ -600,30 +610,30 @@ public class ProfileApiTest {
     IOTracingFrameNode d1 = expectedRoot.getOrAddChild(2, 10);
     IOTracingFrameNode b1 = d1.getOrAddChild(3, 10);
     IOTracingFrameNode a1 = b1.getOrAddChild(4, 10);
-    a1.addTrace(10, Recording.IOTraceType.file_read, 1000, 1000, false);
+    a1.addTrace(4, Recording.IOTraceType.file_read, 1000, 1000, false);
 
     IOTracingFrameNode f1 = expectedRoot.getOrAddChild(5, 10);
     IOTracingFrameNode e1 = f1.getOrAddChild(6, 10);
     IOTracingFrameNode b2 = e1.getOrAddChild(3, 10);
     IOTracingFrameNode a2 = b2.getOrAddChild(4, 10);
-    a2.addTrace(11, Recording.IOTraceType.socket_read, 1000, 1100, false);
+    a2.addTrace(5, Recording.IOTraceType.socket_read, 1000, 1100, false);
 
     IOTracingFrameNode e2 = expectedRoot.getOrAddChild(6, 10);
     IOTracingFrameNode b3 = e2.getOrAddChild(3, 10);
     IOTracingFrameNode a3 = b3.getOrAddChild(4, 10);
-    a3.addTrace(10, Recording.IOTraceType.file_write, 1000, 1000, false);
+    a3.addTrace(4, Recording.IOTraceType.file_write, 1000, 1000, false);
 
     IOTracingFrameNode e3 = e2.getOrAddChild(6, 10);
     IOTracingFrameNode b4 = e3.getOrAddChild(3, 10);
     IOTracingFrameNode a4 = b4.getOrAddChild(4, 10);
-    a4.addTrace(11, Recording.IOTraceType.socket_write, 1000, 1100, false);
+    a4.addTrace(5, Recording.IOTraceType.socket_write, 1000, 1100, false);
 
     for (int i = 0; i < 4; i++) {
       expectedDetails.incrementSamples();
     }
     traces.put("1", expectedDetails);
 
-    return new FinalizedIOTracingAggregationBucket(expectedMethodIdLookup, traces);
+    return new FinalizedIOTracingAggregationBucket(expectedMethodIdLookup, expectedIOSourceLookup, traces);
   }
 
   private FinalizedProfileWorkInfo getExpectedWorkInfo(LocalDateTime startedAt, LocalDateTime endedAt, Map<WorkEntities.WorkType, Integer> samplesMap) {

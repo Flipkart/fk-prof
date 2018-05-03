@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class IOTracingProps {
   public final static int MAX_SAMPLES = 1500;
 
-  private final int fdIdx;
+  private final int srcIdx;
   private final Recording.IOTraceType traceType;
 
   private AtomicInteger samples = new AtomicInteger(0);
@@ -21,8 +21,8 @@ public class IOTracingProps {
   private AtomicLong bytesSum = new AtomicLong(0);
   private AtomicInteger timeouts = new AtomicInteger(0);
 
-  public IOTracingProps(int fdIdx, Recording.IOTraceType traceType) {
-    this.fdIdx = fdIdx;
+  public IOTracingProps(int srcIdx, Recording.IOTraceType traceType) {
+    this.srcIdx = srcIdx;
     this.traceType = traceType;
   }
 
@@ -61,7 +61,7 @@ public class IOTracingProps {
     }
 
     IOTracingProps other = (IOTracingProps) o;
-    return this.fdIdx == other.fdIdx
+    return this.srcIdx == other.srcIdx
         && this.traceType.equals(other.traceType)
         && this.samples.get() == other.samples.get();
   }
@@ -69,7 +69,7 @@ public class IOTracingProps {
   protected Profile.IOTracingNodeProps buildProto() {
     Collections.sort(latencies);
     return Profile.IOTracingNodeProps.newBuilder()
-        .setFdIdx(fdIdx)
+        .setSrcIdx(srcIdx)
         .setTraceType(traceType)
         .setSamples(samples.get())
         .setDropped(samples.get() > MAX_SAMPLES)

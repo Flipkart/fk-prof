@@ -29,7 +29,7 @@ class CpuSamplingAggregatedSamplesSerializer implements Serializer {
     CheckedOutputStream cout = new CheckedOutputStream(out, checksum);
 
     // method lookup
-    Serializer.writeCheckedDelimited(cpuSamplingAggregation.methodIdLookup.buildMethodIdLookupProto(), cout);
+    Serializer.writeCheckedDelimited(cpuSamplingAggregation.methodIdLookup.buildProto(), cout);
 
     // stacktrace tree
     checksum.reset();
