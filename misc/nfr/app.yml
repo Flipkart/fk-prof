@@ -59,8 +59,6 @@ appIp: 127.0.0.1
 appPort: 8081
 appPort2: 8083
 
-driver: false
-
 isDebug: true
 
 enableCpuWork: false

@@ -14,19 +14,17 @@ import org.apache.http.client.HttpClient;
 
 public class LoadGenApp extends Application<LoadGenAppConfig> {
 
-    private final HibernateBundle<LoadGenAppConfig> hibernate =
+    private final HibernateBundle<LoadGenAppConfig> hibernate = !isDriver() ?
         new HibernateBundle<LoadGenAppConfig>(User.class) {
-
             private PooledDataSourceFactory sessionFactory = null;
-
             @Override
-            public PooledDataSourceFactory getDataSourceFactory(LoadGenAppConfig dropwizardConfig) {
+            public PooledDataSourceFactory getDataSourceFactory(LoadGenAppConfig config) {
                 if (sessionFactory == null) {
-                    sessionFactory = dropwizardConfig.getDataSourceFactory();
+                    sessionFactory = config.getDataSourceFactory();
                 }
                 return sessionFactory;
             }
-        };
+        } : null;
 
     public static void main(String[] args) throws Exception {
         new LoadGenApp().run(args);
@@ -34,13 +32,15 @@ public class LoadGenApp extends Application<LoadGenAppConfig> {
 
     @Override
     public void initialize(Bootstrap<LoadGenAppConfig> bootstrap) {
-        bootstrap.addBundle(hibernate);
+        if(!isDriver()) {
+            bootstrap.addBundle(hibernate);
+        }
     }
 
     @Override
     public void run(LoadGenAppConfig config, Environment environment) throws Exception {
         // app in test
-        if (!config.isDriver()) {
+        if (!isDriver()) {
             startLoad(config, environment);
         } else {
             // driver app
@@ -74,5 +74,9 @@ public class LoadGenApp extends Application<LoadGenAppConfig> {
                         config.getThreadSpawnConfig().threadSleepDuration, config.getDebug()).doWork());
             }
         }
+    }
+
+    private boolean isDriver() {
+        return Boolean.parseBoolean(System.getProperties().getProperty("driver", "false"));
     }
 }

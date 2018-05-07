@@ -1,36 +1,3 @@
-database:
-  # the name of your JDBC driver
-  driverClass: com.mysql.cj.jdbc.Driver
-
-  # the username
-  user: root
-
-  # the password
-  password: password
-
-  # the JDBC URL
-  url: jdbc:mysql://127.0.0.1/user
-
-  # any properties specific to your JDBC driver:
-  properties:
-    charSet: UTF-8
-    hibernate.dialect: org.hibernate.dialect.MySQLDialect
-
-  # the maximum amount of time to wait on an empty pool before throwing an exception
-  maxWaitForConnection: 1s
-
-  # the SQL query to run when validating a connection's liveness
-  validationQuery: "/* MyApplication Health Check */ SELECT 1"
-
-  # the minimum number of connections to keep open
-  minSize: 2
-
-  # the maximum number of connections to keep open
-  maxSize: 32
-
-  # whether or not idle connections should be validated
-  checkConnectionWhileIdle: false
-
 server:
   type: default
   maxThreads: 128
@@ -48,8 +15,6 @@ driverPort: 8082
 appIp: 127.0.0.1
 appPort: 8081
 appPort2: 8083
-
-driver: true
 
 httpClient:
   timeout: 1000ms

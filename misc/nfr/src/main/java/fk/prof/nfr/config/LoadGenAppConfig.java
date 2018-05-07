@@ -12,8 +12,6 @@ import org.apache.logging.log4j.core.config.plugins.validation.constraints.Valid
 
 public class LoadGenAppConfig extends Configuration {
 
-    @Valid
-    @NotNull
     @JsonProperty("database")
     private DataSourceFactory database = new DataSourceFactory();
 
@@ -41,10 +39,6 @@ public class LoadGenAppConfig extends Configuration {
     @NotNull
     @JsonProperty("appPort2")
     private Integer appPort2;
-
-    @NotNull
-    @JsonProperty("driver")
-    private Boolean isDriver;
 
     @NotNull
     @JsonProperty("enableCpuWork")
@@ -91,10 +85,6 @@ public class LoadGenAppConfig extends Configuration {
 
     public Integer getAppPort2() {
         return appPort2;
-    }
-
-    public Boolean isDriver() {
-        return isDriver;
     }
 
     @JsonProperty("httpClient")
