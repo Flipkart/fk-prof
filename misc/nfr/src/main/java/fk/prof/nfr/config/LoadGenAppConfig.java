@@ -37,6 +37,11 @@ public class LoadGenAppConfig extends Configuration {
     @JsonProperty("appPort")
     private Integer appPort;
 
+    @ValidPort
+    @NotNull
+    @JsonProperty("appPort2")
+    private Integer appPort2;
+
     @NotNull
     @JsonProperty("driver")
     private Boolean isDriver;
@@ -82,6 +87,10 @@ public class LoadGenAppConfig extends Configuration {
 
     public Integer getAppPort() {
         return appPort;
+    }
+
+    public Integer getAppPort2() {
+        return appPort2;
     }
 
     public Boolean isDriver() {

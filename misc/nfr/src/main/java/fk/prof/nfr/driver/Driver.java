@@ -23,40 +23,48 @@ public class Driver implements Runnable {
 
     private String ip;
 
-    private int port;
+    private int port1, port2;
 
-    public Driver(HttpClient client, String ip, int port) {
+    public Driver(HttpClient client, String ip, int port1, int port2) {
         this.client = client;
         this.ip = ip;
-        this.port = port;
+        this.port1 = port1;
+        this.port2 = port2;
     }
 
     @Override
     public void run() {
-        while (true) {
-            HttpUriRequest req = new HttpGet(uri());
-            HttpResponse resp = null;
-            try {
-                resp = client.execute(req);
-                String str = EntityUtils.toString(resp.getEntity());
-                dataTransferred += str.length();
-                reqDone++;
-            } catch (Exception e) {
-                logger.error(e.getMessage());
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException ie) {
-                    break;
-                }
-            } finally {
-                if (resp != null) {
-                    EntityUtils.consumeQuietly(resp.getEntity());
-                }
-            }
-        }
+        startRequests(port1);
+        startRequests(port2);
     }
 
-    private String uri() {
+    private void startRequests(int port) {
+        new Thread(() -> {
+            while (true) {
+                HttpUriRequest req = new HttpGet(uri(port));
+                HttpResponse resp = null;
+                try {
+                    resp = client.execute(req);
+                    String str = EntityUtils.toString(resp.getEntity());
+                    dataTransferred += str.length();
+                    reqDone++;
+                } catch (Exception e) {
+                    logger.error(e.getMessage());
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException ie) {
+                        break;
+                    }
+                } finally {
+                    if (resp != null) {
+                        EntityUtils.consumeQuietly(resp.getEntity());
+                    }
+                }
+            }
+        }).start();
+    }
+
+    private String uri(int port) {
         return "http://" + ip + ":" + port + "/load-gen-app/io?id=" + rndmId();
     }
 

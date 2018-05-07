@@ -47,6 +47,7 @@ driverPort: 8082
 
 appIp: 127.0.0.1
 appPort: 8081
+appPort2: 8083
 
 driver: true
 
@@ -59,3 +60,8 @@ httpClient:
   maxConnectionsPerRoute: 32
   keepAlive: 1000ms
   retries: 0
+
+isDebug: true
+
+enableCpuWork: false
+enableIoWork: true

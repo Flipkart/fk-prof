@@ -14,13 +14,19 @@ import org.apache.http.client.HttpClient;
 
 public class LoadGenApp extends Application<LoadGenAppConfig> {
 
-    private final HibernateBundle<LoadGenAppConfig> hibernate = new HibernateBundle<LoadGenAppConfig>(
-        User.class) {
-        @Override
-        public PooledDataSourceFactory getDataSourceFactory(LoadGenAppConfig dropwizardConfig) {
-            return dropwizardConfig.getDataSourceFactory();
-        }
-    };
+    private final HibernateBundle<LoadGenAppConfig> hibernate =
+        new HibernateBundle<LoadGenAppConfig>(User.class) {
+
+            private PooledDataSourceFactory sessionFactory = null;
+
+            @Override
+            public PooledDataSourceFactory getDataSourceFactory(LoadGenAppConfig dropwizardConfig) {
+                if (sessionFactory == null) {
+                    sessionFactory = dropwizardConfig.getDataSourceFactory();
+                }
+                return sessionFactory;
+            }
+        };
 
     public static void main(String[] args) throws Exception {
         new LoadGenApp().run(args);
@@ -43,7 +49,7 @@ public class LoadGenApp extends Application<LoadGenAppConfig> {
             final HttpClient httpClient = new HttpClientBuilder(environment)
                 .using(config.getHttpClientConfiguration())
                 .build(getName());
-            final Driver driverApp = new Driver(httpClient, config.getAppIp(), config.getAppPort());
+            final Driver driverApp = new Driver(httpClient, config.getAppIp(), config.getAppPort(), config.getAppPort2());
 
             Executors.newSingleThreadExecutor().submit(driverApp);
         }
@@ -52,7 +58,11 @@ public class LoadGenApp extends Application<LoadGenAppConfig> {
     private void startLoad(LoadGenAppConfig config, Environment environment) {
         if (config.getEnableIoWork()) {
             final UserDAO dao = new UserDAO(hibernate.getSessionFactory());
-            environment.jersey().register(new DropwizardResource(config.getDriverIp(), config.getDriverPort(), dao));
+            IOService svc = new IOService(config.getDriverIp(), config.getDriverPort(), dao);
+            environment.jersey().register(new DropwizardResource(svc));
+
+            // netty server
+            new NettyHttpServer(config.getAppPort2(), svc, hibernate.getSessionFactory()).start();
         }
 
         if (config.getEnableCpuWork()) {
