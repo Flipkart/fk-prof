@@ -38,11 +38,11 @@ public class ChannelHandler implements ChannelPoolHandler {
         p.addLast("aggregator", new HttpObjectAggregator(1048576));
         p.addLast("contentExtractor", new ResponseHandler());
 
-        logger.info("[ " + this.remoteAddress + "] channel CREATED. Total count : " + count.get());
+        logger.debug("[ " + this.remoteAddress + "] channel CREATED. Total count : " + count.get());
 
         ch.closeFuture().addListener(f -> {
             count.decrementAndGet();
-            logger.info("[ " + this.remoteAddress + "] channel CLOSED. Total count : " + count.get());
+            logger.debug("[ " + this.remoteAddress + "] channel CLOSED. Total count : " + count.get());
         });
     }
 }
