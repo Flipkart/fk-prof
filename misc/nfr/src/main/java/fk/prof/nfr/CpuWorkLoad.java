@@ -90,7 +90,7 @@ public class CpuWorkLoad implements Runnable {
                 Runnable[] work = getWork(rndGen);
 
                 Inception inception = new Inception(iterationCounts, work, perfctxs, rndGen,
-                    config.stacktraceFanOut, config.stacktraceDepth, counters);
+                                                    config.stacktraceFanOut, config.stacktraceDepth, counters);
                 while (true) {
                     long start = System.currentTimeMillis();
                     inception.doWorkOnSomeLevel();

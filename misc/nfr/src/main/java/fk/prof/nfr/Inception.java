@@ -30,7 +30,7 @@ public class Inception {
     AtomicInteger[] counters;
 
     public Inception(int[] iterations, Runnable[] work, PerfCtx[][] perfctxs, RndGen rndGen,
-        int maxFanOut, int maxlevelDepth, AtomicInteger[] counters) {
+                     int maxFanOut, int maxlevelDepth, AtomicInteger[] counters) {
         assert maxFanOut <= 20 : "fanout cannot be no more than 20";
         this.maxFanOut = maxFanOut;
         this.iterationCounts = iterations;

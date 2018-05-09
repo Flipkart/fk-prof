@@ -15,7 +15,7 @@ public class RndGen {
 
     int idx = bytes.length;
 
-    Random rnd = new Random();
+    Random rnd = new Random(0);
 
     {
         for (int i = 0; i < 26; ++i) {

@@ -1,11 +1,14 @@
 package fk.prof.nfr.driver;
 
+import com.codahale.metrics.Meter;
+import com.codahale.metrics.MetricRegistry;
+import fk.prof.nfr.netty.client.HttpClient;
+import io.netty.util.concurrent.EventExecutorGroup;
+import io.netty.util.concurrent.Promise;
+import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.Random;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.util.EntityUtils;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,57 +18,75 @@ public class Driver implements Runnable {
 
     private final HttpClient client;
 
+    private final EventExecutorGroup executors;
+
     private final Random rndm = new Random();
 
-    long dataTransferred = 0;
+    private final List<InetSocketAddress> servers;
 
-    long reqDone = 0;
+    private final int maxRequestsInFlight;
 
-    private String ip;
+    private final Meter requestsInitiated, requestsCompleted;
 
-    private int port1, port2;
+    private final AtomicBoolean running = new AtomicBoolean(false);
 
-    public Driver(HttpClient client, String ip, int port1, int port2) {
+    public Driver(HttpClient client, EventExecutorGroup executors, List<InetSocketAddress> servers,
+                  int maxRequestsInFlight, MetricRegistry metricsRegistry) {
         this.client = client;
-        this.ip = ip;
-        this.port1 = port1;
-        this.port2 = port2;
+        this.executors = executors;
+        this.servers = servers;
+        this.maxRequestsInFlight = maxRequestsInFlight;
+        this.requestsInitiated = metricsRegistry.meter("driver.requests.initiated");
+        this.requestsCompleted = metricsRegistry.meter("driver.requests.completed");
+        metricsRegistry.gauge("driver.running", () -> running::get);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> running.set(false)));
     }
 
     @Override
     public void run() {
-        startRequests(port1);
-        startRequests(port2);
+        startRequests();
     }
 
-    private void startRequests(int port) {
+    private void startRequests() {
         new Thread(() -> {
-            while (true) {
-                HttpUriRequest req = new HttpGet(uri(port));
-                HttpResponse resp = null;
-                try {
-                    resp = client.execute(req);
-                    String str = EntityUtils.toString(resp.getEntity());
-                    dataTransferred += str.length();
-                    reqDone++;
-                } catch (Exception e) {
-                    logger.error(e.getMessage());
+            running.set(true);
+            while (running.get()) {
+                if (requestsInitiated.getCount() - requestsCompleted.getCount() > maxRequestsInFlight) {
                     try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ie) {
-                        break;
-                    }
-                } finally {
-                    if (resp != null) {
-                        EntityUtils.consumeQuietly(resp.getEntity());
+                        Thread.sleep(100);
+                        continue;
+                    } catch (Exception e) {
+                        // ignore
+                        logger.error(
+                            "Sleep interrupted for driver, " + requestsInitiated.getCount() + ", " + requestsCompleted
+                                .getCount());
                     }
                 }
+
+                int serverId = rndm.nextInt(servers.size());
+                InetSocketAddress address = servers.get(serverId);
+
+                Promise<String> promise = executors.next().newPromise();
+                client.doGet(address.getHostString(), address.getPort(), path(), promise, true);
+                requestsInitiated.mark();
+
+                promise.addListener(f -> {
+                    requestsCompleted.mark();
+                    if (logger.isDebugEnabled()) {
+                        logger.debug(
+                            "driver -- " + requestsInitiated.getCount() + " -- " + requestsCompleted.getCount() + " "
+                                + (
+                                f.isSuccess() ? f.getNow()
+                                    : f.cause().getMessage()));
+                    }
+                });
             }
         }).start();
     }
 
-    private String uri(int port) {
-        return "http://" + ip + ":" + port + "/load-gen-app/io?id=" + rndmId();
+    private String path() {
+        return "/load-gen-app/io?id=" + rndmId();
     }
 
     private int rndmId() {

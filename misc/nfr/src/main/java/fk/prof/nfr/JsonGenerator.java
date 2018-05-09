@@ -18,7 +18,7 @@ public class JsonGenerator {
     private static RndGen rnd;
 
     private static PerfCtx childCtx = new PerfCtx("hashmap-create-ctx", 20,
-        MergeSemantics.PARENT_SCOPED);
+                                                  MergeSemantics.PARENT_SCOPED);
 
     public JsonGenerator(RndGen rndGen) {
         this.rnd = rndGen;
@@ -41,7 +41,7 @@ public class JsonGenerator {
     }
 
     private void genFields(Map<String, Object> map, int size, int idx, float objProb,
-        float arrayProb) {
+                           float arrayProb) {
 
         if (idx < size) {
             map.put(randomString(32), genRndmObject(size / 2, objProb, arrayProb));

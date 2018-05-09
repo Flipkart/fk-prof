@@ -9,15 +9,13 @@ server:
     - type: http
       port: 8181
 
-httpClient:
-  timeout: 1000ms
-  connectionTimeout: 1000ms
-  timeToLive: 1h
-  cookiesEnabled: false
-  maxConnections: 32
-  maxConnectionsPerRoute: 32
-  keepAlive: 0ms
-  retries: 0
+metrics:
+  reporters:
+    - type: csv
+      file: /tmp/load-gen-app1/metrics
+      includes: ["driver.requests.completed.csv", "driver.requests.initiated.csv", "driver.running"]
+      frequency: 1 second
+
 
 database:
   # the name of your JDBC driver
@@ -52,17 +50,18 @@ database:
   # whether or not idle connections should be validated
   checkConnectionWhileIdle: false
 
-driverIp: 127.0.0.1
-driverPort: 8082
-
-appIp: 127.0.0.1
-appPort: 8081
-appPort2: 8083
+serversList: ["127.0.0.1:8081", "127.0.0.1:8082", "127.0.0.1:8083", "127.0.0.1:8084"]
 
 isDebug: true
 
 enableCpuWork: false
 enableIoWork: true
+
+ioWork:
+  nioThreadCnt: 1
+  workerThreadCnt: 32
+  driverRequestsInFlight: 5
+
 cpuWork:
   threadCnt: 6
   loadShare: [0.33, 0.33, 0.34]

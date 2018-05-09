@@ -2,43 +2,24 @@ package fk.prof.nfr.config;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.dropwizard.Configuration;
-import io.dropwizard.client.HttpClientConfiguration;
 import io.dropwizard.db.DataSourceFactory;
+import java.net.InetSocketAddress;
+import java.util.List;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
-import org.apache.logging.log4j.core.config.plugins.validation.constraints.ValidHost;
-import org.apache.logging.log4j.core.config.plugins.validation.constraints.ValidPort;
 
 public class LoadGenAppConfig extends Configuration {
 
+    @NotNull
+    @Valid
     @JsonProperty("database")
     private DataSourceFactory database = new DataSourceFactory();
 
-    @ValidHost
     @NotNull
-    @JsonProperty("driverIp")
-    private String driverIp;
-
-    @ValidPort
-    @NotNull
-    @JsonProperty("driverPort")
-    private Integer driverPort;
-
-    @ValidHost
-    @NotNull
-    @JsonProperty("appIp")
-    private String appIp;
-
-    @ValidPort
-    @NotNull
-    @JsonProperty("appPort")
-    private Integer appPort;
-
-    @ValidPort
-    @NotNull
-    @JsonProperty("appPort2")
-    private Integer appPort2;
+    @JsonProperty("serversList")
+    private List<InetSocketAddress> servers;
 
     @NotNull
     @JsonProperty("enableCpuWork")
@@ -47,6 +28,10 @@ public class LoadGenAppConfig extends Configuration {
     @NotNull
     @JsonProperty("enableIoWork")
     private Boolean enableIoWork;
+
+    @Nullable
+    @JsonProperty("ioWork")
+    private IoWorkConfig ioWorkConfig;
 
     @Nullable
     @JsonProperty("cpuWork")
@@ -59,42 +44,12 @@ public class LoadGenAppConfig extends Configuration {
     @JsonProperty("isDebug")
     private Boolean isDebug;
 
-    @Valid
-    @NotNull
-    private HttpClientConfiguration httpClient = new HttpClientConfiguration();
-
     public DataSourceFactory getDataSourceFactory() {
         return database;
     }
 
-    public String getDriverIp() {
-        return driverIp;
-    }
-
-    public Integer getDriverPort() {
-        return driverPort;
-    }
-
-    public String getAppIp() {
-        return appIp;
-    }
-
-    public Integer getAppPort() {
-        return appPort;
-    }
-
-    public Integer getAppPort2() {
-        return appPort2;
-    }
-
-    @JsonProperty("httpClient")
-    public HttpClientConfiguration getHttpClientConfiguration() {
-        return httpClient;
-    }
-
-    @JsonProperty("httpClient")
-    public void setHttpClientConfiguration(HttpClientConfiguration httpClient) {
-        this.httpClient = httpClient;
+    public IoWorkConfig getIoWorkConfig() {
+        return ioWorkConfig;
     }
 
     public CpuWorkConfig getCpuWorkConfig() {
@@ -115,5 +70,16 @@ public class LoadGenAppConfig extends Configuration {
 
     public Boolean getDebug() {
         return isDebug;
+    }
+
+    public List<InetSocketAddress> getServers() {
+        return servers;
+    }
+
+    public void setServers(List<String> instances) {
+        this.servers = instances.stream().map(s -> {
+            String[] ipPortPair = s.split(":");
+            return InetSocketAddress.createUnresolved(ipPortPair[0], Integer.parseInt(ipPortPair[1]));
+        }).collect(Collectors.toList());
     }
 }
