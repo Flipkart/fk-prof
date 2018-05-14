@@ -134,7 +134,7 @@
               <goal>run</goal>
             </goals>
             <configuration>
-              <protocVersion>3.1.0</protocVersion>
+              <protocVersion>${protoc.version}</protocVersion>
               <inputDirectories>
                 <include>../idl/</include>
               </inputDirectories>

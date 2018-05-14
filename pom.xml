@@ -30,6 +30,8 @@
         <maven.jar.version>3.0.2</maven.jar.version>
         <jackson.version>2.7.4</jackson.version>
         <hibernate.version>5.4.1.Final</hibernate.version>
+        <protoc.version>3.5.1</protoc.version>
+        <protobuf.version>3.5.1</protobuf.version>
     </properties>
 
     <dependencyManagement>
@@ -42,12 +44,12 @@
             <dependency>
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java</artifactId>
-                <version>3.1.0</version>
+                <version>${protobuf.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java-util</artifactId>
-                <version>3.1.0</version>
+                <version>${protobuf.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
