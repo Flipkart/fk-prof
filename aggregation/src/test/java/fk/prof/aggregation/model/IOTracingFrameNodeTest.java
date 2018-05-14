@@ -31,15 +31,15 @@ public class IOTracingFrameNodeTest {
 
     Set<Profile.IOTracingNodeProps> props = new HashSet<>();
     props.add(Profile.IOTracingNodeProps.newBuilder()
-        .setFdIdx(1).setTraceType(Recording.IOTraceType.file_read)
+        .setSrcIdx(1).setTraceType(Recording.IOTraceType.file_read)
         .setSamples(3).setLatency95(30).setLatency99(30)
         .setMean(20).setBytes(600).setDropped(false).build());
     props.add(Profile.IOTracingNodeProps.newBuilder()
-        .setFdIdx(1).setTraceType(Recording.IOTraceType.file_write)
+        .setSrcIdx(1).setTraceType(Recording.IOTraceType.file_write)
         .setSamples(3).setLatency95(20).setLatency99(20)
         .setMean((40.0f/3.0f)).setBytes(300).setDropped(false).build());
     props.add(Profile.IOTracingNodeProps.newBuilder()
-        .setFdIdx(2).setTraceType(Recording.IOTraceType.file_write)
+        .setSrcIdx(2).setTraceType(Recording.IOTraceType.file_write)
         .setSamples(1).setLatency95(20).setLatency99(20)
         .setMean(20).setBytes(200).setDropped(false).build());
     Assert.assertEquals(props, new HashSet<>(fn.getIoTracingPropsList()));

@@ -46,8 +46,8 @@ public class IOTracingFrameNode extends StacktraceFrameNode<IOTracingFrameNode> 
     }
   }
 
-  public boolean addTrace(int fdIdx, Recording.IOTraceType traceType, long latency, int bytes, boolean timeout) {
-    return getTracesForFd(fdIdx, traceType).addSample(latency, bytes, timeout);
+  public boolean addTrace(int srcIdx, Recording.IOTraceType traceType, long latency, int bytes, boolean timeout) {
+    return getTracesForIOSource(srcIdx, traceType).addSample(latency, bytes, timeout);
   }
 
   @Override
@@ -78,7 +78,7 @@ public class IOTracingFrameNode extends StacktraceFrameNode<IOTracingFrameNode> 
 
   protected Profile.FrameNode buildFrameNodeProto() {
     List<Profile.IOTracingNodeProps> nodeProps = this.getProps().values().stream()
-        .flatMap(fdEntry -> fdEntry.values().stream())
+        .flatMap(ioSrcEntry -> ioSrcEntry.values().stream())
         .map(IOTracingProps::buildProto)
         .collect(Collectors.toList());
 
@@ -112,12 +112,12 @@ public class IOTracingFrameNode extends StacktraceFrameNode<IOTracingFrameNode> 
     return propsForType;
   }
 
-  private IOTracingProps getTracesForFd(int fd, Recording.IOTraceType type) {
+  private IOTracingProps getTracesForIOSource(int srcIdx, Recording.IOTraceType type) {
     Map<Integer, IOTracingProps> propsForType = getPropsForActivityType(type);
-    IOTracingProps traces = propsForType.get(fd);
+    IOTracingProps traces = propsForType.get(srcIdx);
     if(traces == null) {
-      traces = new IOTracingProps(fd, type);
-      propsForType.put(fd, traces);
+      traces = new IOTracingProps(srcIdx, type);
+      propsForType.put(srcIdx, traces);
     }
     return traces;
   }

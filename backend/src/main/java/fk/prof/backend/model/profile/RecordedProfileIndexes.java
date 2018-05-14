@@ -8,6 +8,9 @@ import fk.prof.idl.Recording;
 
 import java.util.List;
 
+/**
+ * These indexes are maintained per recorder profile and not at an aggregated level.
+ */
 public class RecordedProfileIndexes {
   private final HashLongObjMap<String> methodLookup = HashLongObjMaps.newUpdatableMap();
   private final HashIntObjMap<String> traceLookup = HashIntObjMaps.newUpdatableMap();

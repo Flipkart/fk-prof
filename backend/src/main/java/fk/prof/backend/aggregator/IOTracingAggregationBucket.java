@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class IOTracingAggregationBucket extends WorkSpecificAggregationBucket<FinalizedIOTracingAggregationBucket> {
   private final MethodIdLookup methodIdLookup = new MethodIdLookup();
+  private final IOSourceLookup ioSourceLookup = new IOSourceLookup();
   private final ConcurrentHashMap<String, IOTracingTraceDetail> traceDetailLookup = new ConcurrentHashMap<>();
 
   /**
@@ -52,9 +53,14 @@ public class IOTracingAggregationBucket extends WorkSpecificAggregationBucket<Fi
               currentNode = currentNode.getOrAddChild(methodId, frame.getLineNo());
               //The first frame is the on-cpu frame so incrementing on-cpu samples count
               if (i == 0) {
+                Recording.FDInfo fdInfo = indexes.getFdInfo(ioTrace.getFdId());
+                if (fdInfo == null) {
+                  throw new AggregationFailure("Unknown FD id encountered in stack sample, aborting aggregation of this profile");
+                }
+                int ioSourceId = ioSourceLookup.getOrAdd(fdInfo);
                 int bytes = ioTrace.hasRead() ? ioTrace.getRead().getCount() : ioTrace.getWrite().getCount();
                 boolean timeout = ioTrace.hasRead() && ioTrace.getRead().getTimeout();
-                currentNode.addTrace(ioTrace.getFdId(), ioTrace.getType(), ioTrace.getLatencyNs(), bytes, timeout);
+                currentNode.addTrace(ioSourceId, ioTrace.getType(), ioTrace.getLatencyNs(), bytes, timeout);
               }
             }
           }
@@ -70,6 +76,7 @@ public class IOTracingAggregationBucket extends WorkSpecificAggregationBucket<Fi
   protected FinalizedIOTracingAggregationBucket buildFinalizedEntity() {
     return new FinalizedIOTracingAggregationBucket(
         methodIdLookup,
+        ioSourceLookup,
         traceDetailLookup
     );
   }
