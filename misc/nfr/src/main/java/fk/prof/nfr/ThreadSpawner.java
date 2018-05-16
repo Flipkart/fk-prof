@@ -1,11 +1,16 @@
 package fk.prof.nfr;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Random;
 
 /**
  * Created by gaurav.ashok on 16/09/17.
  */
 public class ThreadSpawner {
+
+    private static Logger logger = LoggerFactory.getLogger(ThreadSpawner.class);
 
     int n, maxSleepDuration;
 
@@ -43,11 +48,11 @@ public class ThreadSpawner {
                 threads[i] = new Thread(() -> {
                     try {
                         if (isDebug) {
-                            System.out.println("Threadspawner: thd " + th_id + " started");
+                            logger.info("Threadspawner: thd " + th_id + " started");
                         }
                         Thread.sleep(100 + (new Random().nextInt() % maxSleepDuration)); // atleast 100 ms.
                         if (isDebug) {
-                            System.out.println("Threadspawner: thd " + th_id + " will now end");
+                            logger.info("Threadspawner: thd " + th_id + " will now end");
                         }
                     } catch (Exception e) {
                     }

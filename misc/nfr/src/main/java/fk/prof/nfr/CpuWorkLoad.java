@@ -6,6 +6,9 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import fk.prof.PerfCtx;
 import fk.prof.nfr.config.CpuWorkConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Objects;
@@ -19,6 +22,8 @@ import java.util.stream.Stream;
  * Created by gaurav.ashok on 03/04/17.
  */
 public class CpuWorkLoad implements Runnable {
+
+    private static Logger logger = LoggerFactory.getLogger(CpuWorkLoad.class);
 
     static final ObjectMapper om = new ObjectMapper();
 
@@ -59,15 +64,13 @@ public class CpuWorkLoad implements Runnable {
                 totalTimings[1] += timings[1];
                 totalTimings[2] += timings[2];
             }
-            System.out.println(timings[0] + "\t" + timings[1] + "\t" + timings[2]);
+            logger.info(timings[0] + "\t" + timings[1] + "\t" + timings[2]);
         }
 
         totalTimings[0] /= 10;
         totalTimings[1] /= 10;
         totalTimings[2] /= 10;
-        System.out.println(
-            "averaged out over 10 runs: " + totalTimings[0] + "\t" + totalTimings[1] + "\t"
-                + totalTimings[2]);
+        logger.info("averaged out over 10 runs: " + totalTimings[0] + "\t" + totalTimings[1] + "\t" + totalTimings[2]);
 
         int[] iterationCounts = new int[config.loadTypes];
         for (int i = 0; i < config.loadTypes; ++i) {
@@ -75,9 +78,8 @@ public class CpuWorkLoad implements Runnable {
                 / (config.traceDuplicationMultiplier) / (totalTimings[i] / 1000.0f)));
         }
 
-        System.out.println(
-            "iterations for each load: " + iterationCounts[0] + "\t" + iterationCounts[1] + "\t"
-                + iterationCounts[2]);
+        logger.info("iterations for each load: " + iterationCounts[0] + "\t" + iterationCounts[1] + "\t"
+            + iterationCounts[2]);
 
         ExecutorService execSvc = Executors.newCachedThreadPool();
 
@@ -101,7 +103,7 @@ public class CpuWorkLoad implements Runnable {
 
                         long sleepFor = totalTimeShare - (end - start);
                         if (isDebug) {
-                            System.out.print("thread " + tid + " sleeping for " + sleepFor);
+                            logger.info("thread " + tid + " sleeping for " + sleepFor);
                         }
 
                         try {
@@ -126,7 +128,7 @@ public class CpuWorkLoad implements Runnable {
 
                 LocalDateTime ldt = LocalDateTime.now();
 
-                System.out.println(ldt + "\t" + (_c1 - c1) + "\t" + (_c2 - c2) + "\t" + (_c3 - c3));
+                logger.info(ldt + "\t" + (_c1 - c1) + "\t" + (_c2 - c2) + "\t" + (_c3 - c3));
                 c1 = _c1;
                 c2 = _c2;
                 c3 = _c3;
@@ -145,12 +147,12 @@ public class CpuWorkLoad implements Runnable {
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
-                System.out.println("Stopping cpu load");
+                logger.info("Stopping cpu load");
                 execSvc.shutdownNow();
                 execSvc.awaitTermination(5000, TimeUnit.MILLISECONDS);
-                System.out.println("Stopped cpu load");
+                logger.info("Stopped cpu load");
             } catch (Exception e) {
-                System.err.println("Issue in shutdown hook for cpu load: " + e.getMessage());
+                logger.error("Issue in shutdown hook for cpu load: " + e.getMessage());
                 e.printStackTrace();
             }
         }));
