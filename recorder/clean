@@ -1,0 +1,8 @@
+rm -f CMakeCache.txt
+rm -rf CMakeFiles
+rm -f cmake_install.cmake 
+rm -f compile_commands.json 
+rm -f CTestTestfile.cmake 
+rm -f Makefile
+rm -f mt1.tmp
+

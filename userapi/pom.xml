@@ -6,12 +6,12 @@
   <parent>
     <artifactId>prof</artifactId>
     <groupId>fk</groupId>
-    <version>2.0-SNAPSHOT</version>
+    <version>2.1-SNAPSHOT</version>
   </parent>
   <groupId>fk.prof</groupId>
   <artifactId>userapi</artifactId>
   <packaging>jar</packaging>
-  <version>2.0-SNAPSHOT</version>
+  <version>2.1-SNAPSHOT</version>
   <name>UserAPI for fk-prof</name>
 
   <properties>
@@ -22,12 +22,12 @@
     <dependency>
       <groupId>fk.prof</groupId>
       <artifactId>storage</artifactId>
-      <version>2.0-SNAPSHOT</version>
+      <version>2.1-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>fk.prof</groupId>
       <artifactId>aggregation</artifactId>
-      <version>2.0-SNAPSHOT</version>
+      <version>2.1-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>io.vertx</groupId>
@@ -115,7 +115,7 @@
               <goal>run</goal>
             </goals>
             <configuration>
-              <protocVersion>3.1.0</protocVersion>
+              <protocVersion>${protoc.version}</protocVersion>
               <inputDirectories>
                 <include>../idl/</include>
               </inputDirectories>
