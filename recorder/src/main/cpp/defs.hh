@@ -1,6 +1,8 @@
 #ifndef DEFS_HH
 #define DEFS_HH
 
+#include <cstdint>
+
 #define RECORDER_VERION 1
 #define DATA_ENCODING_VERSION 1
 
@@ -75,5 +77,7 @@
 #define DISALLOW_IMPLICIT_CONSTRUCTORS(TypeName)                                                   \
     TypeName() = delete;                                                                           \
     DISALLOW_COPY_AND_ASSIGN(TypeName)
+
+using uiid_t = std::uint64_t;
 
 #endif /* DEFS_HH */

@@ -6,21 +6,22 @@
 
 typedef std::int32_t fd_t;
 
-enum FdType {
-    File, Socket
-};
+enum FdType { File, Socket };
+
+uiid_t next_fd_uiid();
 
 struct FdInfo {
-    FdType type;
-    std::string targe_path;
-    bool connect;       // to distinguish between connected/accepted socket connection
-    
-    static FdInfo file(const char* path) {
-        return FdInfo {File, std::string(path), false};
+    const FdType type;
+    const std::string targe_path;
+    const bool connect; // to distinguish between connected/accepted socket connection
+    const uiid_t uiid;  // unique instance id
+
+    static FdInfo file(const char *path) {
+        return FdInfo{File, std::string(path), false, next_fd_uiid()};
     }
-    
-    static FdInfo socket(const char* remote_path, bool connect) {
-        return FdInfo {Socket, std::string(remote_path), connect};
+
+    static FdInfo socket(const char *remote_path, bool connect) {
+        return FdInfo{Socket, std::string(remote_path), connect, next_fd_uiid()};
     }
 };
 
@@ -30,29 +31,30 @@ struct TrivialIntHasher {
     }
 };
 
-class FdMapBase : public LinkedMapBase<map::ConcurrentMapProvider<TrivialIntHasher, false>, FdInfo> {
+class FdMapBase
+    : public LinkedMapBase<map::ConcurrentMapProvider<TrivialIntHasher, false>, FdInfo> {
 
-    void put(map::KeyType key, Value* info);
-    
+    void put(map::KeyType key, Value *info);
+
     map::KeyType toKey(fd_t fd) {
         auto p = static_cast<uintptr_t>(fd);
-        return (map::KeyType) p;
+        return (map::KeyType)p;
     }
 
 public:
     FdMapBase(int capacity);
-    
-    void putFileInfo(fd_t fd, const char* path);
-    
-    void putSocketInfo(fd_t fd, const char* remote_path, bool connect);
 
-    Value* get(fd_t fd);
+    void putFileInfo(fd_t fd, const char *path);
+
+    void putSocketInfo(fd_t fd, const char *remote_path, bool connect);
+
+    Value *get(fd_t fd);
 
     void remove(fd_t fd);
 };
 
 typedef FdMapBase FdMap;
 typedef FdMap::Value FdBucket;
-FdMap& getFdMap();
+FdMap &getFdMap();
 
 #endif /* FD_MAP_HH */

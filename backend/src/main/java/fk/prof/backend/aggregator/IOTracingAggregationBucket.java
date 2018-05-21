@@ -25,6 +25,7 @@ public class IOTracingAggregationBucket extends WorkSpecificAggregationBucket<Fi
       for (Recording.IOTrace ioTrace : ioTraceWse.getTracesList()) {
         Recording.StackSample stackSample = ioTrace.getStack();
         if(stackSample == null) {
+          // currently the recorder can send the evt without stacktrace.
           throw new AggregationFailure("IO trace aggregation for samples with missing stacktrace is not supported");
         }
         for (Integer traceId : stackSample.getTraceIdList()) {//TODO: this is not necessarily the best way of doing this from temporal locality PoV (may be we want a de-duped DS), think thru this -jj

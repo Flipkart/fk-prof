@@ -55,10 +55,13 @@ IOTracer::IOTracer(JavaVM *_jvm, jvmtiEnv *_jvmti_env, ThreadMap &_thread_map, F
                    std::uint32_t _max_stack_depth)
     : jvm(_jvm), jvmti_env(_jvmti_env), thread_map(_thread_map), fd_map(_fd_map),
       processor_notifier(_processor_notifier), latency_threshold_ns(_latency_threshold_ns),
-      max_stack_depth(_max_stack_depth), evt_queue(_serializer, _max_stack_depth), running(false) {
+      max_stack_depth(_max_stack_depth), evt_queue(_serializer, _max_stack_depth), running(false),
+      dropped_evt_cnt(0) {
     fd_map.putFileInfo(0, "stdin");
     fd_map.putFileInfo(1, "stdout");
     fd_map.putFileInfo(2, "stderr");
+    fd_map.putFileInfo(-1, "closed_or_invalid_file");
+    fd_map.putFileInfo(-2, "0.0.0.0:0");
 }
 
 IOTracer::~IOTracer() {
@@ -99,11 +102,20 @@ void IOTracer::run() {
                  evt_queue.size());
 }
 
+fd_t as_file_fd(fd_t fd) {
+    return fd = fd < 0 ? IOTracer::INVALID_FILE_FD_ID : fd;
+}
+
+fd_t as_socket_fd(fd_t fd) {
+    return fd = fd < 0 ? IOTracer::INVALID_SOCKET_FD_ID : fd;
+}
+
 void IOTracer::recordFileRead(JNIEnv *jni_env, fd_t fd, std::uint64_t ts, std::uint64_t latency_ns,
                               int count) {
+    fd = as_file_fd(fd);
     FdBucket *fd_info = fd_map.get(fd);
 
-    blocking::FdReadEvt read_evt = {.fd = fd_info, count = count, .timeout = false};
+    blocking::FdReadEvt read_evt = {.fd_info = fd_info, count = count, .timeout = false};
     blocking::BlockingEvt evt = {.ts = ts,
                                  .latency_ns = latency_ns,
                                  .type = blocking::EvtType::file_read,
@@ -114,9 +126,10 @@ void IOTracer::recordFileRead(JNIEnv *jni_env, fd_t fd, std::uint64_t ts, std::u
 
 void IOTracer::recordFileWrite(JNIEnv *jni_env, fd_t fd, std::uint64_t ts, std::uint64_t latency_ns,
                                int count) {
+    fd = as_file_fd(fd);
     FdBucket *fd_info = fd_map.get(fd);
 
-    blocking::FdWriteEvt write_evt = {.fd = fd_info, count = count};
+    blocking::FdWriteEvt write_evt = {.fd_info = fd_info, count = count};
     blocking::BlockingEvt evt = {.ts = ts,
                                  .latency_ns = latency_ns,
                                  .type = blocking::EvtType::file_write,
@@ -127,9 +140,10 @@ void IOTracer::recordFileWrite(JNIEnv *jni_env, fd_t fd, std::uint64_t ts, std::
 
 void IOTracer::recordSocketRead(JNIEnv *jni_env, fd_t fd, std::uint64_t ts,
                                 std::uint64_t latency_ns, int count, bool timeout) {
+    fd = as_socket_fd(fd);
     FdBucket *fd_info = fd_map.get(fd);
 
-    blocking::FdReadEvt read_evt = {.fd = fd_info, count = count, .timeout = timeout};
+    blocking::FdReadEvt read_evt = {.fd_info = fd_info, count = count, .timeout = timeout};
     blocking::BlockingEvt evt = {.ts = ts,
                                  .latency_ns = latency_ns,
                                  .type = blocking::EvtType::socket_read,
@@ -140,9 +154,10 @@ void IOTracer::recordSocketRead(JNIEnv *jni_env, fd_t fd, std::uint64_t ts,
 
 void IOTracer::recordSocketWrite(JNIEnv *jni_env, fd_t fd, std::uint64_t ts,
                                  std::uint64_t latency_ns, int count) {
+    fd = as_socket_fd(fd);
     FdBucket *fd_info = fd_map.get(fd);
 
-    blocking::FdWriteEvt write_evt = {.fd = fd_info, count = count};
+    blocking::FdWriteEvt write_evt = {.fd_info = fd_info, count = count};
     blocking::BlockingEvt evt = {.ts = ts,
                                  .latency_ns = latency_ns,
                                  .type = blocking::EvtType::socket_write,
@@ -151,23 +166,28 @@ void IOTracer::recordSocketWrite(JNIEnv *jni_env, fd_t fd, std::uint64_t ts,
     record(jni_env, evt);
 }
 
-void IOTracer::record(JNIEnv *jni_env, blocking::BlockingEvt &evt) {
+void IOTracer::record(JNIEnv *jni_env, const blocking::BlockingEvt &evt) {
     jvmtiFrameInfo frames[max_stack_depth];
     jint frame_count;
 
-    ThreadBucket *thd_info = thread_map.get(jni_env);
+    ThreadBucket *const thd_info = thread_map.get(jni_env);
     bool default_context = !thd_info->data.ctx_tracker.in_ctx();
 
     // get stacktrace from depth 2. Top 2 frames are from IOTracer class.
     auto err = jvmti_env->GetStackTrace(nullptr, 2, max_stack_depth, frames, &frame_count);
+
+    bool dropped = false;
     if (err != JVMTI_ERROR_NONE) {
         logger->debug("error while getting stacktrace: {}", err);
 
-        evt_queue.push(iotrace::InMsg(evt, thd_info, default_context));
+        dropped = !evt_queue.push(iotrace::InMsg(evt, thd_info, default_context));
     } else {
-        evt_queue.push(iotrace::InMsg(evt, thd_info, frames, frame_count, default_context));
+        dropped =
+            !evt_queue.push(iotrace::InMsg(evt, thd_info, frames, frame_count, default_context));
     }
-    // TODO count dropped events.
+
+    if (dropped)
+        dropped_evt_cnt.fetch_and(1, std::memory_order_relaxed);
 
     if (evt_queue.size() > Capacity / 2) {
         processor_notifier->notify();

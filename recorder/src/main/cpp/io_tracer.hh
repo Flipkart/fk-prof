@@ -66,16 +66,21 @@ private:
 class IOTracer : public Process {
 public:
     IOTracer(JavaVM *_jvm, jvmtiEnv *_jvmti_env, ThreadMap &_thread_map, FdMap &_fd_map,
-             std::shared_ptr<Notifiable> _processor_notifier, typename iotrace::Queue::Listener &_serializer,
-             std::int64_t _latency_threshold, std::uint32_t _max_stack_depth);
+             std::shared_ptr<Notifiable> _processor_notifier,
+             typename iotrace::Queue::Listener &_serializer, std::int64_t _latency_threshold,
+             std::uint32_t _max_stack_depth);
 
     bool start(JNIEnv *env);
 
     void run() override;
 
     void stop() override;
-    
+
     bool isRunning();
+
+    std::uint64_t get_dropped_evt_cnt() {
+        return dropped_evt_cnt.load(std::memory_order_relaxed);
+    }
 
     void recordSocketRead(JNIEnv *jni_env, fd_t fd, std::uint64_t ts, std::uint64_t latency_ns,
                           int count, bool timeout);
@@ -93,8 +98,11 @@ public:
 
     DISALLOW_COPY_AND_ASSIGN(IOTracer);
 
+    static constexpr int INVALID_FILE_FD_ID = -1;
+    static constexpr int INVALID_SOCKET_FD_ID = -2;
+
 private:
-    void record(JNIEnv *jni_env, blocking::BlockingEvt &evt);
+    void record(JNIEnv *jni_env, const blocking::BlockingEvt &evt);
 
     JavaVM *jvm;
 
@@ -113,6 +121,8 @@ private:
     iotrace::Queue evt_queue;
 
     std::atomic_bool running;
+
+    std::atomic<std::uint64_t> dropped_evt_cnt;
 };
 
 IOTracerJavaState &getIOTracerJavaState();

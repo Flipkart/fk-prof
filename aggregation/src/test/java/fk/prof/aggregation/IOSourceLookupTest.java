@@ -1,7 +1,6 @@
 package fk.prof.aggregation;
 
 import fk.prof.aggregation.model.IOSourceLookup;
-import fk.prof.aggregation.model.MethodIdLookup;
 import fk.prof.idl.Profile;
 import fk.prof.idl.Recording;
 import org.junit.Assert;
@@ -46,9 +45,7 @@ public class IOSourceLookupTest {
     Assert.assertEquals(Profile.IOSource.newBuilder().setFdType(Recording.FDType.socket).setUri("socket").build(), reverseLookup[srcId2]);
 
     Assert.assertEquals(IOSourceLookup.FILE_INVALID_INFO, reverseLookup[IOSourceLookup.FILE_INVALID_ID]);
-    Assert.assertEquals(IOSourceLookup.FILE_NIO_INVALID_INFO, reverseLookup[IOSourceLookup.FILE_NIO_INVALID_ID]);
     Assert.assertEquals(IOSourceLookup.SOCKET_INVALID_INFO, reverseLookup[IOSourceLookup.SOCKET_INVALID_ID]);
-    Assert.assertEquals(IOSourceLookup.SOCKET_NIO_INVALID_INFO, reverseLookup[IOSourceLookup.SOCKET_NIO_INVALID_ID]);
   }
 
 }

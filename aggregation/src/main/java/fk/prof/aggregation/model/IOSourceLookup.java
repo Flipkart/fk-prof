@@ -9,24 +9,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class IOSourceLookup {
   public final static int FILE_INVALID_ID = 0;
-  public final static Profile.IOSource FILE_INVALID_INFO = Profile.IOSource.newBuilder().setFdType(Recording.FDType.file).setUri("Invalid File").build();
-  public final static int FILE_NIO_INVALID_ID = 1;
-  public final static Profile.IOSource FILE_NIO_INVALID_INFO = Profile.IOSource.newBuilder().setFdType(Recording.FDType.filenio).setUri("Invalid File").build();
-  public final static int SOCKET_INVALID_ID = 2;
-  public final static Profile.IOSource SOCKET_INVALID_INFO = Profile.IOSource.newBuilder().setFdType(Recording.FDType.socket).setUri("Invalid Socket").build();
-  public final static int SOCKET_NIO_INVALID_ID = 3;
-  public final static Profile.IOSource SOCKET_NIO_INVALID_INFO = Profile.IOSource.newBuilder().setFdType(Recording.FDType.socketnio).setUri("Invalid Socket").build();
-
+  public final static Profile.IOSource FILE_INVALID_INFO = Profile.IOSource.newBuilder().setFdType(Recording.FDType.file).setUri("closed_or_invalid_file").build();
+  public final static int SOCKET_INVALID_ID = 1;
+  public final static Profile.IOSource SOCKET_INVALID_INFO = Profile.IOSource.newBuilder().setFdType(Recording.FDType.socket).setUri("0.0.0.0:0").build();
 
   //Counter to generate io source ids in auto increment fashion
-  private final AtomicInteger counter = new AtomicInteger(4);
+  private final AtomicInteger counter = new AtomicInteger(2);
   private final ConcurrentHashMap<Profile.IOSource, Integer> lookup = new ConcurrentHashMap<>();
 
   public IOSourceLookup() {
     lookup.put(FILE_INVALID_INFO, FILE_INVALID_ID);
-    lookup.put(FILE_NIO_INVALID_INFO, FILE_NIO_INVALID_ID);
     lookup.put(SOCKET_INVALID_INFO, SOCKET_INVALID_ID);
-    lookup.put(SOCKET_NIO_INVALID_INFO, SOCKET_NIO_INVALID_ID);
   }
 
   public Integer getOrAdd(Recording.FDInfo fdInfo) {
@@ -71,5 +64,4 @@ public class IOSourceLookup {
   protected Profile.IOSources buildProto() {
     return Profile.IOSources.newBuilder().addAllIoSources(Arrays.asList(generateReverseLookup())).build();
   }
-
 }
