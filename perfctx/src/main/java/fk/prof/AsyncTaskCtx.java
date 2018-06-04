@@ -80,7 +80,7 @@ public class AsyncTaskCtx {
         if(st != null) {
             for(StackTraceElement e: st) {
                 if(e.getClassName().startsWith(skipPackage) ||
-                    e.getClassName().startsWith("fk.prof.AsyncTaskCtx"))
+                    e.getClassName().startsWith("fk.prof."))
                     continue;
                 return e.getClassName() + e.getMethodName() + " @ " + e.getLineNumber();
             }
@@ -109,10 +109,12 @@ public class AsyncTaskCtx {
     }
 
     public void start() {
-        this.start = System.nanoTime();
+        this.start = System.currentTimeMillis() - 1528123623000L;
+        System.out.println("start: " + name + "\t" + start);
     }
 
     public void end() {
-        this.end = System.nanoTime();
+        this.end = System.currentTimeMillis() - 1528123623000L;
+        System.out.println("end: " + name + "\t" + end);
     }
 }

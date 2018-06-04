@@ -8,7 +8,7 @@ import javassist.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 
-class ClassInstrumentHooks {
+class ClassInstrumentHooks implements ClassInstrumentor {
   final Map<String, EntryExitHooks<CtMethod>> methods = new HashMap<>();
   final Map<String, EntryExitHooks<CtConstructor>> constructors = new HashMap<>();
 
@@ -18,7 +18,8 @@ class ClassInstrumentHooks {
    * @return
    * @throws Exception
    */
-  boolean apply(CtClass cclass) throws Exception {
+  @Override
+  public boolean apply(CtClass cclass) throws Exception {
     boolean methodsModified = applyToMethods(cclass);
     boolean constructorsModified = applyToConstructors(cclass);
     return methodsModified || constructorsModified;

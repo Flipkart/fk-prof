@@ -1,7 +1,11 @@
 import fk.prof.AsyncTaskCtx;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
 class RunnableDemo implements Runnable {
-    private Thread t;
     private String threadName;
 
     RunnableDemo(String name) {
@@ -12,44 +16,41 @@ class RunnableDemo implements Runnable {
     public void run() {
         System.out.println("Running " + threadName);
         try {
-            System.out.println("Thread: " + threadName);
             // Let the thread sleep for a while.
-            Thread.sleep(200);
+            Thread.sleep(500);
         } catch (InterruptedException e) {
             System.out.println("Thread " + threadName + " interrupted.");
         }
         System.out.println("Thread " + threadName + " exiting.");
     }
-
-    public void start() {
-        System.out.println("Starting " + threadName);
-        if (t == null) {
-            t = new Thread(this, threadName);
-            t.start();
-        }
-    }
-
-    public void join() throws InterruptedException {
-        t.join();
-    }
 }
 
 public class App {
-    public static void main(String args[]) throws InterruptedException {
+    public static void main(String args[]) throws Exception {
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
         AsyncTaskCtx ctx = AsyncTaskCtx.newTask("test-task");
 
-        System.out.println();
-        RunnableDemo R1 = new RunnableDemo("Thread-1");
-        R1.start();
-
-        RunnableDemo R2 = new RunnableDemo("Thread-2");
-        R2.start();
+        Future<?> f1 = executor.submit(() -> new RunnableDemo("Thread-1").run());
+        Future<?> f2 = executor.submit(() -> {
+            executor.submit(() -> {
+                System.out.println("task submitted from a worker thread");
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {}
+                System.out.println("submitted task finished");
+            });
+            new RunnableDemo("Thread-2").run();
+        });
 
         try {
-            R1.join();
-            R2.join();
+            f1.get();
+            f2.get();
         } finally {
             ctx.complete();
+            executor.shutdown();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
         }
     }
 }

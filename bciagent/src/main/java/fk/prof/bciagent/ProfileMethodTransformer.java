@@ -3,6 +3,8 @@ package fk.prof.bciagent;
 import javassist.*;
 import javassist.expr.ExprEditor;
 import javassist.expr.FieldAccess;
+import javassist.expr.MethodCall;
+import javassist.expr.NewExpr;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
@@ -13,7 +15,7 @@ import java.util.function.Function;
 
 public class ProfileMethodTransformer implements ClassFileTransformer {
 
-  private final Map<String, ClassInstrumentHooks> INSTRUMENTED_CLASSES = new HashMap<>();
+  private final Map<String, ClassInstrumentor> INSTRUMENTED_CLASSES = new HashMap<>();
   private final ClassPool pool;
   private final CtClass threadCtClass;
   private final String currThreadVarName = "$$$_curr_thread";
@@ -110,6 +112,9 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     hooks.methods.put("read(Ljava/io/FileDescriptor;Ljava/nio/ByteBuffer;JLsun/nio/ch/NativeDispatcher;)I", ioutil_read);
     hooks.methods.put("read(Ljava/io/FileDescriptor;[Ljava/nio/ByteBuffer;IILsun/nio/ch/NativeDispatcher;)J", ioutil_read);
 
+//    INSTRUMENTED_CLASSES.put("java.lang.Thread", this::transformThread);
+    INSTRUMENTED_CLASSES.put("java.util.concurrent.AbstractExecutorService", this::transformAbstractThreadExecutor);
+
     return true;
   }
 
@@ -123,20 +128,14 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
       String normalizedClassName = className.replaceAll("/", ".");
       pool.insertClassPath(new ByteArrayClassPath(normalizedClassName, classfileBuffer));
 
-      if(INSTRUMENTED_CLASSES.get(normalizedClassName) == null && !normalizedClassName.equals("java.lang.Thread")) {
+      if(INSTRUMENTED_CLASSES.get(normalizedClassName) == null) {
         return null;
       }
 
       CtClass cclass = pool.get(normalizedClassName);
-      if(className.equals("java/lang/Thread")) {
-        transformThread(cclass);
-        cclass.debugWriteFile("/home/gaurav.ashok/Documents/work/temp/classFilesDump");
-        return cclass.toBytecode();
-      }
-
       boolean modified = false;
       if (!cclass.isFrozen()) {
-        ClassInstrumentHooks instrumentHooks = INSTRUMENTED_CLASSES.get(cclass.getName());
+        ClassInstrumentor instrumentHooks = INSTRUMENTED_CLASSES.get(cclass.getName());
         modified = instrumentHooks != null && instrumentHooks.apply(cclass);
       }
 
@@ -152,7 +151,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     return null;
   }
 
-  private void transformThread(CtClass cclass) throws Exception {
+  private boolean transformThread(CtClass cclass) throws Exception {
     CtMethod m = Util.getMethod(cclass,
         "init",
         "(Ljava/lang/ThreadGroup;Ljava/lang/Runnable;Ljava/lang/String;JLjava/security/AccessControlContext;Z)V");
@@ -186,5 +185,27 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
         }
       }
     });
+
+    return true;
+  }
+
+  private boolean transformAbstractThreadExecutor(CtClass cclass) throws Exception {
+    CtMethod m = Util.getMethod(cclass,
+        "submit",
+        "(Ljava/lang/Runnable;)Ljava/util/concurrent/Future;");
+
+    m.instrument(new ExprEditor() {
+      @Override
+      public void edit(MethodCall m) throws CannotCompileException {
+        if ("newTaskFor".equals(m.getMethodName())) {
+          String code = String.format("{" +
+              "$_ = $proceed(fk.prof.TracingRunnable.wrap($1), $2);" +
+              "}");
+          m.replace(code);
+        }
+      }
+    });
+
+    return true;
   }
 }
