@@ -52,6 +52,7 @@ set(SRC "src/main/cpp")
 set(SRC_PRELOAD "src/main/c")
 set(INCLUDE_VENDOR_CONCQUEUE "${CMAKE_SOURCE_DIR}/vendor/concurrentqueue")
 set(INCLUDE_VENDOR_SPDLOG "${CMAKE_SOURCE_DIR}/vendor/spdlog/include")
+set(INCLUDE_VENDOR_JNIF "/home/gaurav.ashok/Documents/work/jnif/src-libjnif")
 set(SRC_TEST "src/test/cpp")
 set(BIN "build")
 set(BASE_OUTPUT "bagent")
@@ -130,7 +131,8 @@ set(SOURCE_FILES
     ${SRC}/scheduler.cc
     ${SRC}/perf_ctx.cc
     ${SRC}/prob_pct.cc
-    ${SRC}/metric_formatter.cc)
+    ${SRC}/metric_formatter.cc
+    ${SRC}/class_redef.cc)
 
 set(PRELOAD_SOURCE_FILES
     ${SRC_PRELOAD}/preload.c)
@@ -207,7 +209,8 @@ if (${VERBOSE_LOGS} MATCHES "y")
   set(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} -DSPDLOG_TRACE_ON -DSPDLOG_DEBUG_ON")
 endif()
 # to enable tracing add: -DENABLE_TRACING
-set(CMAKE_CXX_FLAGS "-I${INCLUDE_VENDOR_SPDLOG} -I${INCLUDE_VENDOR_CONCQUEUE} -I${PROTOBUF_INCLUDE_DIR} ${CMAKE_CXX_FLAGS} ${GLOBAL_WARNINGS} ${GLOBAL_COPTS} -pthread -std=c++11 -fno-omit-frame-pointer")
+link_directories("/home/gaurav.ashok/Documents/work/jnif/build")
+set(CMAKE_CXX_FLAGS "-I${INCLUDE_VENDOR_SPDLOG} -I${INCLUDE_VENDOR_CONCQUEUE} -I${PROTOBUF_INCLUDE_DIR} -I${INCLUDE_VENDOR_JNIF} ${CMAKE_CXX_FLAGS} ${GLOBAL_WARNINGS} ${GLOBAL_COPTS} -pthread -std=c++11 -fno-omit-frame-pointer")
 
 ##########################################################
 # Build
@@ -218,7 +221,7 @@ add_library(${AGENT_LIB} SHARED ${TI_SRC_FILES})
 if ("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD") 
     target_link_libraries(${BASE_OUTPUT} proto ${PROTOBUF_LIBRARY} ${ZLIB_LDFLAGS} ${CURL_LDFLAGS} ${MEDIDA_LDFLAGS} ${ELF_LDFLAGS} ${UNWIND_LDFLAGS} atomic)
 else()
-    target_link_libraries(${BASE_OUTPUT} proto ${PROTOBUF_LIBRARY} ${ZLIB_LDFLAGS} ${CURL_LDFLAGS} ${MEDIDA_LDFLAGS} ${ELF_LDFLAGS} ${UNWIND_LDFLAGS} dl atomic)
+    target_link_libraries(${BASE_OUTPUT} proto jnif ${PROTOBUF_LIBRARY} ${ZLIB_LDFLAGS} ${CURL_LDFLAGS} ${MEDIDA_LDFLAGS} ${ELF_LDFLAGS} ${UNWIND_LDFLAGS} dl atomic)
 endif()
 target_link_libraries(${AGENT_LIB} ${BASE_OUTPUT})
 add_library(${PRELOAD_LIB} SHARED ${PRELOAD_SOURCE_FILES})

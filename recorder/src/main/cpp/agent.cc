@@ -13,37 +13,35 @@
 #include "perf_ctx.hh"
 #include "prob_pct.hh"
 #include "metric_formatter.hh"
+#include "class_redef.hh"
 
 #if defined(__APPLE__) || defined(__FreeBSD__)
 #define GETENV_NEW_THREAD_ASYNC_UNSAFE
 #endif
 
 LoggerP logger = spdlog::syslog_logger("syslog", "fk-prof-rec", LOG_PID);
-static ConfigurationOptions* CONFIGURATION;
-static Controller* controller;
+static ConfigurationOptions *CONFIGURATION;
+static Controller *controller;
 static ThreadMap thread_map;
 static medida::MetricsRegistry metrics_registry;
 static PerfCtx::Registry ctx_reg;
 static ProbPct prob_pct;
-static medida::reporting::UdpReporter* metrics_reporter;
+static medida::reporting::UdpReporter *metrics_reporter;
 static MetricFormatter::SyslogTsdbFormatter *formatter;
 static ThdProcP<void *> metrics_thd;
 std::atomic<bool> abort_metrics_poll;
 
 // This has to be here, or the VM turns off class loading events.
 // And AsyncGetCallTrace needs class loading events to be turned on!
-void JNICALL OnClassLoad(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
-        jclass klass) {
+void JNICALL OnClassLoad(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread, jclass klass) {
     IMPLICITLY_USE(jvmti_env);
     IMPLICITLY_USE(jni_env);
     IMPLICITLY_USE(thread);
-    IMPLICITLY_USE(klass);
 }
 
-static void JNICALL CompiledMethodLoad(jvmtiEnv* jvmti, jmethodID method,
-                                       jint code_size, const void* code_addr,
-                                       jint map_length, const jvmtiAddrLocationMap* map,
-                                       const void* compile_info) {
+static void JNICALL CompiledMethodLoad(jvmtiEnv *jvmti, jmethodID method, jint code_size,
+                                       const void *code_addr, jint map_length,
+                                       const jvmtiAddrLocationMap *map, const void *compile_info) {
     // Needed to enable DebugNonSafepoints info by default
 }
 
@@ -57,16 +55,16 @@ void CreateJMethodIDsForClass(jvmtiEnv *jvmti, jclass klass) {
         // JVMTI_ERROR_CLASS_NOT_PREPARED is okay because some classes may
         // be loaded but not prepared at this point.
         JvmtiScopedPtr<char> ksig(jvmti);
-        JVMTI_ERROR_CLEANUP(
-            jvmti->GetClassSignature(klass, ksig.GetRef(), NULL),
-            ksig.AbandonBecauseOfError());
-        logger->error("Failed to create method IDs for methods in class {} with error {} ", ksig.Get(), e);
+        JVMTI_ERROR_CLEANUP(jvmti->GetClassSignature(klass, ksig.GetRef(), NULL),
+                            ksig.AbandonBecauseOfError());
+        logger->error("Failed to create method IDs for methods in class {} with error {} ",
+                      ksig.Get(), e);
     }
 }
 
 void metrics_poller(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg) {
     auto itvl = std::chrono::seconds(5);
-    while (! abort_metrics_poll.load(std::memory_order_relaxed)) {
+    while (!abort_metrics_poll.load(std::memory_order_relaxed)) {
         std::this_thread::sleep_for(itvl);
         metrics_reporter->run();
     }
@@ -86,16 +84,16 @@ void JNICALL OnVMInit(jvmtiEnv *jvmti, JNIEnv *jniEnv, jthread thread) {
         CreateJMethodIDsForClass(jvmti, klass);
     }
 
-    metrics_thd = start_new_thd<void *>(jniEnv, jvmti, "Fk-Prof Metrics Reporter", metrics_poller, nullptr);
-    
+    metrics_thd =
+        start_new_thd<void *>(jniEnv, jvmti, "Fk-Prof Metrics Reporter", metrics_poller, nullptr);
+
     // load IOTRace class and initialize the local iotrace object.
     getIOTracerJavaState().onVMInit(jvmti, jniEnv);
-    
+
     controller->start();
 }
 
-void JNICALL OnClassPrepare(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
-        jthread thread, jclass klass) {
+void JNICALL OnClassPrepare(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread, jclass klass) {
     IMPLICITLY_USE(jni_env);
     IMPLICITLY_USE(thread);
     // We need to do this to "prime the pump", as it were -- make sure
@@ -108,7 +106,7 @@ void JNICALL OnClassPrepare(jvmtiEnv *jvmti_env, JNIEnv *jni_env,
 void JNICALL OnVMDeath(jvmtiEnv *jvmti_env, JNIEnv *jni_env) {
     IMPLICITLY_USE(jvmti_env);
     IMPLICITLY_USE(jni_env);
-    
+
     getIOTracerJavaState().onVMDeath(jvmti_env, jni_env);
 }
 
@@ -130,8 +128,7 @@ static bool PrepareJvmti(jvmtiEnv *jvmti) {
     jvmtiCapabilities all_caps;
     int error;
 
-    if (JVMTI_ERROR_NONE ==
-            (error = jvmti->GetPotentialCapabilities(&all_caps))) {
+    if (JVMTI_ERROR_NONE == (error = jvmti->GetPotentialCapabilities(&all_caps))) {
         // This makes sure that if we need a capability, it is one of the
         // potential capabilities.  The technique isn't wonderful, but it
         // is compact and as likely to be compatible between versions as
@@ -145,13 +142,12 @@ static bool PrepareJvmti(jvmtiEnv *jvmti) {
         }
 
         // This adds the capabilities.
-        JVMTI_ERROR_CLEANUP_RET(
-            jvmti->AddCapabilities(&caps),
-            false,
-            logger->error("Failed to add capabilities with error {}", error));
+        JVMTI_ERROR_CLEANUP_RET(jvmti->AddCapabilities(&caps), false,
+                                logger->error("Failed to add capabilities with error {}", error));
     }
-    if (jvmti->AddToSystemClassLoaderSearch(CONFIGURATION->pctx_jar_path) != JVMTI_ERROR_NONE) {
-        logger->error("Failed to add path to perf-ctx jar ({}) to classpath {}", CONFIGURATION->pctx_jar_path, error);
+    if (jvmti->AddToBootstrapClassLoaderSearch(CONFIGURATION->pctx_jar_path) != JVMTI_ERROR_NONE) {
+        logger->error("Failed to add path to perf-ctx jar ({}) to classpath {}",
+                      CONFIGURATION->pctx_jar_path, error);
         return false;
     } else {
         logger->info("Added perf-ctx jar '{}' to classpath", CONFIGURATION->pctx_jar_path);
@@ -169,9 +165,9 @@ void JVM_StartThread_Interposer(JNIEnv *jni_env, jobject jthread) {
     pthread_sigmask(SIG_UNBLOCK, &prof_signal_mask, NULL);
 }
 
-//Set up interposition of calls to Thread::start0
+// Set up interposition of calls to Thread::start0
 void JNICALL OnNativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread,
-        jmethodID method, void *address, void **new_address_ptr) {
+                                jmethodID method, void *address, void **new_address_ptr) {
     if (actual_JVM_StartThread != NULL) {
         return;
     }
@@ -188,25 +184,25 @@ void JNICALL OnNativeMethodBind(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread th
         int err = jvmti_env->GetMethodDeclaringClass(method, &declaringClass);
         if (err != JNI_OK) {
             logger->error("Error {} retrieving class", err);
-            jvmti_env->Deallocate((unsigned char *) name_ptr);
-            jvmti_env->Deallocate((unsigned char *) signature_ptr);
+            jvmti_env->Deallocate((unsigned char *)name_ptr);
+            jvmti_env->Deallocate((unsigned char *)signature_ptr);
             return;
         }
         jclass clazz = jni_env->GetObjectClass(declaringClass);
-        jmethodID getSimpleNameMethod = jni_env->GetMethodID(clazz,
-            "getSimpleName", "()Ljava/lang/String;");
-        jstring jClassName = (jstring) jni_env->CallObjectMethod(declaringClass,
-            getSimpleNameMethod);
+        jmethodID getSimpleNameMethod =
+            jni_env->GetMethodID(clazz, "getSimpleName", "()Ljava/lang/String;");
+        jstring jClassName =
+            (jstring)jni_env->CallObjectMethod(declaringClass, getSimpleNameMethod);
 
         const char *className = jni_env->GetStringUTFChars(jClassName, 0);
         if (strcmp(className, "Thread") == 0) {
-            *new_address_ptr = (void*) &JVM_StartThread_Interposer;
-            actual_JVM_StartThread = (void (*)(JNIEnv *, jthread)) address;
+            *new_address_ptr = (void *)&JVM_StartThread_Interposer;
+            actual_JVM_StartThread = (void (*)(JNIEnv *, jthread))address;
         }
         jni_env->ReleaseStringUTFChars(jClassName, className);
     }
-    jvmti_env->Deallocate((unsigned char *) name_ptr);
-    jvmti_env->Deallocate((unsigned char *) signature_ptr);
+    jvmti_env->Deallocate((unsigned char *)name_ptr);
+    jvmti_env->Deallocate((unsigned char *)signature_ptr);
 }
 
 volatile bool main_started = false;
@@ -222,7 +218,7 @@ void JNICALL OnThreadStart(jvmtiEnv *jvmti_env, JNIEnv *jni_env, jthread thread)
             }
         }
         thread_map.put(jni_env, thread_info.name, thread_info.priority, thread_info.is_daemon);
-        jvmti_env->Deallocate((unsigned char *) thread_info.name);
+        jvmti_env->Deallocate((unsigned char *)thread_info.name);
     }
     pthread_sigmask(SIG_UNBLOCK, &prof_signal_mask, NULL);
 }
@@ -251,11 +247,15 @@ static bool RegisterJvmti(jvmtiEnv *jvmti) {
     callbacks->ThreadStart = &OnThreadStart;
     callbacks->ThreadEnd = &OnThreadEnd;
 
-    JVMTI_ERROR_RET((jvmti->SetEventCallbacks(callbacks.get(), sizeof(jvmtiEventCallbacks))), false);
+    callbacks->ClassFileLoadHook = &OnClassFileLoadHook;
 
-    jvmtiEvent events[] = { JVMTI_EVENT_VM_DEATH, JVMTI_EVENT_VM_INIT,
-                            JVMTI_EVENT_CLASS_FILE_LOAD_HOOK, JVMTI_EVENT_CLASS_LOAD, JVMTI_EVENT_CLASS_PREPARE, JVMTI_EVENT_COMPILED_METHOD_LOAD,
-                            JVMTI_EVENT_THREAD_START, JVMTI_EVENT_THREAD_END, JVMTI_EVENT_NATIVE_METHOD_BIND };
+    JVMTI_ERROR_RET((jvmti->SetEventCallbacks(callbacks.get(), sizeof(jvmtiEventCallbacks))),
+                    false);
+
+    jvmtiEvent events[] = {
+        JVMTI_EVENT_VM_DEATH,     JVMTI_EVENT_VM_INIT,       JVMTI_EVENT_CLASS_FILE_LOAD_HOOK,
+        JVMTI_EVENT_CLASS_LOAD,   JVMTI_EVENT_CLASS_PREPARE, JVMTI_EVENT_COMPILED_METHOD_LOAD,
+        JVMTI_EVENT_THREAD_START, JVMTI_EVENT_THREAD_END,    JVMTI_EVENT_NATIVE_METHOD_BIND};
 
     size_t num_events = sizeof(events) / sizeof(jvmtiEvent);
 
@@ -263,7 +263,8 @@ static bool RegisterJvmti(jvmtiEnv *jvmti) {
     // Events are enumerated in jvmstatagent.h
     for (int i = 0; i < num_events; i++) {
         JVMTI_ERROR_RET((jvmti->SetEventNotificationMode(JVMTI_ENABLE, events[i], NULL)), false);
-        SPDLOG_DEBUG(logger, "Initialized notification for ti-event = {} (which is {} / {})", events[i], i + 1, num_events);
+        SPDLOG_DEBUG(logger, "Initialized notification for ti-event = {} (which is {} / {})",
+                     events[i], i + 1, num_events);
     }
 
     return true;
@@ -297,14 +298,14 @@ AGENTEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved
     CONFIGURATION = new ConfigurationOptions(options);
 
     logger->set_level(CONFIGURATION->log_level);
-    logger->set_pattern("{%t} %+");//TODO: make this configurable
+    logger->set_pattern("{%t} %+"); // TODO: make this configurable
     log_level_self_test();
     logger->info("======================= Starting fk-prof JVMTI agent =======================");
-    
-    if (! CONFIGURATION->valid()) return 1;
 
-    if ((err = (jvm->GetEnv(reinterpret_cast<void **>(&jvmti), JVMTI_VERSION))) !=
-            JNI_OK) {
+    if (!CONFIGURATION->valid())
+        return 1;
+
+    if ((err = (jvm->GetEnv(reinterpret_cast<void **>(&jvmti), JVMTI_VERSION))) != JNI_OK) {
         logger->error("JVMTI initialisation error {}", err);
         return 1;
     }
@@ -336,10 +337,12 @@ AGENTEXPORT jint JNICALL Agent_OnLoad(JavaVM *jvm, char *options, void *reserved
     Asgct::SetAsgct(Accessors::GetJvmFunction<ASGCTType>("AsyncGetCallTrace"));
     Asgct::SetIsGCActive(Accessors::GetJvmFunction<IsGCActiveType>("IsGCActive"));
 
-    formatter = new MetricFormatter::SyslogTsdbFormatter(tsdb_tags(), CONFIGURATION->stats_syslog_tag);
-    metrics_reporter = new medida::reporting::UdpReporter(metrics_registry, *formatter, CONFIGURATION->metrics_dst_port);
+    formatter =
+        new MetricFormatter::SyslogTsdbFormatter(tsdb_tags(), CONFIGURATION->stats_syslog_tag);
+    metrics_reporter = new medida::reporting::UdpReporter(metrics_registry, *formatter,
+                                                          CONFIGURATION->metrics_dst_port);
     abort_metrics_poll.store(false, std::memory_order_relaxed);
-    
+
     controller = new Controller(jvm, jvmti, thread_map, *CONFIGURATION);
 
     return 0;
@@ -358,18 +361,18 @@ AGENTEXPORT void JNICALL Agent_OnUnload(JavaVM *vm) {
     delete CONFIGURATION;
 }
 
-ThreadMap& get_thread_map() {
+ThreadMap &get_thread_map() {
     return thread_map;
 }
 
-medida::MetricsRegistry& get_metrics_registry() {
+medida::MetricsRegistry &get_metrics_registry() {
     return metrics_registry;
 }
 
-ProbPct& get_prob_pct() {
+ProbPct &get_prob_pct() {
     return prob_pct;
 }
 
-PerfCtx::Registry& get_ctx_reg() {
+PerfCtx::Registry &get_ctx_reg() {
     return ctx_reg;
 }

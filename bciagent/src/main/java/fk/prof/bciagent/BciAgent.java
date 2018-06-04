@@ -12,7 +12,7 @@ public class BciAgent {
      */
     private static native void bciAgentLoaded();
 
-    public static void premain(String agentArgs, Instrumentation inst) {
+    public static void premain(String agentArgs, Instrumentation inst) throws Exception {
         System.out.println("Starting the agent");
 
         // Saw some issues when this was below some lambda creating calls.

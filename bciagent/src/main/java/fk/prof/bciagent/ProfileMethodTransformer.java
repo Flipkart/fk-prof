@@ -1,9 +1,12 @@
 package fk.prof.bciagent;
 
 import javassist.*;
+import javassist.expr.ExprEditor;
+import javassist.expr.FieldAccess;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
+import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 import java.util.*;
 import java.util.function.Function;
@@ -12,6 +15,8 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
 
   private final Map<String, ClassInstrumentHooks> INSTRUMENTED_CLASSES = new HashMap<>();
   private final ClassPool pool;
+  private final CtClass threadCtClass;
+  private final String currThreadVarName = "$$$_curr_thread";
 
   /**
    * notifies the recorder that the bci failed for the provided class. Disables the io tracing if called at least once.
@@ -20,8 +25,9 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
    */
   private static native void bciFailed(String className);
 
-  public ProfileMethodTransformer() {
+  public ProfileMethodTransformer() throws NotFoundException {
     pool = ClassPool.getDefault();
+    threadCtClass = pool.get("java.lang.Thread");
   }
 
   public boolean init() {
@@ -113,13 +119,21 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
       if (className == null) {
         return null;
       }
+
       String normalizedClassName = className.replaceAll("/", ".");
-      if(INSTRUMENTED_CLASSES.get(normalizedClassName) == null) {
+      pool.insertClassPath(new ByteArrayClassPath(normalizedClassName, classfileBuffer));
+
+      if(INSTRUMENTED_CLASSES.get(normalizedClassName) == null && !normalizedClassName.equals("java.lang.Thread")) {
         return null;
       }
 
-      pool.insertClassPath(new ByteArrayClassPath(className, classfileBuffer));
       CtClass cclass = pool.get(normalizedClassName);
+      if(className.equals("java/lang/Thread")) {
+        transformThread(cclass);
+        cclass.debugWriteFile("/home/gaurav.ashok/Documents/work/temp/classFilesDump");
+        return cclass.toBytecode();
+      }
+
       boolean modified = false;
       if (!cclass.isFrozen()) {
         ClassInstrumentHooks instrumentHooks = INSTRUMENTED_CLASSES.get(cclass.getName());
@@ -136,5 +150,41 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
       bciFailed(className);
     }
     return null;
+  }
+
+  private void transformThread(CtClass cclass) throws Exception {
+    CtMethod m = Util.getMethod(cclass,
+        "init",
+        "(Ljava/lang/ThreadGroup;Ljava/lang/Runnable;Ljava/lang/String;JLjava/security/AccessControlContext;Z)V");
+
+    m.addLocalVariable(currThreadVarName, threadCtClass);
+
+    m.instrument(new ExprEditor() {
+      @Override
+      public void edit(FieldAccess f) throws CannotCompileException {
+        if(f.isWriter() && "name".equals(f.getFieldName())) {
+          String code = String.format("{" +
+              "%1$s = currentThread(); " +
+              "if(%1$s.taskCtx != null) " +
+              "{" +
+                  "this.taskCtx = %1$s.taskCtx.addTask(\"java.lang\");" +
+              "}" +
+              "$proceed($$);" +
+          "}", currThreadVarName);
+          f.replace(code);
+        }
+        else if(f.isWriter() && "target".equals(f.getFieldName())) {
+          String code = String.format("{" +
+              "if (this.taskCtx == null) {" +
+                  "$proceed($$);" +
+              "}" +
+              "else {" +
+                  "$proceed(new fk.prof.WrappedThreadRunnable($1, this.taskCtx));" +
+              "}" +
+          "}", currThreadVarName);
+          f.replace(code);
+        }
+      }
+    });
   }
 }
