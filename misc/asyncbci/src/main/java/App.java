@@ -51,6 +51,7 @@ public class App {
             ctx.complete();
             executor.shutdown();
             executor.awaitTermination(5, TimeUnit.SECONDS);
+            System.out.println(ctx.toString());
         }
     }
 }

@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 public class AsyncTaskCtx {
 
@@ -57,7 +58,7 @@ public class AsyncTaskCtx {
 
     public AsyncTaskCtx addNamedTask(String name) {
         AsyncTaskCtx task = new AsyncTaskCtx(name, this.id);
-        if(children == emptyList) {
+        if (children == emptyList) {
             children = new LinkedList<>();
         }
 
@@ -67,7 +68,7 @@ public class AsyncTaskCtx {
 
     public AsyncTaskCtx addTask(String skipPackage) {
         AsyncTaskCtx task = new AsyncTaskCtx(getCallerSite(skipPackage), this.id);
-        if(children == emptyList) {
+        if (children == emptyList) {
             children = new LinkedList<>();
         }
 
@@ -77,12 +78,12 @@ public class AsyncTaskCtx {
 
     public static String getCallerSite(String skipPackage) {
         StackTraceElement[] st = new Exception().getStackTrace();
-        if(st != null) {
-            for(StackTraceElement e: st) {
-                if(e.getClassName().startsWith(skipPackage) ||
+        if (st != null) {
+            for (StackTraceElement e : st) {
+                if (e.getClassName().startsWith(skipPackage) ||
                     e.getClassName().startsWith("fk.prof."))
                     continue;
-                return e.getClassName() + e.getMethodName() + " @ " + e.getLineNumber();
+                return e.getClassName() + "." + e.getMethodName() + " @ " + e.getLineNumber();
             }
         }
         return "()";
@@ -109,12 +110,25 @@ public class AsyncTaskCtx {
     }
 
     public void start() {
-        this.start = System.currentTimeMillis() - 1528123623000L;
-        System.out.println("start: " + name + "\t" + start);
+        this.start = System.currentTimeMillis();
     }
 
     public void end() {
-        this.end = System.currentTimeMillis() - 1528123623000L;
-        System.out.println("end: " + name + "\t" + end);
+        this.end = System.currentTimeMillis();
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("{");
+        sb.append("\"name\": \"" + name + "\",");
+        sb.append("\"start\": " + start + ",");
+        sb.append("\"duration\": " + (end - start) + ",");
+        sb.append("\"children\": [" +
+            String.join(",", children.stream()
+                .map(c -> c.toString())
+                .collect(Collectors.toList())) +
+            "]");
+        sb.append("}");
+        return sb.toString();
     }
 }
