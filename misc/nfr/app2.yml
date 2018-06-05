@@ -1,0 +1,77 @@
+server:
+  type: default
+  maxThreads: 128
+  minThreads: 4
+  applicationConnectors:
+    - type: http
+      port: 8083
+  adminConnectors:
+    - type: http
+      port: 8183
+  requestLog:
+      appenders: []
+
+metrics:
+  reporters:
+    - type: csv
+      file: /tmp/load-gen-app2/metrics
+      includes: ["driver.requests.completed", "driver.requests.initiated", "driver.running"]
+      frequency: 1 second
+
+database:
+  # the name of your JDBC driver
+  driverClass: com.mysql.cj.jdbc.Driver
+
+  # the username
+  user: root
+
+  # the password
+  password: password
+
+  # the JDBC URL
+  url: jdbc:mysql://127.0.0.1/user
+
+  # any properties specific to your JDBC driver:
+  properties:
+    charSet: UTF-8
+    hibernate.dialect: org.hibernate.dialect.MySQLDialect
+
+  # the maximum amount of time to wait on an empty pool before throwing an exception
+  maxWaitForConnection: 1s
+
+  # the SQL query to run when validating a connection's liveness
+  validationQuery: "/* MyApplication Health Check */ SELECT 1"
+
+  # the minimum number of connections to keep open
+  minSize: 2
+
+  # the maximum number of connections to keep open
+  maxSize: 32
+
+  # whether or not idle connections should be validated
+  checkConnectionWhileIdle: false
+
+serversList: ["127.0.0.1:8081", "127.0.0.1:8082", "127.0.0.1:8083", "127.0.0.1:8084"]
+
+isDebug: true
+
+enableCpuWork: false
+enableIoWork: true
+
+ioWork:
+  nioThreadCnt: 1
+  workerThreadCnt: 32
+  driverRequestsInFlight: 5
+
+cpuWork:
+  threadCnt: 6
+  loadShare: [0.33, 0.33, 0.34]
+  loadMultiplier: 1.0
+  traceDuplicationMultiplier: 1
+  perfCtxCodeCovrg: 50
+  stacktraceFanout: 4
+  stacktraceDepth: 64
+
+threadSpawnWork:
+  threadCnt: 4
+  threadSleepDuration: 5000

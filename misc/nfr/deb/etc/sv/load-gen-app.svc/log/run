@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e
+set -x
+
+exec setuidgid fk-prof-nfr multilog t s16777215 n30 /var/log/load-gen-app

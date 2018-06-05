@@ -1,5 +1,6 @@
 package fk.prof.userapi.api;
 
+import com.amazonaws.util.IOUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.CodedOutputStream;
 import fk.prof.aggregation.model.*;
@@ -144,7 +145,7 @@ public class MockAggregationWindow {
         String data;
 
         public FileLoader(String path) throws IOException {
-            this.data = new ObjectMapper().readValue(new FileInputStream(path), String.class);
+            data = IOUtils.toString(new FileInputStream(path));
         }
 
         @Override

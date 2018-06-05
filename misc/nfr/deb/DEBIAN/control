@@ -1,0 +1,8 @@
+Package: _PACKAGE_
+Version: 1._VERSION_
+Priority: standard
+Section: paas
+Depends: daemontools, daemontools-run
+Architecture: all
+Maintainer: fk-prof-dev@flipkart.com
+Description: Fk Prof load generator

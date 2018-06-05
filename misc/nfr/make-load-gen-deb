@@ -1,0 +1,29 @@
+#!/bin/bash -e
+set -x
+
+DEB_DIR="./deb_dest"
+PACKAGE_NAME="load-gen-app"
+DEST_PATH="$DEB_DIR/usr/share/$PACKAGE_NAME"
+
+rm -rf $DEB_DIR
+cp -r deb $DEB_DIR
+
+mkdir -p $DEST_PATH
+rm -rf $DEST_PATH/*
+
+mvn clean install
+
+jar=$(basename $(ls target/$PACKAGE_NAME*.jar | tail -n1))
+cp target/$jar $DEST_PATH/
+
+pushd $DEST_PATH
+ln -s $jar $PACKAGE_NAME.jar
+popd
+
+export VERSION=$(date +%Y%m%d-%H%M)
+echo $VERSION
+
+find $DEB_DIR/DEBIAN -type f | xargs sed -i "s/_VERSION_/$VERSION/g"
+find $DEB_DIR/DEBIAN -type f | xargs sed -i "s/_PACKAGE_/$PACKAGE_NAME/g"
+
+dpkg-deb -b $DEB_DIR/ load-gen-app.deb
