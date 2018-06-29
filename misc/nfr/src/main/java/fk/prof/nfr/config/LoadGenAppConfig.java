@@ -44,6 +44,9 @@ public class LoadGenAppConfig extends Configuration {
     @JsonProperty("isDebug")
     private Boolean isDebug;
 
+    @JsonProperty("generateLoad")
+    private Boolean generateLoad;
+
     public DataSourceFactory getDataSourceFactory() {
         return database;
     }
@@ -74,6 +77,10 @@ public class LoadGenAppConfig extends Configuration {
 
     public List<InetSocketAddress> getServers() {
         return servers;
+    }
+
+    public Boolean getGenerateLoad() {
+        return generateLoad;
     }
 
     public void setServers(List<String> instances) {

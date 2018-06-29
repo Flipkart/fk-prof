@@ -19,6 +19,10 @@ public class AsyncTaskCtx {
 
     private long start, end;
 
+    private long thdId;
+
+    private String thdName;
+
     private List<AsyncTaskCtx> children = emptyList;
 
     private AsyncTaskCtx(String name, long id) {
@@ -38,7 +42,7 @@ public class AsyncTaskCtx {
             Field f = Thread.class.getDeclaredField("taskCtx");
             task = new AsyncTaskCtx(name);
             f.set(thd, task);
-            task.start();
+            task.start(thd);
             return task;
         } catch (Exception e) {
             System.err.println("Totally not supposed to happen");
@@ -48,6 +52,9 @@ public class AsyncTaskCtx {
         // unreachable
         System.exit(-1);
         return null;
+    }
+
+    public void setActive() {
     }
 
     public void complete() {
@@ -81,7 +88,8 @@ public class AsyncTaskCtx {
         if (st != null) {
             for (StackTraceElement e : st) {
                 if (e.getClassName().startsWith(skipPackage) ||
-                    e.getClassName().startsWith("fk.prof."))
+                    (e.getClassName().startsWith("fk.prof.") && !e.getClassName().startsWith("fk.prof.nfr")) ||
+                    e.getClassName().startsWith("sun."))
                     continue;
                 return e.getClassName() + "." + e.getMethodName() + " @ " + e.getLineNumber();
             }
@@ -110,6 +118,12 @@ public class AsyncTaskCtx {
     }
 
     public void start() {
+        this.start(Thread.currentThread());
+    }
+
+    public void start(Thread thd) {
+        thdId = thd.getId();
+        thdName = thd.getName();
         this.start = System.currentTimeMillis();
     }
 
@@ -122,6 +136,8 @@ public class AsyncTaskCtx {
         StringBuilder sb = new StringBuilder("{");
         sb.append("\"name\": \"" + name + "\",");
         sb.append("\"start\": " + start + ",");
+        sb.append("\"thdid\": " + thdId + ",");
+        sb.append("\"thdname\": \"" + thdName + "\",");
         sb.append("\"duration\": " + (end - start) + ",");
         sb.append("\"children\": [" +
             String.join(",", children.stream()

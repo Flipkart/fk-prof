@@ -3,6 +3,7 @@ package fk.prof.nfr;
 import com.codahale.metrics.SharedMetricRegistries;
 import fk.prof.nfr.config.LoadGenAppConfig;
 import fk.prof.nfr.driver.Driver;
+import fk.prof.nfr.dropwizard.server.AsyncWriteServletFilter;
 import fk.prof.nfr.netty.client.HttpClient;
 import fk.prof.nfr.netty.server.HttpServer;
 import fk.prof.nfr.netty.server.RequestHandler;
@@ -19,6 +20,10 @@ import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetector.Level;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import io.netty.util.concurrent.EventExecutorGroup;
+import org.eclipse.jetty.server.HttpChannelState;
+
+import javax.servlet.AsyncContext;
+import javax.servlet.annotation.WebServlet;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -82,7 +87,7 @@ public class LoadGenApp extends Application<LoadGenAppConfig> {
         startServer(config, environment, servers, nioELGroup, executors, asyncHttpClient);
 
         // start load
-        if (servers.size() > 0) {
+        if (config.getGenerateLoad() && servers.size() > 0) {
             new Driver(asyncHttpClient,
                        executors,
                        servers,
@@ -100,13 +105,17 @@ public class LoadGenApp extends Application<LoadGenAppConfig> {
 
             // jetty server
             environment.jersey().register(new fk.prof.nfr.dropwizard.server.Resource(svc.syncSvc(), servers));
+            environment.jersey().register(new fk.prof.nfr.dropwizard.server.JettyFlowDwResource());
+
+            environment.getApplicationContext().addServlet(AsyncWriteServletFilter.class,
+                "/load-gen-app/jetty/async-write");
 
             // netty server
-            new HttpServer(nioELGroup, getNettyServerPort(config),
-                           new RequestHandler(
-                               new fk.prof.nfr.netty.server.Resource(svc.asyncSvc(asyncHttpClient, executors),
-                                                                     servers)))
-                .start();
+//            new HttpServer(nioELGroup, getNettyServerPort(config),
+//                           new RequestHandler(
+//                               new fk.prof.nfr.netty.server.Resource(svc.asyncSvc(asyncHttpClient, executors),
+//                                                                     servers)))
+//                .start();
         }
 
         if (config.getEnableCpuWork()) {

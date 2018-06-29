@@ -5,6 +5,8 @@ server:
   applicationConnectors:
     - type: http
       port: 8081
+      idleTimeout: 10 seconds
+      acceptorThreads: 1
   adminConnectors:
     - type: http
       port: 8181
@@ -18,6 +20,10 @@ metrics:
       includes: ["driver.requests.completed", "driver.requests.initiated", "driver.running"]
       frequency: 1 second
 
+logging:
+  level: INFO
+  loggers:
+    "org.eclipse.jetty": INFO
 
 database:
   # the name of your JDBC driver
@@ -58,6 +64,7 @@ isDebug: true
 
 enableCpuWork: false
 enableIoWork: true
+generateLoad: false
 
 ioWork:
   nioThreadCnt: 1

@@ -2,13 +2,10 @@ package fk.prof.bciagent;
 
 import javassist.*;
 import javassist.expr.ExprEditor;
-import javassist.expr.FieldAccess;
-import javassist.expr.MethodCall;
 import javassist.expr.NewExpr;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
-import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 import java.util.*;
 import java.util.function.Function;
@@ -18,7 +15,6 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
   private final Map<String, ClassInstrumentor> INSTRUMENTED_CLASSES = new HashMap<>();
   private final ClassPool pool;
   private final CtClass threadCtClass;
-  private final String currThreadVarName = "$$$_curr_thread";
 
   /**
    * notifies the recorder that the bci failed for the provided class. Disables the io tracing if called at least once.
@@ -32,7 +28,7 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     threadCtClass = pool.get("java.lang.Thread");
   }
 
-  public boolean init() {
+  public boolean init() throws NotFoundException {
     String klass;
     ClassInstrumentHooks hooks;
 
@@ -112,9 +108,15 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     hooks.methods.put("read(Ljava/io/FileDescriptor;Ljava/nio/ByteBuffer;JLsun/nio/ch/NativeDispatcher;)I", ioutil_read);
     hooks.methods.put("read(Ljava/io/FileDescriptor;[Ljava/nio/ByteBuffer;IILsun/nio/ch/NativeDispatcher;)J", ioutil_read);
 
-//    INSTRUMENTED_CLASSES.put("java.lang.Thread", this::transformThread);
-    INSTRUMENTED_CLASSES.put("java.util.concurrent.AbstractExecutorService", this::transformAbstractThreadExecutor);
+    INSTRUMENTED_CLASSES.clear();
 
+    JettyInstrumentors instrumentors = new JettyInstrumentors(pool);
+
+    INSTRUMENTED_CLASSES.put("java.util.concurrent.ThreadPoolExecutor", instrumentors::transformThreadPoolExecutor);
+    INSTRUMENTED_CLASSES.put("org.eclipse.jetty.util.thread.QueuedThreadPool",
+        instrumentors::transformJettyQueuedThreadPool);
+    INSTRUMENTED_CLASSES.put("org.eclipse.jetty.server.HttpConnection", instrumentors::transformJettyHttpConnection);
+    INSTRUMENTED_CLASSES.put("org.eclipse.jetty.server.HttpChannelState", instrumentors::transformJettyHttpChannelState);
     return true;
   }
 
@@ -126,12 +128,22 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
       }
 
       String normalizedClassName = className.replaceAll("/", ".");
-      pool.insertClassPath(new ByteArrayClassPath(normalizedClassName, classfileBuffer));
+//      if(normalizedClassName.startsWith("io.dropwizard") || normalizedClassName.startsWith("org.eclipse.jetty")) {
+//        if(normalizedClassName.startsWith("io.dropwizard.metrics")) {
+//          return null;
+//        }
+//
+//        pool.insertClassPath(new ByteArrayClassPath(normalizedClassName, classfileBuffer));
+//        CtClass clazz = pool.get(normalizedClassName);
+//        instrumentPrintMethodEntry(clazz);
+//        return clazz.toBytecode();
+//      }
 
       if(INSTRUMENTED_CLASSES.get(normalizedClassName) == null) {
         return null;
       }
 
+      pool.insertClassPath(new ByteArrayClassPath(normalizedClassName, classfileBuffer));
       CtClass cclass = pool.get(normalizedClassName);
       boolean modified = false;
       if (!cclass.isFrozen()) {
@@ -151,61 +163,16 @@ public class ProfileMethodTransformer implements ClassFileTransformer {
     return null;
   }
 
-  private boolean transformThread(CtClass cclass) throws Exception {
-    CtMethod m = Util.getMethod(cclass,
-        "init",
-        "(Ljava/lang/ThreadGroup;Ljava/lang/Runnable;Ljava/lang/String;JLjava/security/AccessControlContext;Z)V");
-
-    m.addLocalVariable(currThreadVarName, threadCtClass);
-
-    m.instrument(new ExprEditor() {
-      @Override
-      public void edit(FieldAccess f) throws CannotCompileException {
-        if(f.isWriter() && "name".equals(f.getFieldName())) {
-          String code = String.format("{" +
-              "%1$s = currentThread(); " +
-              "if(%1$s.taskCtx != null) " +
-              "{" +
-                  "this.taskCtx = %1$s.taskCtx.addTask(\"java.lang\");" +
-              "}" +
-              "$proceed($$);" +
-          "}", currThreadVarName);
-          f.replace(code);
-        }
-        else if(f.isWriter() && "target".equals(f.getFieldName())) {
-          String code = String.format("{" +
-              "if (this.taskCtx == null) {" +
-                  "$proceed($$);" +
-              "}" +
-              "else {" +
-                  "$proceed(new fk.prof.WrappedThreadRunnable($1, this.taskCtx));" +
-              "}" +
-          "}", currThreadVarName);
-          f.replace(code);
+  private void instrumentPrintMethodEntry(CtClass cclass) throws Exception {
+    for(CtMethod m: cclass.getDeclaredMethods()) {
+      if(!m.isEmpty()) {
+        try {
+          m.insertBefore("{ System.out.println(\">>>> [\" + java.lang.Thread.currentThread().getId() + \"] \" + \"" +
+              cclass.getName() + "\" + \" # \" + \"" + m.getName() + "\"); }");
+        } catch (CannotCompileException e) {
+          System.out.println("Cannot insert before " + cclass.getName() + " # " + m.getName());
         }
       }
-    });
-
-    return true;
-  }
-
-  private boolean transformAbstractThreadExecutor(CtClass cclass) throws Exception {
-    CtMethod m = Util.getMethod(cclass,
-        "submit",
-        "(Ljava/lang/Runnable;)Ljava/util/concurrent/Future;");
-
-    m.instrument(new ExprEditor() {
-      @Override
-      public void edit(MethodCall m) throws CannotCompileException {
-        if ("newTaskFor".equals(m.getMethodName())) {
-          String code = String.format("{" +
-              "$_ = $proceed(fk.prof.TracingRunnable.wrap($1), $2);" +
-              "}");
-          m.replace(code);
-        }
-      }
-    });
-
-    return true;
+    }
   }
 }

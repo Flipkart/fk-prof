@@ -57,6 +57,7 @@ isDebug: true
 
 enableCpuWork: false
 enableIoWork: true
+generateLoad: false
 
 ioWork:
   nioThreadCnt: 1

@@ -25,7 +25,43 @@ class RunnableDemo implements Runnable {
     }
 }
 
+class TempRunnable implements Runnable {
+
+    @Override
+    public void run() {
+
+    }
+}
+
 public class App {
+
+    private Runnable _runnable_1 = new Runnable() {
+        @Override
+        public void run() {
+            System.out.println("runnable 1");
+        }
+    };
+
+    private Runnable _runnable_2 = new TempRunnable() {
+        @Override
+        public void run() {
+            System.out.print("runnable 2");
+        }
+    };
+
+    public App() {
+        System.out.println("empty init");
+    }
+
+    public App(int i) {
+        System.out.println("1 param init");
+    }
+
+    public App(String str) {
+        this();
+        System.out.println("cascading init");
+    }
+
     public static void main(String args[]) throws Exception {
 
         ExecutorService executor = Executors.newFixedThreadPool(2);

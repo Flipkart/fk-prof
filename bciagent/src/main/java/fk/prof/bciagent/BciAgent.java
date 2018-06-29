@@ -3,7 +3,9 @@ package fk.prof.bciagent;
 import fk.prof.bciagent.tracer.IOTracer;
 
 import java.lang.instrument.Instrumentation;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class BciAgent {
 
@@ -17,7 +19,8 @@ public class BciAgent {
 
         // Saw some issues when this was below some lambda creating calls.
         // Retransformation does not play nice with lambdas.
-        Class[] classes = inst.getAllLoadedClasses();
+        List<Class> classes = new ArrayList<>();
+        classes.addAll(Arrays.asList(inst.getAllLoadedClasses()));
 
         if (!verifyPrerequisites()) {
             return;
@@ -34,7 +37,13 @@ public class BciAgent {
 
         inst.addTransformer(transformer, true);
 
-        Class[] retransformClasses = Arrays.stream(classes)
+        // preload required classes;
+        try {
+            Class<?> httpChannelStateClass = ClassLoader.getSystemClassLoader()
+                .loadClass("org.eclipse.jetty.server.HttpChannelState");
+        } catch (ClassNotFoundException e) { }
+
+        Class[] retransformClasses = classes.stream()
                 .filter(inst::isModifiableClass)
                 .toArray(Class[]::new);
 
